@@ -73,7 +73,7 @@ const LoginScreen: React.FC = () => {
               onPress={() => router.replace("/(tabs)")}
             >
               <LinearGradient
-                colors={["#1E63B6", "#0B3C7A"]}
+                colors={["#0549a1","#1E63B6"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}

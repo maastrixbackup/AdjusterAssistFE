@@ -70,7 +70,7 @@ export default function HomeScreen() {
     <>
       <StatusBar style="light" translucent />
       <LinearGradient
-        colors={[ "#1E63B6", "#0B3C7A"]}
+        colors={[ "#276bbd", "#0B3C7A"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={{ flex: 1 }}
@@ -143,7 +143,7 @@ export default function HomeScreen() {
                     >
                       {active ? (
                         <LinearGradient
-                          colors={[ "#0B3C7A","#1E63B6"]}
+                          colors={["#0549a1","#1E63B6"]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 0 }}
                           style={styles.segmentGradient}
@@ -184,7 +184,7 @@ export default function HomeScreen() {
 
               <Pressable style={styles.generateWrap}>
                 <LinearGradient
-                colors={[ "#0B3C7A","#1E63B6"]}
+                colors={[ "#0549a1","#1E63B6"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.generate}
