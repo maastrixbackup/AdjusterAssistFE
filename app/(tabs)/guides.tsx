@@ -1,15 +1,13 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-const TabTwoScreen = () => {
+export default function GuidesScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>History</Text>
+      <Text style={styles.text}>Guides</Text>
     </View>
   );
-};
-
-export default TabTwoScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
