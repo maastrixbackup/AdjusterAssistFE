@@ -18,6 +18,7 @@ const LoginScreen: React.FC = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const logoImg = require("../assets/images/AdjusterAssist1.png");
+  const abstractImg = require("../assets/images/abstract1.png")
   return (
     <SafeAreaProvider>
       <LinearGradient
@@ -34,7 +35,12 @@ const LoginScreen: React.FC = () => {
             end={{ x: 1, y: 0 }}
             style={styles.header}
           >
-            <View>
+            <Image
+              source={abstractImg}
+              style={styles.molecule}
+            />
+
+            <View style={styles.logoContainer}>
               <Image source={logoImg} style={styles.logo} />
             </View>
           </LinearGradient>
@@ -73,7 +79,7 @@ const LoginScreen: React.FC = () => {
               onPress={() => router.replace("/(tabs)")}
             >
               <LinearGradient
-                colors={["#0549a1","#1E63B6"]}
+                colors={["#0549a1", "#1E63B6"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}
@@ -106,6 +112,26 @@ const styles = StyleSheet.create({
   header: {
     height: 120,
     justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  molecule: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 220,
+    height: 120,
+    resizeMode: "cover",
+    opacity: 0.25,   // 👈 controls softness
+  },
+
+  logoContainer: {
+    paddingLeft: 24,
+  },
+
+  logo: {
+    width: 220,
+    resizeMode: "contain",
   },
   appName: {
     color: "#FFFFFF",
@@ -118,12 +144,12 @@ const styles = StyleSheet.create({
     }),
   },
 
-  logo: {
-    width: 240,
-    resizeMode: "contain",
-    top: 0,
-    left: 24
-  },
+  // logo: {
+  //   width: 240,
+  //   resizeMode: "contain",
+  //   top: 0,
+  //   left: 24
+  // },
 
   container: {
     flex: 1,
