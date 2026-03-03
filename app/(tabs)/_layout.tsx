@@ -1,16 +1,47 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { router, Tabs } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function TabLayout() {
+  const { isHydrated, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, isHydrated]);
+
+  if (!isHydrated || !isAuthenticated) {
+    return null;
+  }
+
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#1469C9',
         tabBarInactiveTintColor: '#8C97A8',
-        headerShown: false,
+        headerShown: true,
+        headerTintColor: '#FFFFFF',
+        headerTitleStyle: {
+          fontSize: 15,
+          fontWeight: '600',
+        },
+        headerBackground: () => (
+          <LinearGradient
+            colors={['#276bbd', '#0B3C7A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ flex: 1 }}
+          />
+        ),
         tabBarButton: HapticTab,
         tabBarStyle: {
           height: 86,
@@ -29,6 +60,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
+          headerShown: false,
           tabBarIcon: ({ color }) => <Ionicons size={28} name="home" color={color} />,
         }}
       />

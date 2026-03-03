@@ -1,44 +1,78 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Image,
-  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { router } from "expo-router";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
+import { useAuth } from "@/providers/auth-provider";
+
+const fontRegular = "Roboto";
+const fontMedium = "Roboto-Medium";
+const fontBold = "Roboto-Bold";
 
 const LoginScreen: React.FC = () => {
-  const router = useRouter();
+  const { isHydrated, isAuthenticated, login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const logoImg = require("../assets/images/AdjusterAssist1.png");
-  const abstractImg = require("../assets/images/abstract1.png")
+  const abstractImg = require("../assets/images/abstract1.png");
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+    if (isAuthenticated) {
+      router.replace("/(tabs)");
+    }
+  }, [isAuthenticated, isHydrated]);
+
+  async function handleLogin() {
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage("Email and password are required.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      await login(email.trim(), password);
+      router.replace("/(tabs)");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Login failed";
+      setErrorMessage(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <SafeAreaProvider>
       <LinearGradient
-        colors={["#1E63B6", "#0B3C7A"]}
+        colors={["#1E63B6", "#052146"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={{ flex: 1 }}
       >
         <SafeAreaView edges={["top"]} style={styles.safe}>
-
           <LinearGradient
-            colors={["#1E63B6", "#0B3C7A"]}
+            colors={["#1E63B6", "#052146"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.header}
           >
-            <Image
-              source={abstractImg}
-              style={styles.molecule}
-            />
+            <Image source={abstractImg} style={styles.molecule} />
 
             <View style={styles.logoContainer}>
               <Image source={logoImg} style={styles.logo} />
@@ -54,17 +88,26 @@ const LoginScreen: React.FC = () => {
               <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
               <TextInput
                 placeholder="Email Address"
+                placeholderTextColor="#9CA3AF"
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
               />
             </View>
             <View style={styles.inputWrapper}>
               <Feather name="lock" size={20} color="#9CA3AF" />
               <TextInput
                 placeholder="Password"
+                placeholderTextColor="#9CA3AF"
                 secureTextEntry={!showPassword}
                 style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
@@ -74,20 +117,22 @@ const LoginScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => router.replace("/(tabs)")}
-            >
+            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+            <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
               <LinearGradient
-                colors={["#0549a1", "#1E63B6"]}
+                colors={["#092f61", "#1E63B6"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}
               >
-                <Text style={styles.buttonText}>Log In</Text>
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Log In</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/forgot-password")}>
               <Text style={styles.forgot}>Forgot password?</Text>
             </TouchableOpacity>
 
@@ -105,12 +150,12 @@ const LoginScreen: React.FC = () => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  safe: {
+   safe: {
     flex: 1,
   },
 
   header: {
-    height: 120,
+    height: 110,
     justifyContent: "center",
     overflow: "hidden",
   },
@@ -122,7 +167,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 120,
     resizeMode: "cover",
-    opacity: 0.25,   // 👈 controls softness
+    opacity: 0.25, 
   },
 
   logoContainer: {
@@ -137,26 +182,14 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "600",
-    fontFamily: Platform.select({
-      ios: "AvenirNext-DemiBold",
-      android: "sans-serif-medium",
-      default: "System",
-    }),
+    fontFamily: fontMedium,
   },
-
-  // logo: {
-  //   width: 240,
-  //   resizeMode: "contain",
-  //   top: 0,
-  //   left: 24
-  // },
-
-  container: {
+container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
     marginTop: -8,
 
-    padding: 24,
+    padding: 18,
     paddingTop: 28,
   },
 
@@ -165,11 +198,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     marginTop: 12,
-    fontFamily: Platform.select({
-      ios: "AvenirNext-Bold",
-      android: "sans-serif-medium",
-      default: "System",
-    }),
+    fontFamily: fontBold,
   },
 
   subtitle: {
@@ -177,11 +206,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginVertical: 10,
     fontSize: 14,
-    fontFamily: Platform.select({
-      ios: "AvenirNext-Regular",
-      android: "sans-serif",
-      default: "System",
-    }),
+    fontFamily: fontRegular,
   },
   inputWrapper: {
     flexDirection: "row",
@@ -205,11 +230,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 14,
     color: "#111827",
-    fontFamily: Platform.select({
-      ios: "AvenirNext-Regular",
-      android: "sans-serif",
-      default: "System",
-    }),
+    fontFamily: fontRegular,
   },
   button: {
     marginTop: 24,
@@ -226,11 +247,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
-    fontFamily: Platform.select({
-      ios: "AvenirNext-DemiBold",
-      android: "sans-serif-medium",
-      default: "System",
-    }),
+    fontFamily: fontMedium,
   },
 
   forgot: {
@@ -238,11 +255,7 @@ const styles = StyleSheet.create({
     color: "#0B5ED7",
     marginTop: 16,
     fontSize: 14,
-    fontFamily: Platform.select({
-      ios: "AvenirNext-Medium",
-      android: "sans-serif-medium",
-      default: "System",
-    }),
+    fontFamily: fontMedium,
   },
 
   signup: {
@@ -250,20 +263,18 @@ const styles = StyleSheet.create({
     marginTop: 20,
     color: "#6B7280",
     fontSize: 14,
-    fontFamily: Platform.select({
-      ios: "AvenirNext-Regular",
-      android: "sans-serif",
-      default: "System",
-    }),
+    fontFamily: fontRegular,
   },
 
   signupLink: {
     color: "#0B5ED7",
     fontWeight: "600",
-    fontFamily: Platform.select({
-      ios: "AvenirNext-DemiBold",
-      android: "sans-serif-medium",
-      default: "System",
-    }),
+    fontFamily: fontMedium,
+  },
+  error: {
+    marginTop: 8,
+    color: "#B42318",
+    textAlign: "center",
+    fontFamily: fontMedium,
   },
 });

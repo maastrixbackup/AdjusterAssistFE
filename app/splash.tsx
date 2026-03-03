@@ -2,15 +2,22 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function SplashScreen() {
+  const { isHydrated, isAuthenticated } = useAuth();
+
   useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
     const timeout = setTimeout(() => {
-      router.replace('/login');
-    }, 1300);
+      router.replace(isAuthenticated ? '/(tabs)' : '/login');
+    }, 900);
 
     return () => clearTimeout(timeout);
-  }, []);
+  }, [isAuthenticated, isHydrated]);
 
   return (
     <LinearGradient colors={['#1E63B6', '#0B3C7A']} style={styles.container}>

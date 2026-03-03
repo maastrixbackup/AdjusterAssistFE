@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Platform,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,10 +13,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+
+import { generateResponse, getSubscriptionStatus, OutputType, SubscriptionStatus } from "@/lib/api";
+import { useAuth } from "@/providers/auth-provider";
 
 type OutputMode = "Email" | "File Note" | "Escalation";
 
 const outputModes: OutputMode[] = ["Email", "File Note", "Escalation"];
+const outputTypeMap: Record<OutputMode, OutputType> = {
+  Email: "email",
+  "File Note": "file_note",
+  Escalation: "escalation",
+};
 
 const recentResponses = [
   {
@@ -35,36 +44,80 @@ const recentResponses = [
   },
 ];
 
-const fontRegular = Platform.select({
-  ios: "AvenirNext-Regular",
-  android: "sans-serif",
-  default: "System",
-});
+const fontRegular = "Roboto";
 
-const fontMedium = Platform.select({
-  ios: "AvenirNext-Medium",
-  android: "sans-serif-medium",
-  default: "System",
-});
-
-const fontDemi = Platform.select({
-  ios: "AvenirNext-DemiBold",
-  android: "sans-serif-medium",
-  default: "System",
-});
-
-const fontBold = Platform.select({
-  ios: "AvenirNext-Bold",
-  android: "sans-serif",
-  default: "System",
-});
+const fontMedium = "Roboto-Medium";
+const fontDemi = "Roboto-Medium";
+const fontBold = "Roboto-Bold";
 
 export default function HomeScreen() {
+  const { token } = useAuth();
   const [selectedOutput, setSelectedOutput] = useState<OutputMode>("Email");
   const [request, setRequest] = useState("");
   const [claimDetails, setClaimDetails] = useState("");
+  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadStatus() {
+      if (!token) {
+        return;
+      }
+      try {
+        const next = await getSubscriptionStatus(token);
+        if (mounted) {
+          setStatus(next);
+        }
+      } catch {
+        if (mounted) {
+          setStatus(null);
+        }
+      }
+    }
+    loadStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
+  async function onGenerate() {
+    if (!token) {
+      return;
+    }
+    if (!request.trim()) {
+      Alert.alert("Missing input", "Please enter your request.");
+      return;
+    }
+    if (status && !status.canGenerate) {
+      Alert.alert("Limit reached", "You reached your monthly free-tier limit. Please upgrade.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await generateResponse(token, {
+        outputType: outputTypeMap[selectedOutput],
+        requestText: request.trim(),
+        claimDetails: claimDetails.trim(),
+      });
+
+      router.push({
+        pathname: "/response",
+        params: {
+          type: result.responseTypeLabel,
+          text: result.responseText,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate response";
+      Alert.alert("Generation failed", message);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <>
@@ -182,14 +235,16 @@ export default function HomeScreen() {
                 style={[styles.textArea, styles.claimArea]}
               />
 
-              <Pressable style={styles.generateWrap}>
+              <Pressable style={styles.generateWrap} onPress={onGenerate} disabled={isGenerating}>
                 <LinearGradient
                   colors={["#0549a1", "#1E63B6"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.generate}
                 >
-                  <Text style={styles.generateText}>Generate Response</Text>
+                  <Text style={styles.generateText}>
+                    {isGenerating ? "Generating..." : "Generate Response"}
+                  </Text>
                 </LinearGradient>
               </Pressable>
             </View>
@@ -239,11 +294,12 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    paddingHorizontal: 18,
-    paddingTop: 6,
-    paddingBottom: 10,
+    paddingHorizontal: 14,
+    // paddingTop: 4,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#D7DEE8",
+    //  height: 60,
   },
 
   headerRow: {
@@ -253,14 +309,14 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: 200,
-    height: 52,
+    width: 220,
+    height: 60,
     resizeMode: "contain",
   },
 
   bellWrap: {
     position: "relative",
-    width: 44,
+    width: 36,
     alignItems: "center",
   },
 
@@ -268,9 +324,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: -2,
     top: -3,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#F04E2A",
     borderWidth: 2,
     borderColor: "#1A5CC8",
@@ -280,7 +336,7 @@ const styles = StyleSheet.create({
 
   badgeText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 12,
     fontFamily: fontBold,
   },
 
@@ -290,21 +346,21 @@ const styles = StyleSheet.create({
   },
 
   contentContainer: {
-    paddingBottom: 24,
+    paddingBottom: 16,
   },
 
   section: {
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#DCE2EB",
   },
 
   sectionTitle: {
     color: "#2A3F5F",
-    fontSize: 18,
-    marginBottom: 10,
+    fontSize: 15,
+    marginBottom: 8,
     fontFamily: fontBold,
     fontWeight: "700",
   },
@@ -316,7 +372,7 @@ const styles = StyleSheet.create({
 
   segmented: {
     flexDirection: "row",
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: "#B5C1D1",
     overflow: "hidden",
@@ -325,7 +381,7 @@ const styles = StyleSheet.create({
 
   segmentButton: {
     flex: 1,
-    height: 40,
+     height: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -334,9 +390,6 @@ const styles = StyleSheet.create({
     borderRightColor: "#C5CFDC",
   },
 
-  // segmentButtonActive: {
-  //   backgroundColor: "#1D80CF",
-  // },
   segmentGradient: {
     flex: 1,
     width: "100%",
@@ -353,7 +406,7 @@ const styles = StyleSheet.create({
   },
 
   segmentText: {
-    fontSize: 16,
+    fontSize: 13,
     color: "#2C4262",
     fontFamily: fontDemi,
   },
@@ -363,17 +416,20 @@ const styles = StyleSheet.create({
   },
 
   textArea: {
-    borderWidth: 1,
-    borderColor: "#BCC7D6",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: "#FFFFFF",
+    shadowColor: "#0B1A33",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
     textAlignVertical: "top",
     color: "#2D4262",
-    fontSize: 17,
+    fontSize: 12,
     fontFamily: fontRegular,
-    fontStyle: "italic",
+    // fontStyle: "italic",
   },
 
   requestArea: {
@@ -381,41 +437,45 @@ const styles = StyleSheet.create({
   },
 
   claimArea: {
-    minHeight: 74,
-    marginBottom: 14,
+    minHeight: 64,
+    marginBottom: 10,
   },
 
   generateWrap: {
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: "hidden",
   },
 
   generate: {
-    height: 55,
+    minHeight: 42,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
   },
 
   generateText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 14,
     fontFamily: fontBold,
   },
 
   cardsWrap: {
-    paddingHorizontal: 18,
-    paddingTop: 8,
-    gap: 12,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    gap: 14,
   },
 
   card: {
-    borderWidth: 1,
-    borderColor: "#D3DAE6",
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: "#FFFFFF",
-    minHeight: 82,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    shadowColor: "#0B1A33",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+    minHeight: 64,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -423,12 +483,12 @@ const styles = StyleSheet.create({
 
   cardTextWrap: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: 6,
   },
 
   cardTitle: {
     color: "#2B4062",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: fontRegular,
   },
 
@@ -442,13 +502,13 @@ const styles = StyleSheet.create({
 
   cardTitleItalic: {
     fontFamily: fontMedium,
-    fontStyle: "italic",
+    // fontStyle: "italic",
   },
 
   cardDate: {
-    marginTop: 5,
+    marginTop: 4,
     color: "#556784",
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: fontRegular,
   },
 });
