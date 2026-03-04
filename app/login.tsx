@@ -1,16 +1,16 @@
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  View,
+  Image,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Image,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons, Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/providers/auth-provider";
@@ -117,8 +117,14 @@ const LoginScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
-            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-            <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+            {errorMessage ? (
+              <Text style={styles.error}>{errorMessage}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={loading}
+            >
               <LinearGradient
                 colors={["#092f61", "#1E63B6"]}
                 start={{ x: 0, y: 0 }}
@@ -150,7 +156,7 @@ const LoginScreen: React.FC = () => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-   safe: {
+  safe: {
     flex: 1,
   },
 
@@ -167,7 +173,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 120,
     resizeMode: "cover",
-    opacity: 0.25, 
+    opacity: 0.25,
   },
 
   logoContainer: {
@@ -184,7 +190,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontFamily: fontMedium,
   },
-container: {
+  container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
     marginTop: -8,

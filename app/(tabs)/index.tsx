@@ -1,21 +1,26 @@
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import { StatusBar } from "expo-status-bar";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
-import { generateResponse, getSubscriptionStatus, OutputType, SubscriptionStatus } from "@/lib/api";
+import {
+  generateResponse,
+  getSubscriptionStatus,
+  OutputType,
+  SubscriptionStatus,
+} from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 
 type OutputMode = "Email" | "File Note" | "Escalation";
@@ -92,7 +97,10 @@ export default function HomeScreen() {
       return;
     }
     if (status && !status.canGenerate) {
-      Alert.alert("Limit reached", "You reached your monthly free-tier limit. Please upgrade.");
+      Alert.alert(
+        "Limit reached",
+        "You reached your monthly free-tier limit. Please upgrade.",
+      );
       return;
     }
 
@@ -112,7 +120,8 @@ export default function HomeScreen() {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to generate response";
+      const message =
+        error instanceof Error ? error.message : "Failed to generate response";
       Alert.alert("Generation failed", message);
     } finally {
       setIsGenerating(false);
@@ -191,7 +200,8 @@ export default function HomeScreen() {
                       onPress={() => setSelectedOutput(mode)}
                       style={[
                         styles.segmentButton,
-                        index === outputModes.length - 1 && styles.segmentLastButton,
+                        index === outputModes.length - 1 &&
+                          styles.segmentLastButton,
                       ]}
                     >
                       {active ? (
@@ -235,7 +245,11 @@ export default function HomeScreen() {
                 style={[styles.textArea, styles.claimArea]}
               />
 
-              <Pressable style={styles.generateWrap} onPress={onGenerate} disabled={isGenerating}>
+              <Pressable
+                style={styles.generateWrap}
+                onPress={onGenerate}
+                disabled={isGenerating}
+              >
                 <LinearGradient
                   colors={["#0549a1", "#1E63B6"]}
                   start={{ x: 0, y: 0 }}
@@ -257,9 +271,7 @@ export default function HomeScreen() {
                 <Pressable key={item.id} style={styles.card}>
                   <View style={styles.cardTextWrap}>
                     <Text style={styles.cardTitle}>
-                      <Text style={styles.cardTitleStrong}>
-                        {item.type}{" "}
-                      </Text>
+                      <Text style={styles.cardTitleStrong}>{item.type} </Text>
                       <Text
                         style={
                           item.italicSubject
@@ -272,11 +284,7 @@ export default function HomeScreen() {
                     </Text>
                     <Text style={styles.cardDate}>{item.date}</Text>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={30}
-                    color="#30496E"
-                  />
+                  <Ionicons name="chevron-forward" size={30} color="#30496E" />
                 </Pressable>
               ))}
             </View>
@@ -381,7 +389,7 @@ const styles = StyleSheet.create({
 
   segmentButton: {
     flex: 1,
-     height: 40,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

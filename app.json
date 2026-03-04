@@ -18,7 +18,6 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-     
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -50,7 +49,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "02813a2a-518a-47b5-9b4d-0d106c0c0ee5"
+        "projectId": "6a1feab1-61a6-4811-a565-a7c7c1dc31fc"
       }
     }
   }

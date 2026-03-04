@@ -1,13 +1,15 @@
-import React, { useEffect } from 'react';
-import { router, Tabs } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { LinearGradient } from "expo-linear-gradient";
+import { router, Tabs } from "expo-router";
+import React, { useEffect } from "react";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '@/providers/auth-provider';
+import { HapticTab } from "@/components/haptic-tab";
+import { useAuth } from "@/providers/auth-provider";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
   const { isHydrated, isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!isHydrated) {
@@ -15,7 +17,7 @@ export default function TabLayout() {
     }
 
     if (!isAuthenticated) {
-      router.replace('/login');
+      router.replace("/login");
     }
   }, [isAuthenticated, isHydrated]);
 
@@ -26,17 +28,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#1469C9',
-        tabBarInactiveTintColor: '#8C97A8',
+        tabBarActiveTintColor: "#1469C9",
+        tabBarInactiveTintColor: "#8C97A8",
         headerShown: true,
-        headerTintColor: '#FFFFFF',
+        headerTintColor: "#FFFFFF",
         headerTitleStyle: {
           fontSize: 15,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         headerBackground: () => (
           <LinearGradient
-            colors={['#276bbd', '#0B3C7A']}
+            colors={["#276bbd", "#0B3C7A"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ flex: 1 }}
@@ -44,49 +46,62 @@ export default function TabLayout() {
         ),
         tabBarButton: HapticTab,
         tabBarStyle: {
-          height: 86,
+          height: 60 + insets.bottom,
           paddingTop: 8,
-          paddingBottom: 10,
-          borderTopColor: '#D0D7E2',
+          paddingBottom: insets.bottom,
+          borderTopColor: "#D0D7E2",
           borderTopWidth: 1,
-          backgroundColor: '#F8FAFC',
+          backgroundColor: "#F8FAFC",
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: "500",
         },
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: "Home",
           headerShown: false,
-          tabBarIcon: ({ color }) => <Ionicons size={28} name="home" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons size={28} name="home" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'History',
+          title: "History",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons size={28} name="clock-outline" color={color} />
+            <MaterialCommunityIcons
+              size={28}
+              name="clock-outline"
+              color={color}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="guides"
         options={{
-          title: 'Guides',
+          title: "Guides",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons size={28} name="file-document-edit-outline" color={color} />
+            <MaterialCommunityIcons
+              size={28}
+              name="file-document-edit-outline"
+              color={color}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Ionicons size={28} name="settings" color={color} />,
+          title: "Settings",
+          tabBarIcon: ({ color }) => (
+            <Ionicons size={28} name="settings" color={color} />
+          ),
         }}
       />
     </Tabs>
