@@ -115,6 +115,7 @@ export default function HomeScreen() {
       router.push({
         pathname: "/response",
         params: {
+          outputType: result.responseType,
           type: result.responseTypeLabel,
           text: result.responseText,
         },
@@ -300,33 +301,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
+header: {
+  height: 64,
+  paddingHorizontal: 16,
+  justifyContent: "center",
+  borderBottomWidth: 1,
+  borderBottomColor: "#D7DEE8",
+},
 
-  header: {
-    paddingHorizontal: 14,
-    // paddingTop: 4,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#D7DEE8",
-    //  height: 60,
-  },
+headerRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+},
 
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+logo: {
+  width: 180,
+  height: 40,
+  resizeMode: "contain",
+},
 
-  logo: {
-    width: 220,
-    height: 60,
-    resizeMode: "contain",
-  },
-
-  bellWrap: {
-    position: "relative",
-    width: 36,
-    alignItems: "center",
-  },
+bellWrap: {
+  position: "relative",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 6,
+},
 
   badge: {
     position: "absolute",
