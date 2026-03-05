@@ -115,6 +115,7 @@ export default function HomeScreen() {
       router.push({
         pathname: "/response",
         params: {
+          outputType: result.responseType,
           type: result.responseTypeLabel,
           text: result.responseText,
         },
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
 
   logo: {
     width: 220,
-    height: 60,
+    height: 50,
     resizeMode: "contain",
   },
 
