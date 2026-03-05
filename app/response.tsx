@@ -70,52 +70,61 @@ export default function ResponseScreen() {
     }
   }
 
-  return (
-    <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <LinearGradient
-        colors={["#0A4EA7", "#1E63B6", "#0B3E82"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.brandHeader, { paddingTop: insets.top + 10 }]}
-      >
-      
+return (
+  <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
+    <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+    <LinearGradient
+      colors={["#1E63B6", "#092f61"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.brandHeader, { paddingTop: insets.top + 10 }]}
+    >
       <View style={styles.titleBar}>
         <Pressable onPress={onBack} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
+
         <Text style={styles.title}>Generated Output</Text>
         <View style={styles.titleSpacer} />
       </View>
-      </LinearGradient>
+    </LinearGradient>
 
-      <View style={styles.metaWrap}>
-        <Text style={styles.metaLabel}>Response Type</Text>
-        <View style={styles.responseTypeChip}>
-          <Text style={styles.responseTypeValue}>{responseTypeLabel}</Text>
-        </View>
+    <View style={styles.metaWrap}>
+      <Text style={styles.metaLabel}>Response Type</Text>
+      <View style={styles.responseTypeChip}>
+        <Text style={styles.responseTypeValue}>{responseTypeLabel}</Text>
       </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.responseCard}>
-          <Text style={styles.bodyText}>{responseText}</Text>
-        </View>
-
-        <Pressable style={styles.copyButton} onPress={onCopy} disabled={copying}>
-          <LinearGradient
-            colors={["#0A4EA7", "#2B7DE3"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.copyGradient}
-          >
-            <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.copyButtonText}>{copying ? "Copying..." : "Copy Response"}</Text>
-          </LinearGradient>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
-  );
+    </View>
+    <ScrollView
+      style={styles.content}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      <View 
+      // style={styles.responseCard}
+      >
+        <Text style={styles.bodyText}>{responseText}</Text>
+      </View>
+    </ScrollView>
+    <View style={[styles.copyWrapper, { paddingBottom: insets.bottom + 10 }]}>
+      <Pressable onPress={onCopy} disabled={copying}>
+        <LinearGradient
+          colors={["#092f61", "#1E63B6"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.copyGradient}
+        >
+          <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.copyButtonText}>
+            {copying ? "Copying..." : "Copy Response"}
+          </Text>
+        </LinearGradient>
+      </Pressable>
+    </View>
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({
@@ -145,13 +154,8 @@ const styles = StyleSheet.create({
   },
   titleBar: {
     alignItems: "center",
-    // backgroundColor: "#FFFFFF",
-    // borderBottomColor: "#E4E8EF",
-    // borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    // minHeight: 66,
-    // paddingHorizontal: 14,
   },
   backButton: {
     alignItems: "center",
@@ -202,19 +206,19 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  contentContainer: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  responseCard: {
-    backgroundColor: "#F8FAFD",
-    borderColor: "#DCE5F2",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-  },
+  // contentContainer: {
+  //   backgroundColor: "#FFFFFF",
+  //   paddingHorizontal: 16,
+  //   paddingTop: 16,
+  //   paddingBottom: 24,
+  // },
+  // responseCard: {
+  //   backgroundColor: "#F8FAFD",
+  //   borderColor: "#DCE5F2",
+  //   borderRadius: 12,
+  //   borderWidth: 1,
+  //   padding: 14,
+  // },
   bodyText: {
     color: "#1D2C44",
     fontFamily: fontRegular,
@@ -231,17 +235,43 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  copyGradient: {
-    alignItems: "center",
-    borderRadius: 12,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    minHeight: 52,
-  },
+  // copyGradient: {
+  //   alignItems: "center",
+  //   borderRadius: 12,
+  //   flexDirection: "row",
+  //   gap: 8,
+  //   justifyContent: "center",
+  //   minHeight: 52,
+  // },
   copyButtonText: {
     color: "#FFFFFF",
     fontFamily: fontMedium,
     fontSize: 18,
   },
+  copyWrapper: {
+  position: "absolute",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: "#FFFFFF",
+  paddingHorizontal: 16,
+  paddingTop: 10,
+  borderTopWidth: 1,
+  borderTopColor: "#E4E8EF",
+},
+
+contentContainer: {
+  paddingHorizontal: 16,
+  paddingTop: 16,
+  paddingBottom: 120,
+},
+
+copyGradient: {
+  alignItems: "center",
+  borderRadius: 12,
+  flexDirection: "row",
+  justifyContent: "center",
+  minHeight: 52,
+  gap: 8,
+},
 });
