@@ -83,7 +83,7 @@ return (
       <View style={styles.titleBar}>
         <Pressable onPress={onBack} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-          <Text style={styles.backText}>Back</Text>
+          {/* <Text style={styles.backText}>Back</Text> */}
         </Pressable>
 
         <Text style={styles.title}>Generated Output</Text>

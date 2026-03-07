@@ -3,8 +3,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+    Alert,
     ActivityIndicator,
     Image,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -12,13 +14,14 @@ import {
     View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "@/providers/auth-provider";
 
 const fontRegular = "Roboto";
 const fontMedium = "Roboto-Medium";
 const fontBold = "Roboto-Bold";
 
 const SignupScreen: React.FC = () => {
-  //   const { register } = useAuth();
+  const { signup } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -47,13 +50,19 @@ const SignupScreen: React.FC = () => {
       setLoading(true);
       setErrorMessage(null);
 
-      //   await register({
-      //     name,
-      //     email,
-      //     password,
-      //   });
+      await signup(name.trim(), email.trim(), password);
+      if (Platform.OS === "web") {
+        window.alert("Signup Successful\n\nYour account has been created.");
+        router.replace("/login");
+        return;
+      }
 
-      router.replace("/(tabs)");
+      Alert.alert("Signup Successful", "Your account has been created.", [
+        {
+          text: "OK",
+          onPress: () => router.replace("/login"),
+        },
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Signup failed";
       setErrorMessage(message);

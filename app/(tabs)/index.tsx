@@ -321,12 +321,11 @@ logo: {
   resizeMode: "contain",
 },
 
-bellWrap: {
-  position: "relative",
-  justifyContent: "center",
-  alignItems: "center",
-  padding: 6,
-},
+  bellWrap: {
+    position: "relative",
+    width: 36,
+    alignItems: "center",
+  },
 
   badge: {
     position: "absolute",
@@ -347,6 +346,7 @@ bellWrap: {
     fontSize: 12,
     fontFamily: fontBold,
   },
+
 
   content: {
     flex: 1,

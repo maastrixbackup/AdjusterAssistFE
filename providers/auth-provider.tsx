@@ -1,7 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 
-import { loginWithEmail, requestPasswordReset } from '@/lib/api';
+import { loginWithEmail, logoutUser, requestPasswordReset, signupWithEmail } from '@/lib/services/authService';
 
 type AuthContextValue = {
   isHydrated: boolean;
@@ -9,6 +9,7 @@ type AuthContextValue = {
   token: string | null;
   email: string | null;
   login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;
 };
@@ -22,25 +23,17 @@ type SessionData = {
   email: string;
 };
 
-function saveSession(session: SessionData | null) {
-  if (Platform.OS !== 'web') {
-    return;
-  }
-
+async function saveSession(session: SessionData | null) {
   if (!session) {
-    sessionStorage.removeItem(SESSION_KEY);
+    await AsyncStorage.removeItem(SESSION_KEY);
     return;
   }
 
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-function loadSession(): SessionData | null {
-  if (Platform.OS !== 'web') {
-    return null;
-  }
-
-  const raw = sessionStorage.getItem(SESSION_KEY);
+async function loadSession(): Promise<SessionData | null> {
+  const raw = await AsyncStorage.getItem(SESSION_KEY);
   if (!raw) {
     return null;
   }
@@ -58,12 +51,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const session = loadSession();
-    if (session) {
-      setToken(session.token);
-      setEmail(session.email);
-    }
-    setIsHydrated(true);
+    let mounted = true;
+
+    (async () => {
+      const session = await loadSession();
+      if (!mounted) {
+        return;
+      }
+
+      if (session) {
+        setToken(session.token);
+        setEmail(session.email);
+      }
+      setIsHydrated(true);
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -76,12 +81,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = await loginWithEmail(inputEmail, password);
         setToken(session.token);
         setEmail(session.email);
-        saveSession(session);
+        await saveSession(session);
+      },
+      async signup(name: string, inputEmail: string, password: string) {
+        await signupWithEmail(name, inputEmail, password);
+        setToken(null);
+        setEmail(null);
+        await saveSession(null);
+        await logoutUser();
       },
       logout() {
         setToken(null);
         setEmail(null);
-        saveSession(null);
+        void logoutUser();
+        void saveSession(null);
       },
       async sendPasswordReset(inputEmail: string) {
         await requestPasswordReset(inputEmail);
