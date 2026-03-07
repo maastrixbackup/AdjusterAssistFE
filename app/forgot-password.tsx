@@ -1,28 +1,49 @@
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-import { useAuth } from '@/providers/auth-provider';
+import { useAuth } from "@/providers/auth-provider";
+
+const fontRegular = "Roboto";
+const fontMedium = "Roboto-Medium";
+const fontBold = "Roboto-Bold";
 
 export default function ForgotPasswordScreen() {
   const { sendPasswordReset } = useAuth();
-  const [email, setEmail] = useState('');
+
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const logoImg = require("../assets/images/AdjusterAssist1.png");
+  const abstractImg = require("../assets/images/abstract1.png");
+
   async function handleReset() {
     if (!email.trim()) {
-      setMessage('Please enter your email.');
+      setMessage("Please enter your email.");
       return;
     }
 
     setLoading(true);
     setMessage(null);
+
     try {
       await sendPasswordReset(email.trim());
-      setMessage('If this email exists, a reset link has been sent.');
+      setMessage("If this email exists, a reset link has been sent.");
     } catch (error) {
-      const text = error instanceof Error ? error.message : 'Unable to process request';
+      const text =
+        error instanceof Error ? error.message : "Unable to process request";
       setMessage(text);
     } finally {
       setLoading(false);
@@ -30,82 +51,198 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Reset Password</Text>
-        <Text style={styles.subtitle}>Enter your email to receive reset instructions.</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="Email"
-          style={styles.input}
-        />
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        <Pressable style={styles.button} onPress={handleReset} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Send Link</Text>}
-        </Pressable>
-        <Pressable onPress={() => router.replace('/login')}>
-          <Text style={styles.link}>Back to login</Text>
-        </Pressable>
-      </View>
-    </View>
+    <SafeAreaProvider>
+      <LinearGradient
+        colors={["#1E63B6", "#052146"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ flex: 1 }}
+      >
+        <SafeAreaView edges={["top"]} style={styles.safe}>
+          {/* Header */}
+
+          <LinearGradient
+            colors={["#1E63B6", "#052146"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.header}
+          >
+            <Image source={abstractImg} style={styles.molecule} />
+
+            <View style={styles.logoContainer}>
+              <Image source={logoImg} style={styles.logo} />
+            </View>
+          </LinearGradient>
+
+          {/* Body */}
+
+          <View style={styles.container}>
+            <Text style={styles.title}>Reset Password</Text>
+
+            <Text style={styles.subtitle}>
+              Enter your email to receive reset instructions.
+            </Text>
+
+            {/* Email Input */}
+
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
+
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder="Email Address"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input}
+              />
+            </View>
+
+            {message ? <Text style={styles.message}>{message}</Text> : null}
+
+            {/* Button */}
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleReset}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={["#092f61", "#1E63B6"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.buttonGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Send Reset Link</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Back to login */}
+
+            <TouchableOpacity onPress={() => router.replace("/login")}>
+              <Text style={styles.link}>Back to login</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safe: {
     flex: 1,
-    backgroundColor: '#F3F7FC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
   },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 20,
+
+  header: {
+    height: 110,
+    justifyContent: "center",
+    overflow: "hidden",
   },
+
+  molecule: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 220,
+    height: 120,
+    resizeMode: "cover",
+    opacity: 0.25,
+  },
+
+  logoContainer: {
+    paddingLeft: 24,
+  },
+
+  logo: {
+    width: 220,
+    resizeMode: "contain",
+  },
+
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    marginTop: -8,
+    padding: 18,
+    paddingTop: 28,
+  },
+
   title: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#143D72',
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 12,
+    fontFamily: fontBold,
   },
+
   subtitle: {
-    marginTop: 8,
-    marginBottom: 16,
-    color: '#4F5F78',
+    textAlign: "center",
+    color: "#6B7280",
+    marginVertical: 10,
+    fontSize: 14,
+    fontFamily: fontRegular,
   },
-  input: {
+
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#CFD8E4',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 48,
+    borderColor: "#E3E8EF",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 52,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
+
+  input: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    color: "#111827",
+    fontFamily: fontRegular,
+  },
+
   message: {
     marginTop: 10,
-    color: '#334155',
+    textAlign: "center",
+    color: "#334155",
+    fontFamily: fontMedium,
   },
+
   button: {
-    marginTop: 14,
-    height: 46,
-    borderRadius: 10,
-    backgroundColor: '#1458A8',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 24,
   },
+
+  buttonGradient: {
+    height: 52,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+    fontFamily: fontMedium,
   },
+
   link: {
-    marginTop: 14,
-    color: '#1458A8',
-    textAlign: 'center',
-    fontWeight: '600',
+    marginTop: 16,
+    color: "#0B5ED7",
+    textAlign: "center",
+    fontSize: 14,
+    fontFamily: fontMedium,
   },
 });

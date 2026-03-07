@@ -1,56 +1,61 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Image,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-
-import { useAuth } from "@/providers/auth-provider";
 
 const fontRegular = "Roboto";
 const fontMedium = "Roboto-Medium";
 const fontBold = "Roboto-Bold";
 
-const LoginScreen: React.FC = () => {
-  const { isHydrated, isAuthenticated, login } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
+const SignupScreen: React.FC = () => {
+  //   const { register } = useAuth();
+
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const logoImg = require("../assets/images/AdjusterAssist1.png");
   const abstractImg = require("../assets/images/abstract1.png");
 
-  useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-    if (isAuthenticated) {
-      router.replace("/(tabs)");
-    }
-  }, [isAuthenticated, isHydrated]);
-
-  async function handleLogin() {
-    if (!email.trim() || !password.trim()) {
-      setErrorMessage("Email and password are required.");
+  async function handleSignup() {
+    if (!name || !email || !password || !confirmPassword) {
+      setErrorMessage("All fields are required.");
       return;
     }
 
-    setLoading(true);
-    setErrorMessage(null);
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
+      return;
+    }
+
     try {
-      await login(email.trim(), password);
+      setLoading(true);
+      setErrorMessage(null);
+
+      //   await register({
+      //     name,
+      //     email,
+      //     password,
+      //   });
+
       router.replace("/(tabs)");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Login failed";
+      const message = error instanceof Error ? error.message : "Signup failed";
       setErrorMessage(message);
     } finally {
       setLoading(false);
@@ -80,10 +85,25 @@ const LoginScreen: React.FC = () => {
           </LinearGradient>
 
           <View style={styles.container}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>
-              Login with your email and password.
-            </Text>
+            <Text style={styles.title}>Create Account</Text>
+
+            <Text style={styles.subtitle}>Sign up to get started.</Text>
+
+            {/* Name */}
+
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={20} color="#9CA3AF" />
+              <TextInput
+                placeholder="Full Name"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+
+            {/* Email */}
+
             <View style={styles.inputWrapper}>
               <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
               <TextInput
@@ -92,11 +112,13 @@ const LoginScreen: React.FC = () => {
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                autoCorrect={false}
                 value={email}
                 onChangeText={setEmail}
               />
             </View>
+
+            {/* Password */}
+
             <View style={styles.inputWrapper}>
               <Feather name="lock" size={20} color="#9CA3AF" />
               <TextInput
@@ -106,9 +128,8 @@ const LoginScreen: React.FC = () => {
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
               />
+
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
@@ -117,12 +138,30 @@ const LoginScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Confirm Password */}
+
+            <View style={styles.inputWrapper}>
+              <Feather name="lock" size={20} color="#9CA3AF" />
+              <TextInput
+                placeholder="Confirm Password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showPassword}
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+
             {errorMessage ? (
               <Text style={styles.error}>{errorMessage}</Text>
             ) : null}
+
+            {/* Signup Button */}
+
             <TouchableOpacity
               style={styles.button}
-              onPress={handleLogin}
+              onPress={handleSignup}
               disabled={loading}
             >
               <LinearGradient
@@ -134,21 +173,20 @@ const LoginScreen: React.FC = () => {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.buttonText}>Log In</Text>
+                  <Text style={styles.buttonText}>Sign Up</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/forgot-password")}>
-              <Text style={styles.forgot}>Forgot password?</Text>
-            </TouchableOpacity>
+
+            {/* Login Link */}
 
             <Text style={styles.signup}>
-              Don{"'"}t have an account?{" "}
+              Already have an account?{" "}
               <Text
                 style={styles.signupLink}
-                onPress={() => router.push("/signup")}
+                onPress={() => router.push("/login")}
               >
-                Sign Up
+                Log In
               </Text>
             </Text>
           </View>
@@ -158,7 +196,7 @@ const LoginScreen: React.FC = () => {
   );
 };
 
-export default LoginScreen;
+export default SignupScreen;
 
 const styles = StyleSheet.create({
   safe: {
@@ -189,17 +227,11 @@ const styles = StyleSheet.create({
     width: 220,
     resizeMode: "contain",
   },
-  appName: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-    fontFamily: fontMedium,
-  },
+
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
     marginTop: -8,
-
     padding: 18,
     paddingTop: 28,
   },
@@ -219,6 +251,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontRegular,
   },
+
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -243,6 +276,7 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontFamily: fontRegular,
   },
+
   button: {
     marginTop: 24,
   },
@@ -261,14 +295,6 @@ const styles = StyleSheet.create({
     fontFamily: fontMedium,
   },
 
-  forgot: {
-    textAlign: "center",
-    color: "#0B5ED7",
-    marginTop: 16,
-    fontSize: 14,
-    fontFamily: fontMedium,
-  },
-
   signup: {
     textAlign: "center",
     marginTop: 20,
@@ -282,6 +308,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontFamily: fontMedium,
   },
+
   error: {
     marginTop: 8,
     color: "#B42318",
