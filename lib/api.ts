@@ -1,8 +1,21 @@
-export type OutputType = 'email' | 'file_note' | 'escalation';
+import { BASE_URL } from "@/lib/config/apiConfig";
+
+export type OutputType = "email" | "file_note" | "escalation";
 
 export type AuthSession = {
   token: string;
   email: string;
+};
+
+type AuthApiResponse = {
+  success: boolean;
+  message: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  token: string;
 };
 
 export type GenerateResponseRequest = {
@@ -18,7 +31,7 @@ export type GenerateResponseResult = {
 };
 
 export type SubscriptionStatus = {
-  plan: 'free' | 'paid';
+  plan: "free" | "paid";
   monthlyLimit: number;
   usedThisMonth: number;
   remainingThisMonth: number;
@@ -26,45 +39,91 @@ export type SubscriptionStatus = {
   priceLabel: string;
 };
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL = BASE_URL;
 
-async function apiRequest<T>(path: string, init: RequestInit, token?: string): Promise<T> {
+async function apiRequest<T>(
+  path: string,
+  init: RequestInit,
+  token?: string,
+): Promise<T> {
   if (!API_BASE_URL) {
-    throw new Error('Missing EXPO_PUBLIC_API_BASE_URL');
+    throw new Error("Missing EXPO_PUBLIC_API_BASE_URL");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
+  const url = `${API_BASE_URL}${path}`;
+  const method = init.method ?? "GET";
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(init.headers ?? {}),
+  };
+
+  console.log("[API REQUEST]", {
+    url,
+    method,
+    body: init.body ?? null,
   });
 
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    console.log("[API NETWORK ERROR]", {
+      url,
+      method,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+
   const json = await response.json().catch(() => ({}));
+  console.log("[API RESPONSE]", {
+    url,
+    method,
+    status: response.status,
+    ok: response.ok,
+    data: json,
+  });
+
   if (!response.ok) {
-    throw new Error(json?.message ?? 'Request failed');
+    throw new Error(json?.message ?? "Request failed");
   }
 
   return json as T;
 }
 
-export async function loginWithEmail(email: string, password: string): Promise<AuthSession> {
-  if (!API_BASE_URL) {
-    return {
-      token: `mock-${Date.now()}`,
-      email,
-    };
-  }
+export async function loginWithEmail(
+  email: string,
+  password: string,
+): Promise<AuthSession> {
+  const data = await apiRequest<AuthApiResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
 
-  return apiRequest<AuthSession>(
-    '/v1/auth/login',
-    {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    },
-  );
+  return {
+    token: data.token,
+    email: data.user.email,
+  };
+}
+
+export async function signupWithEmail(
+  name: string,
+  email: string,
+  password: string,
+): Promise<AuthSession> {
+  const data = await apiRequest<AuthApiResponse>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ name, email, password }),
+  });
+
+  return {
+    token: data.token,
+    email: data.user.email,
+  };
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
@@ -72,30 +131,27 @@ export async function requestPasswordReset(email: string): Promise<void> {
     return;
   }
 
-  await apiRequest<{ ok: true }>(
-    '/v1/auth/password-reset',
-    {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    },
-  );
+  await apiRequest<{ ok: true }>("/v1/auth/password-reset", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
 }
 
 export async function generateResponse(
   token: string,
-  payload: GenerateResponseRequest
+  payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
   if (!API_BASE_URL) {
-    const today = new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
+    const today = new Date().toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
     });
 
-    if (payload.outputType === 'email') {
+    if (payload.outputType === "email") {
       return {
-        responseType: 'email',
-        responseTypeLabel: 'Email Response',
+        responseType: "email",
+        responseTypeLabel: "Email Response",
         responseText: `Good afternoon Mr. Reynolds,
 Thank you for your follow-up regarding the contractor's recommendation for replacement of the electrical system.
 
@@ -107,10 +163,10 @@ Best regards,`,
       };
     }
 
-    if (payload.outputType === 'file_note') {
+    if (payload.outputType === "file_note") {
       return {
-        responseType: 'file_note',
-        responseTypeLabel: 'File Note',
+        responseType: "file_note",
+        responseTypeLabel: "File Note",
         responseText: `File Note
 Date: ${today}
 Type of Contact: Insured Phone Call
@@ -127,8 +183,8 @@ Assign independent electrical engineer and review findings.`,
     }
 
     return {
-      responseType: 'escalation',
-      responseTypeLabel: 'Escalation Response',
+      responseType: "escalation",
+      responseTypeLabel: "Escalation Response",
       responseText: `Subject: Claim Status and Investigation Update
 
 Dear Mr. Carter,
@@ -141,39 +197,47 @@ Sincerely,`,
   }
 
   return apiRequest<GenerateResponseResult>(
-    '/v1/generate',
+    "/v1/generate",
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(payload),
     },
     token,
   );
 }
 
-export async function getSubscriptionStatus(token: string): Promise<SubscriptionStatus> {
+export async function getSubscriptionStatus(
+  token: string,
+): Promise<SubscriptionStatus> {
   if (!API_BASE_URL) {
     return {
-      plan: 'free',
+      plan: "free",
       monthlyLimit: 10,
       usedThisMonth: 0,
       remainingThisMonth: 10,
       canGenerate: true,
-      priceLabel: '$49/month',
+      priceLabel: "$49/month",
     };
   }
 
-  return apiRequest<SubscriptionStatus>('/v1/subscription/status', { method: 'GET' }, token);
+  return apiRequest<SubscriptionStatus>(
+    "/v1/subscription/status",
+    { method: "GET" },
+    token,
+  );
 }
 
-export async function createCheckoutSession(token: string): Promise<{ checkoutUrl: string }> {
+export async function createCheckoutSession(
+  token: string,
+): Promise<{ checkoutUrl: string }> {
   if (!API_BASE_URL) {
-    return { checkoutUrl: 'https://stripe.com' };
+    return { checkoutUrl: "https://stripe.com" };
   }
 
   return apiRequest<{ checkoutUrl: string }>(
-    '/v1/subscription/checkout',
+    "/v1/subscription/checkout",
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({}),
     },
     token,
