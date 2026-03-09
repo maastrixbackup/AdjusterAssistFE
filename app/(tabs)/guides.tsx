@@ -1,10 +1,11 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import WorkInProgress from "../workinprogress";
 
 export default function GuidesScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Guides</Text>
+    <WorkInProgress />
     </View>
   );
 }

@@ -67,7 +67,17 @@ export async function signupWithEmail(
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  await apiRequest("/v1/auth/password-reset", "POST", { email });
+  await apiRequest("/auth/forgot-password", "POST", { email });
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  await apiRequest("/auth/reset-password", "POST", {
+    token,
+    newPassword,
+  });
 }
 
 export async function logoutUser(): Promise<void> {
