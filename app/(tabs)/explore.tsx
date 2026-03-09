@@ -1,10 +1,11 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import WorkInProgress from "../workinprogress";
 
 const TabTwoScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>History</Text>
+      <WorkInProgress />
     </View>
   );
 };

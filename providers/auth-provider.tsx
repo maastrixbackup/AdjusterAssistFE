@@ -1,7 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
-import { loginWithEmail, logoutUser, requestPasswordReset, signupWithEmail } from '@/lib/services/authService';
+import {
+  loginWithEmail,
+  logoutUser,
+  requestPasswordReset,
+  resetPassword as resetUserPassword,
+  signupWithEmail,
+} from '@/lib/services/authService';
 
 type AuthContextValue = {
   isHydrated: boolean;
@@ -12,6 +18,7 @@ type AuthContextValue = {
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
 };
 
 const SESSION_KEY = 'adjusterassist_session_v1';
@@ -98,6 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async sendPasswordReset(inputEmail: string) {
         await requestPasswordReset(inputEmail);
+      },
+      async resetPassword(inputToken: string, newPassword: string) {
+        await resetUserPassword(inputToken, newPassword);
       },
     }),
     [email, isHydrated, token]

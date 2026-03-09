@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -19,19 +19,20 @@ const fontRegular = "Roboto";
 const fontMedium = "Roboto-Medium";
 const fontBold = "Roboto-Bold";
 
-export default function ForgotPasswordScreen() {
-  const { sendPasswordReset } = useAuth();
-
-  const [email, setEmail] = useState("");
+export default function ResetPasswordScreen() {
+  const { resetPassword } = useAuth();
+  const [token, setToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
   const abstractImg = require("../assets/images/abstract1.png");
 
-  async function handleReset() {
-    if (!email.trim()) {
-      setMessage("Please enter your email.");
+  async function handleResetPassword() {
+    if (!token.trim() || !newPassword.trim()) {
+      setMessage("Token and new password are required.");
       return;
     }
 
@@ -39,11 +40,12 @@ export default function ForgotPasswordScreen() {
     setMessage(null);
 
     try {
-      await sendPasswordReset(email.trim());
-      setMessage("If this email exists, a reset link has been sent.");
+      await resetPassword(token.trim(), newPassword);
+      setMessage("Password reset successful. Please login.");
+      router.replace("/login");
     } catch (error) {
       const text =
-        error instanceof Error ? error.message : "Unable to process request";
+        error instanceof Error ? error.message : "Unable to reset password";
       setMessage(text);
     } finally {
       setLoading(false);
@@ -59,8 +61,6 @@ export default function ForgotPasswordScreen() {
         style={{ flex: 1 }}
       >
         <SafeAreaView edges={["top"]} style={styles.safe}>
-          {/* Header */}
-
           <LinearGradient
             colors={["#1E63B6", "#052146"]}
             start={{ x: 0, y: 0 }}
@@ -68,44 +68,56 @@ export default function ForgotPasswordScreen() {
             style={styles.header}
           >
             <Image source={abstractImg} style={styles.molecule} />
-
             <View style={styles.logoContainer}>
               <Image source={logoImg} style={styles.logo} />
             </View>
           </LinearGradient>
 
-          {/* Body */}
-
           <View style={styles.container}>
-            <Text style={styles.title}>Reset Password</Text>
-
+            <Text style={styles.title}>Set New Password</Text>
             <Text style={styles.subtitle}>
-              Enter your email to receive reset instructions.
+              Paste the token from email and enter a new password.
             </Text>
 
-            {/* Email Input */}
-
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
-
+              <Ionicons name="key-outline" size={20} color="#9CA3AF" />
               <TextInput
-                value={email}
-                onChangeText={setEmail}
+                value={token}
+                onChangeText={setToken}
                 autoCapitalize="none"
-                keyboardType="email-address"
-                placeholder="Email Address"
+                autoCorrect={false}
+                placeholder="Reset Token"
                 placeholderTextColor="#9CA3AF"
                 style={styles.input}
               />
             </View>
 
-            {message ? <Text style={styles.message}>{message}</Text> : null}
+            <View style={styles.inputWrapper}>
+              <Feather name="lock" size={20} color="#9CA3AF" />
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="New Password"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color="#9CA3AF"
+                />
+              </TouchableOpacity>
+            </View>
 
-            {/* Button */}
+            {message ? <Text style={styles.message}>{message}</Text> : null}
 
             <TouchableOpacity
               style={styles.button}
-              onPress={handleReset}
+              onPress={handleResetPassword}
               disabled={loading}
             >
               <LinearGradient
@@ -117,18 +129,13 @@ export default function ForgotPasswordScreen() {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.buttonText}>Send Reset Link</Text>
+                  <Text style={styles.buttonText}>Reset Password</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Back to login */}
-
             <TouchableOpacity onPress={() => router.replace("/login")}>
               <Text style={styles.link}>Back to login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/reset-password")}>
-              <Text style={styles.link}>Have token? Reset now</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -141,13 +148,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
-
   header: {
     height: 110,
     justifyContent: "center",
     overflow: "hidden",
   },
-
   molecule: {
     position: "absolute",
     right: 0,
@@ -157,16 +162,13 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     opacity: 0.25,
   },
-
   logoContainer: {
     paddingLeft: 24,
   },
-
   logo: {
     width: 220,
     resizeMode: "contain",
   },
-
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -174,7 +176,6 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingTop: 28,
   },
-
   title: {
     fontSize: 24,
     fontWeight: "700",
@@ -182,7 +183,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: fontBold,
   },
-
   subtitle: {
     textAlign: "center",
     color: "#6B7280",
@@ -190,7 +190,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontRegular,
   },
-
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -207,7 +206,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-
   input: {
     flex: 1,
     marginLeft: 10,
@@ -215,32 +213,27 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontFamily: fontRegular,
   },
-
   message: {
     marginTop: 10,
     textAlign: "center",
     color: "#334155",
     fontFamily: fontMedium,
   },
-
   button: {
     marginTop: 24,
   },
-
   buttonGradient: {
     height: 52,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
-
   buttonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
     fontFamily: fontMedium,
   },
-
   link: {
     marginTop: 16,
     color: "#0B5ED7",

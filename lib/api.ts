@@ -1,6 +1,6 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
 
-export type OutputType = "email" | "file_note" | "escalation";
+export type OutputType = "email" | "file" | "escalation";
 
 export type AuthSession = {
   token: string;
@@ -19,9 +19,7 @@ type AuthApiResponse = {
 };
 
 export type GenerateResponseRequest = {
-  outputType: OutputType;
-  requestText: string;
-  claimDetails?: string;
+  type: OutputType;
 };
 
 export type GenerateResponseResult = {
@@ -40,6 +38,12 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
+// const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const responseTypeLabels: Record<OutputType, string> = {
+  email: "Email Response",
+  file: "File Note",
+  escalation: "Escalation Response",
+};
 
 async function apiRequest<T>(
   path: string,
@@ -131,9 +135,23 @@ export async function requestPasswordReset(email: string): Promise<void> {
     return;
   }
 
-  await apiRequest<{ ok: true }>("/v1/auth/password-reset", {
+  await apiRequest<{ ok: true }>("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  if (!API_BASE_URL) {
+    return;
+  }
+
+  await apiRequest<{ ok: true }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
   });
 }
 
@@ -141,69 +159,22 @@ export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  if (!API_BASE_URL) {
-    const today = new Date().toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    if (payload.outputType === "email") {
-      return {
-        responseType: "email",
-        responseTypeLabel: "Email Response",
-        responseText: `Good afternoon Mr. Reynolds,
-Thank you for your follow-up regarding the contractor's recommendation for replacement of the electrical system.
-
-Ordinance or Law coverage may apply when code-related upgrades are required as a direct result of repairing covered physical damage from the reported loss. At this time, we have not received documentation from a building authority confirming that a full electrical replacement is required due to damage caused by this event.
-
-To ensure a thorough and objective evaluation, an independent electrical engineer will be assigned to inspect and test the affected system. Once the inspection is completed and the findings are reviewed, we will provide an update regarding next steps.
-
-Best regards,`,
-      };
-    }
-
-    if (payload.outputType === "file_note") {
-      return {
-        responseType: "file_note",
-        responseTypeLabel: "File Note",
-        responseText: `File Note
-Date: ${today}
-Type of Contact: Insured Phone Call
-
-Summary of Communication:
-Insured contacted to inquire about contractor recommendation for full electrical system replacement. No documentation provided at this time.
-
-Investigation Status:
-Engineer inspection pending to evaluate electrical system condition.
-
-Next Steps:
-Assign independent electrical engineer and review findings.`,
-      };
-    }
-
-    return {
-      responseType: "escalation",
-      responseTypeLabel: "Escalation Response",
-      responseText: `Subject: Claim Status and Investigation Update
-
-Dear Mr. Carter,
-Thank you for your correspondence regarding your concerns with the current claim evaluation.
-
-Based on available information, the investigation remains ongoing, and additional evaluation may be necessary to fully assess the reported damages.
-
-Sincerely,`,
-    };
-  }
-
-  return apiRequest<GenerateResponseResult>(
-    "/v1/generate",
+  const res = await apiRequest<{ success?: boolean; data?: string; message?: string }>(
+    "/drafts/generate",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        type: payload.type,
+      }),
     },
     token,
   );
+
+  return {
+    responseType: payload.type,
+    responseTypeLabel: responseTypeLabels[payload.type],
+    responseText: res.data ?? res.message ?? "",
+  };
 }
 
 export async function getSubscriptionStatus(

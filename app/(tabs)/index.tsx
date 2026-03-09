@@ -28,7 +28,7 @@ type OutputMode = "Email" | "File Note" | "Escalation";
 const outputModes: OutputMode[] = ["Email", "File Note", "Escalation"];
 const outputTypeMap: Record<OutputMode, OutputType> = {
   Email: "email",
-  "File Note": "file_note",
+  "File Note": "file",
   Escalation: "escalation",
 };
 
@@ -107,9 +107,7 @@ export default function HomeScreen() {
     setIsGenerating(true);
     try {
       const result = await generateResponse(token, {
-        outputType: outputTypeMap[selectedOutput],
-        requestText: request.trim(),
-        claimDetails: claimDetails.trim(),
+        type: outputTypeMap[selectedOutput],
       });
 
       router.push({
