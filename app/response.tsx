@@ -1,20 +1,21 @@
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type OutputType = "email" | "file_note" | "escalation";
+type OutputType = "email" | "file" | "escalation";
 
 type Params = {
   text?: string;
@@ -22,13 +23,9 @@ type Params = {
   outputType?: OutputType;
 };
 
-const fontRegular = "Roboto";
-const fontMedium = "Roboto-Medium";
-const fontBold = "Roboto-Bold";
-
-const defaultLabels: Record<OutputType, string> = {
+const defaultLabels: Record<string, string> = {
   email: "Email Response",
-  file_note: "File Note",
+  file: "File Note",
   escalation: "Escalation Response",
 };
 
@@ -37,241 +34,266 @@ export default function ResponseScreen() {
   const insets = useSafeAreaInsets();
   const [copying, setCopying] = useState(false);
 
-  const outputType = useMemo<OutputType>(() => {
-    if (params.outputType === "email" || params.outputType === "file_note" || params.outputType === "escalation") {
-      return params.outputType;
+  const responseText = useMemo(() => {
+    if (!params.text) return "No response available.";
+    if (typeof params.text === "object") {
+      return JSON.stringify(params.text, null, 2);
     }
-    return "email";
-  }, [params.outputType]);
+    return params.text;
+  }, [params.text]);
 
-  const responseTypeLabel = useMemo(
-    () => params.type ?? defaultLabels[outputType],
-    [params.type, outputType]
-  );
-  const responseText = useMemo(() => params.text ?? "No response available.", [params.text]);
+  const responseTypeLabel = params.type || defaultLabels[params.outputType || "email"] || "Generated Output";
 
   function onBack() {
     if (router.canGoBack()) {
       router.back();
-      return;
+    } else {
+      router.replace("/(tabs)");
     }
-    router.replace("/(tabs)");
   }
+
+  const onShare = async () => {
+    try {
+      await Share.share({
+        message: responseText,
+        title: responseTypeLabel,
+      });
+    } catch (error) {
+      console.log("Share error:", error);
+    }
+  };
 
   async function onCopy() {
     try {
       setCopying(true);
       await Clipboard.setStringAsync(responseText);
-      Alert.alert("Copied", "Response copied to clipboard.");
+      Alert.alert("Success", "Draft copied to clipboard.");
     } catch {
-      Alert.alert("Copy failed", "Could not copy response. Please try again.");
+      Alert.alert("Error", "Failed to copy text.");
     } finally {
-      setCopying(false);
+      setTimeout(() => setCopying(false), 2000);
     }
   }
 
-return (
-  <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
-    <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-    <LinearGradient
-      colors={["#1E63B6", "#092f61"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.brandHeader, { paddingTop: insets.top + 10 }]}
-    >
-      <View style={styles.titleBar}>
-        <Pressable onPress={onBack} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-          {/* <Text style={styles.backText}>Back</Text> */}
-        </Pressable>
-
-        <Text style={styles.title}>Generated Output</Text>
-        <View style={styles.titleSpacer} />
-      </View>
-    </LinearGradient>
-
-    <View style={styles.metaWrap}>
-      <Text style={styles.metaLabel}>Response Type</Text>
-      <View style={styles.responseTypeChip}>
-        <Text style={styles.responseTypeValue}>{responseTypeLabel}</Text>
-      </View>
-    </View>
-    <ScrollView
-      style={styles.content}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
-      <View 
-      // style={styles.responseCard}
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Dynamic Header */}
+      <LinearGradient
+        colors={["#276bbd", "#0B3C7A"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[styles.header, { paddingTop: insets.top }]}
       >
-        <Text style={styles.bodyText}>{responseText}</Text>
-      </View>
-    </ScrollView>
-    <View style={[styles.copyWrapper, { paddingBottom: insets.bottom + 10 }]}>
-      <Pressable onPress={onCopy} disabled={copying}>
-        <LinearGradient
-          colors={["#092f61", "#1E63B6"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.copyGradient}
+        <View style={styles.headerContent}>
+          <Pressable onPress={onBack} style={styles.iconButton}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Review Draft</Text>
+          <Pressable onPress={onShare} style={styles.iconButton}>
+            <Ionicons name="share-outline" size={24} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </LinearGradient>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Meta Section */}
+        <View style={styles.metaRow}>
+          <View style={styles.typeBadge}>
+            <MaterialCommunityIcons name="robot" size={16} color="#1469C9" />
+            <Text style={styles.typeText}>{responseTypeLabel}</Text>
+          </View>
+          <Text style={styles.timestamp}>{new Date().toLocaleDateString()}</Text>
+        </View>
+
+        {/* The Document Card */}
+        <View style={styles.documentCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardHeaderLabel}>AI GENERATED CONTENT</Text>
+            <View style={styles.cardHeaderLine} />
+          </View>
+          
+          <Text style={styles.bodyText}>{responseText}</Text>
+          
+          <View style={styles.cardFooter}>
+            <Text style={styles.footerNote}>This draft was generated by AI and should be reviewed for accuracy.</Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Primary Action Button */}
+      <View style={[styles.floatingFooter, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable 
+          onPress={onCopy} 
+          disabled={copying}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            pressed && { scale: 0.98, opacity: 0.9 }
+          ]}
         >
-          <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
-          <Text style={styles.copyButtonText}>
-            {copying ? "Copying..." : "Copy Response"}
-          </Text>
-        </LinearGradient>
-      </Pressable>
+          <LinearGradient
+            colors={copying ? ["#10B981", "#059669"] : ["#276bbd", "#0B3C7A"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.buttonGradient}
+          >
+            <Ionicons name={copying ? "checkmark-done" : "copy-outline"} size={20} color="#FFF" />
+            <Text style={styles.buttonText}>
+              {copying ? "Copied to Clipboard" : "Copy Draft"}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
     </View>
-  </SafeAreaView>
-);
+  );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F8FAFC",
   },
-  brandHeader: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 14,
+  header: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: "#0B3C7A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
   },
-  brandRow: {
-    alignItems: "center",
+  headerContent: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-  },
-  brandLeft: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-  },
-  brandText: {
-    color: "#FFFFFF",
-    fontFamily: fontBold,
-    fontSize: 22,
-  },
-  titleBar: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    alignItems: "center",
-    flexDirection: "row",
-    minWidth: 82,
-  },
-  backText: {
-    color: "#FFFFFF",
-    fontFamily: fontMedium,
-    fontSize: 18,
-    marginLeft: 2,
-  },
-  title: {
-    color: "#FFFFFF",
-    fontFamily: fontBold,
-    fontSize: 20,
-  },
-  titleSpacer: {
-    minWidth: 82,
-  },
-  metaWrap: {
-    backgroundColor: "#FFFFFF",
-    borderBottomColor: "#E4E8EF",
-    borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    height: 64,
   },
-  metaLabel: {
-    color: "#11233E",
-    fontFamily: fontMedium,
-    fontSize: 14,
-    marginBottom: 8,
+  headerTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
-  responseTypeChip: {
-    alignSelf: "flex-start",
-    backgroundColor: "#EDF4FF",
-    borderColor: "#9FB8DE",
-    borderRadius: 999,
-    borderWidth: 1,
+  iconButton: {
+    padding: 8,
+    borderRadius: 12,
+  },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    marginBottom: 16,
+  },
+  typeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DBEAFE",
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
   },
-  responseTypeValue: {
-    color: "#124A93",
-    fontFamily: fontBold,
+  typeText: {
+    color: "#1E40AF",
     fontSize: 13,
+    fontWeight: "700",
   },
-  content: {
+  timestamp: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  scroll: {
     flex: 1,
   },
-  // contentContainer: {
-  //   backgroundColor: "#FFFFFF",
-  //   paddingHorizontal: 16,
-  //   paddingTop: 16,
-  //   paddingBottom: 24,
-  // },
-  // responseCard: {
-  //   backgroundColor: "#F8FAFD",
-  //   borderColor: "#DCE5F2",
-  //   borderRadius: 12,
-  //   borderWidth: 1,
-  //   padding: 14,
-  // },
+  scrollContent: {
+    padding: 20,
+  },
+  documentCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  cardHeader: {
+    marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  cardHeaderLabel: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  cardHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#F1F5F9",
+  },
   bodyText: {
-    color: "#1D2C44",
-    fontFamily: fontRegular,
+    color: "#334155",
     fontSize: 16,
-    lineHeight: 26,
+    lineHeight: 28,
+    letterSpacing: 0.2,
   },
-  copyButton: {
-    borderRadius: 12,
-    marginTop: 16,
+  cardFooter: {
+    marginTop: 30,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  footerNote: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontStyle: "italic",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  floatingFooter: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(248, 250, 252, 0.95)",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  primaryButton: {
+    borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#0A4EA7",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
+    elevation: 4,
+    shadowColor: "#276bbd",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 2,
   },
-  // copyGradient: {
-  //   alignItems: "center",
-  //   borderRadius: 12,
-  //   flexDirection: "row",
-  //   gap: 8,
-  //   justifyContent: "center",
-  //   minHeight: 52,
-  // },
-  copyButtonText: {
+  buttonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 60,
+    gap: 12,
+  },
+  buttonText: {
     color: "#FFFFFF",
-    fontFamily: fontMedium,
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: "800",
   },
-  copyWrapper: {
-  position: "absolute",
-  bottom: 0,
-  left: 0,
-  right: 0,
-  backgroundColor: "#FFFFFF",
-  paddingHorizontal: 16,
-  paddingTop: 10,
-  borderTopWidth: 1,
-  borderTopColor: "#E4E8EF",
-},
-
-contentContainer: {
-  paddingHorizontal: 16,
-  paddingTop: 16,
-  paddingBottom: 120,
-},
-
-copyGradient: {
-  alignItems: "center",
-  borderRadius: 12,
-  flexDirection: "row",
-  justifyContent: "center",
-  minHeight: 52,
-  gap: 8,
-},
 });

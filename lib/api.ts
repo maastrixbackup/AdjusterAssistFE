@@ -14,13 +14,19 @@ type AuthApiResponse = {
     id: number;
     name: string;
     email: string;
-    role: string; // Added role to the user response type
+    role: string;
   };
   token: string;
 };
 
+/**
+ * UPDATED: Matches your required JSON payload exactly
+ */
 export type GenerateResponseRequest = {
+  fileId: number;
   type: OutputType;
+  userInput: string;
+  shouldSave: boolean;
 };
 
 export type GenerateResponseResult = {
@@ -133,48 +139,41 @@ export async function signupWithEmail(
   };
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
-  if (!API_BASE_URL) return;
-  await apiRequest<{ ok: true }>("/auth/forgot-password", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
-}
-
-export async function resetPassword(
-  token: string,
-  newPassword: string,
-): Promise<void> {
-  if (!API_BASE_URL) return;
-  await apiRequest<{ ok: true }>("/auth/reset-password", {
-    method: "POST",
-    body: JSON.stringify({ token, newPassword }),
-  });
-}
-
+/**
+ * UPDATED: Uses the explicit payload structure and handles credit-based failures
+ */
 export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
+  // Update the type definition here to match your real API response
   const res = await apiRequest<{
-    success?: boolean;
-    data?: string;
-    message?: string;
+    success: boolean;
+    message: string;
+    data: {
+      draftId: number;
+      claim_number: string;
+      client_name: string;
+      content: string; // This is what we need!
+    };
   }>(
-    "/drafts/generate-test",
+    "/drafts/generate",
     {
       method: "POST",
-      body: JSON.stringify({
-        type: payload.type,
-      }),
+      body: JSON.stringify(payload),
     },
     token,
   );
 
+  if (res.success === false) {
+    throw new Error(res.message || "Insufficient credits.");
+  }
+
   return {
     responseType: payload.type,
-    responseTypeLabel: responseTypeLabels[payload.type],
-    responseText: res.data ?? res.message ?? "",
+    responseTypeLabel: responseTypeLabels[payload.type] || "Response",
+    // FIX: Access res.data.content instead of just res.data
+    responseText: res.data?.content ?? res.message ?? "No content generated",
   };
 }
 

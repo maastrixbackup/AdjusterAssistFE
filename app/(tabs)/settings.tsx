@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   planName: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#114acf',
   },
   statusPill: {
     backgroundColor: '#F1F5F9',

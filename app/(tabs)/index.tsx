@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -14,9 +15,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from 'react-native-toast-message';
 
 import {
   generateResponse,
+  GenerateResponseRequest,
   getSubscriptionStatus,
   OutputType,
   SubscriptionStatus,
@@ -37,23 +40,17 @@ const recentResponses = [
     id: "1",
     type: "Email Response:",
     subject: "Roof Inspection Summary",
-    date: "Mar 12, 2024",
+    date: "Mar 12, 2026",
     italicSubject: false,
   },
   {
     id: "2",
     type: "File Note:",
     subject: "Water Damage Assessment",
-    date: "Mar 10, 2024",
+    date: "Mar 10, 2026",
     italicSubject: true,
   },
 ];
-
-const fontRegular = "Roboto";
-
-const fontMedium = "Roboto-Medium";
-const fontDemi = "Roboto-Medium";
-const fontBold = "Roboto-Bold";
 
 export default function HomeScreen() {
   const { token } = useAuth();
@@ -68,452 +65,398 @@ export default function HomeScreen() {
   useEffect(() => {
     let mounted = true;
     async function loadStatus() {
-      if (!token) {
-        return;
-      }
+      if (!token) return;
       try {
         const next = await getSubscriptionStatus(token);
-        if (mounted) {
-          setStatus(next);
-        }
+        if (mounted) setStatus(next);
       } catch {
-        if (mounted) {
-          setStatus(null);
-        }
+        if (mounted) setStatus(null);
       }
     }
     loadStatus();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [token]);
 
   async function onGenerate() {
-    if (!token) {
-      return;
-    }
+    if (!token) return;
+
+    // 1. Validation
     if (!request.trim()) {
-      Alert.alert("Missing input", "Please enter your request.");
+      Toast.show({
+        type: 'error',
+        text1: 'Input Required',
+        text2: 'Please describe what you need to generate.'
+      });
       return;
     }
-    if (status && !status.subscription.remaining) {
+
+    // 2. Local Credit Check
+    if (status && status.subscription.remaining <= 0) {
       Alert.alert(
-        "Limit reached",
-        "You reached your monthly free-tier limit. Please upgrade.",
+        "No Credits Remaining",
+        "You have used all your credits for this month.",
+        [{ text: "Upgrade Now", onPress: () => router.push("/settings") }, { text: "Cancel" }]
       );
       return;
     }
 
     setIsGenerating(true);
     try {
-      const result = await generateResponse(token, {
+      // Mapping to required backend structure
+      const payload: GenerateResponseRequest = {
+        fileId: 1,
         type: outputTypeMap[selectedOutput],
-      });
+        userInput: `${request.trim()}${claimDetails ? ` \n\nDetails: ${claimDetails.trim()}` : ""}`,
+        shouldSave: true
+      };
 
+      const result = await generateResponse(token, payload);
+
+      /**
+       * UPDATED: Passing the actual draft text to the response screen.
+       * generateResponse in api.ts should now return result.responseText 
+       * extracted from res.data.content.
+       */
       router.push({
         pathname: "/response",
         params: {
           outputType: result.responseType,
           type: result.responseTypeLabel,
-          text: result.responseText,
+          text: result.responseText, 
         },
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to generate response";
-      Alert.alert("Generation failed", message);
+      const message = error instanceof Error ? error.message : "Failed to generate response";
+
+      if (message.includes("credits") || message.includes("plan")) {
+        Alert.alert("Subscription Notice", message);
+      } else {
+        Toast.show({ type: 'error', text1: 'Generation Failed', text2: message });
+      }
     } finally {
       setIsGenerating(false);
     }
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: "#F3F5F8" }}>
       <StatusBar style="light" translucent />
+
       <LinearGradient
         colors={["#276bbd", "#0B3C7A"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={{ flex: 1 }}
+        style={styles.headerGradient}
       >
-        <SafeAreaView edges={["top"]} style={styles.safe}>
-          <View style={styles.header}>
-            <View style={styles.headerRow}>
-              <Image source={logo} style={styles.logo} />
-              <View style={styles.bellWrap}>
-                <Ionicons name="notifications" size={36} color="#FFFFFF" />
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>2</Text>
-                </View>
+        <SafeAreaView edges={["top"]} style={styles.headerContent}>
+          <View style={styles.headerRow}>
+            <Image source={logo} style={styles.logo} />
+            <View style={styles.headerActions}>
+              <View style={styles.creditPill}>
+                <Text style={styles.creditText}>
+                  {status ? `${status.subscription.remaining} Credits` : "---"}
+                </Text>
               </View>
-            </View>
-          </View>
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Select Output Type</Text>
-              <View style={styles.segmented}>
-                {outputModes.map((mode, index) => {
-                  const active = mode === selectedOutput;
-
-                  const ButtonContent = (
-                    <>
-                      {mode === "Email" && (
-                        <Ionicons
-                          name="mail"
-                          size={20}
-                          color={active ? "#FFFFFF" : "#314A6F"}
-                        />
-                      )}
-                      {mode === "File Note" && (
-                        <MaterialCommunityIcons
-                          name="file-document-outline"
-                          size={20}
-                          color={active ? "#FFFFFF" : "#314A6F"}
-                        />
-                      )}
-                      {mode === "Escalation" && (
-                        <MaterialCommunityIcons
-                          name="alert-circle-outline"
-                          size={20}
-                          color={active ? "#FFFFFF" : "#314A6F"}
-                        />
-                      )}
-                      <Text
-                        style={[
-                          styles.segmentText,
-                          active && styles.segmentTextActive,
-                        ]}
-                      >
-                        {mode}
-                      </Text>
-                    </>
-                  );
-
-                  return (
-                    <Pressable
-                      key={mode}
-                      onPress={() => setSelectedOutput(mode)}
-                      style={[
-                        styles.segmentButton,
-                        index === outputModes.length - 1 &&
-                          styles.segmentLastButton,
-                      ]}
-                    >
-                      {active ? (
-                        <LinearGradient
-                          colors={["#0549a1", "#1E63B6"]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.segmentGradient}
-                        >
-                          {ButtonContent}
-                        </LinearGradient>
-                      ) : (
-                        ButtonContent
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Enter Your Request</Text>
-              <TextInput
-                value={request}
-                onChangeText={setRequest}
-                multiline
-                placeholder="Respond to insured about roof inspection findings..."
-                placeholderTextColor="#4B5D78"
-                style={[styles.textArea, styles.requestArea]}
-              />
-            </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Claim Details <Text style={styles.optional}>(Optional)</Text>
-              </Text>
-              <TextInput
-                value={claimDetails}
-                onChangeText={setClaimDetails}
-                multiline
-                placeholder="Provide any relevant claim information here..."
-                placeholderTextColor="#4B5D78"
-                style={[styles.textArea, styles.claimArea]}
-              />
-
-              <Pressable
-                style={styles.generateWrap}
-                onPress={onGenerate}
-                disabled={isGenerating}
-              >
-                <LinearGradient
-                  colors={["#0549a1", "#1E63B6"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.generate}
-                >
-                  <Text style={styles.generateText}>
-                    {isGenerating ? "Generating..." : "Generate Response"}
-                  </Text>
-                </LinearGradient>
+              <Pressable style={styles.bellWrap}>
+                <Ionicons name="notifications-outline" size={28} color="#FFFFFF" />
+                <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
               </Pressable>
             </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recent Responses</Text>
-            </View>
-
-            <View style={styles.cardsWrap}>
-              {recentResponses.map((item) => (
-                <Pressable key={item.id} style={styles.card}>
-                  <View style={styles.cardTextWrap}>
-                    <Text style={styles.cardTitle}>
-                      <Text style={styles.cardTitleStrong}>{item.type} </Text>
-                      <Text
-                        style={
-                          item.italicSubject
-                            ? styles.cardTitleItalic
-                            : styles.cardTitleNormal
-                        }
-                      >
-                        {item.subject}
-                      </Text>
-                    </Text>
-                    <Text style={styles.cardDate}>{item.date}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={30} color="#30496E" />
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
+          </View>
         </SafeAreaView>
       </LinearGradient>
-    </>
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionTitle}>1. Select Output Type</Text>
+          <View style={styles.segmented}>
+            {outputModes.map((mode) => {
+              const active = mode === selectedOutput;
+              return (
+                <Pressable
+                  key={mode}
+                  onPress={() => setSelectedOutput(mode)}
+                  style={[styles.segmentButton, active && styles.segmentButtonActive]}
+                >
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{mode}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionTitle}>2. Response Request</Text>
+          <TextInput
+            value={request}
+            onChangeText={setRequest}
+            multiline
+            placeholder="e.g., The carrier is delaying payment on Claim #4451..."
+            placeholderTextColor="#94A3B8"
+            style={[styles.textArea, styles.requestArea]}
+          />
+
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+            3. Claim Details <Text style={styles.optional}>(Optional)</Text>
+          </Text>
+          <TextInput
+            value={claimDetails}
+            onChangeText={setClaimDetails}
+            multiline
+            placeholder="Property details or specific loss notes..."
+            placeholderTextColor="#94A3B8"
+            style={[styles.textArea, styles.claimArea]}
+          />
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.generateButton,
+              (isGenerating || pressed) && { opacity: 0.9 },
+              isGenerating && { backgroundColor: '#64748B' }
+            ]}
+            onPress={onGenerate}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="star-box-multiple" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.generateText}>Generate AI Draft</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+
+        <View style={styles.recentHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Pressable><Text style={styles.viewAll}>View All</Text></Pressable>
+        </View>
+
+        <View style={styles.cardsWrap}>
+          {recentResponses.map((item) => (
+            <Pressable key={item.id} style={styles.card}>
+              <View style={styles.cardIcon}>
+                <Ionicons name={item.type.includes("Email") ? "mail" : "document-text"} size={20} color="#276bbd" />
+              </View>
+              <View style={styles.cardTextWrap}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  <Text style={styles.cardTitleStrong}>{item.type}</Text> {item.subject}
+                </Text>
+                <Text style={styles.cardDate}>{item.date}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: "transparent",
+  headerGradient: {
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  header: {
-    height: 64,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#D7DEE8",
+  headerContent: {
+    paddingHorizontal: 20,
   },
-
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: 10,
   },
-
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
   logo: {
-    width: 180,
+    width: 140,
     height: 40,
     resizeMode: "contain",
   },
-
+  creditPill: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  creditText: {
+    color: '#f3e353',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   bellWrap: {
     position: "relative",
-    width: 36,
-    alignItems: "center",
   },
-
   badge: {
     position: "absolute",
     right: -2,
-    top: -3,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#F04E2A",
+    top: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#EF4444",
     borderWidth: 2,
-    borderColor: "#1A5CC8",
+    borderColor: "#0B3C7A",
     alignItems: "center",
     justifyContent: "center",
   },
-
   badgeText: {
     color: "#FFFFFF",
-    fontSize: 12,
-    fontFamily: fontBold,
+    fontSize: 10,
+    fontWeight: "800",
   },
-
   content: {
     flex: 1,
-    backgroundColor: "#F3F5F8",
+    marginTop: -10,
   },
-
   contentContainer: {
-    paddingBottom: 16,
+    paddingBottom: 30,
+    paddingHorizontal: 16,
   },
-
-  section: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#DCE2EB",
+  cardSection: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-
   sectionTitle: {
-    color: "#2A3F5F",
-    fontSize: 15,
-    marginBottom: 8,
-    fontFamily: fontBold,
-    fontWeight: "700",
+    color: "#1E293B",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-
   optional: {
-    color: "#435774",
-    fontFamily: fontRegular,
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: '400',
   },
-
   segmented: {
     flexDirection: "row",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#B5C1D1",
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    padding: 4,
   },
-
   segmentButton: {
     flex: 1,
-    height: 40,
-    flexDirection: "row",
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    borderRightWidth: 1,
-    borderRightColor: "#C5CFDC",
+    borderRadius: 8,
   },
-
-  segmentGradient: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
-    borderRadius: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+  segmentButtonActive: {
+    backgroundColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-
-  segmentLastButton: {
-    borderRightWidth: 0,
-  },
-
   segmentText: {
     fontSize: 13,
-    color: "#2C4262",
-    fontFamily: fontDemi,
+    color: "#64748B",
+    fontWeight: "600",
   },
-
   segmentTextActive: {
-    color: "#FFFFFF",
+    color: "#0F172A",
+    fontWeight: "800",
   },
-
   textArea: {
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#0B1A33",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    borderRadius: 12,
+    padding: 15,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    color: "#1E293B",
+    fontSize: 14,
     textAlignVertical: "top",
-    color: "#2D4262",
-    fontSize: 12,
-    fontFamily: fontRegular,
-    // fontStyle: "italic",
   },
-
-  requestArea: {
-    minHeight: 130,
-  },
-
-  claimArea: {
-    minHeight: 64,
-    marginBottom: 10,
-  },
-
-  generateWrap: {
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-
-  generate: {
-    minHeight: 42,
-    paddingVertical: 10,
+  requestArea: { minHeight: 120 },
+  claimArea: { minHeight: 80 },
+  generateButton: {
+    backgroundColor: "#276bbd",
+    height: 54,
+    borderRadius: 15,
+    marginTop: 20,
+    flexDirection: 'row',
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#276bbd",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-
   generateText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontFamily: fontBold,
+    fontSize: 16,
+    fontWeight: "800",
   },
-
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  viewAll: {
+    color: '#276bbd',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   cardsWrap: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    gap: 14,
+    marginTop: 12,
+    gap: 12,
   },
-
   card: {
-    borderRadius: 6,
+    borderRadius: 16,
     backgroundColor: "#FFFFFF",
-    shadowColor: "#0B1A33",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-    minHeight: 64,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-
+  cardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
   cardTextWrap: {
     flex: 1,
-    paddingRight: 6,
   },
-
   cardTitle: {
-    color: "#2B4062",
-    fontSize: 13,
-    fontFamily: fontRegular,
+    color: "#334155",
+    fontSize: 14,
+    fontWeight: '500',
   },
-
   cardTitleStrong: {
-    fontFamily: fontBold,
+    fontWeight: "800",
+    color: '#1E293B',
   },
-
-  cardTitleNormal: {
-    fontFamily: fontMedium,
-  },
-
-  cardTitleItalic: {
-    fontFamily: fontMedium,
-    // fontStyle: "italic",
-  },
-
   cardDate: {
-    marginTop: 4,
-    color: "#556784",
+    marginTop: 2,
+    color: "#94A3B8",
     fontSize: 12,
-    fontFamily: fontRegular,
   },
 });
