@@ -96,7 +96,7 @@ export default function HomeScreen() {
       Alert.alert("Missing input", "Please enter your request.");
       return;
     }
-    if (status && !status.canGenerate) {
+    if (status && !status.subscription.remaining) {
       Alert.alert(
         "Limit reached",
         "You reached your monthly free-tier limit. Please upgrade.",
@@ -299,25 +299,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
-header: {
-  height: 64,
-  paddingHorizontal: 16,
-  justifyContent: "center",
-  borderBottomWidth: 1,
-  borderBottomColor: "#D7DEE8",
-},
+  header: {
+    height: 64,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#D7DEE8",
+  },
 
-headerRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-},
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
-logo: {
-  width: 180,
-  height: 40,
-  resizeMode: "contain",
-},
+  logo: {
+    width: 180,
+    height: 40,
+    resizeMode: "contain",
+  },
 
   bellWrap: {
     position: "relative",
@@ -344,7 +344,6 @@ logo: {
     fontSize: 12,
     fontFamily: fontBold,
   },
-
 
   content: {
     flex: 1,

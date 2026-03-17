@@ -96,44 +96,59 @@ export default function SettingsScreen() {
         <Text style={[styles.title, styles.sectionTitle]}>Subscription</Text>
 
         {loading ? (
-          <ActivityIndicator size="small" />
+          <ActivityIndicator
+            size="small"
+            color="#1458A8"
+            style={{ marginTop: 20 }}
+          />
         ) : (
           <>
             <Text style={styles.rowLabel}>Plan</Text>
             <Text style={styles.rowValue}>
-              {status?.plan === "paid" ? "Paid" : "Free"}
+              {/* Maps plan_type to UI */}
+              {status?.subscription?.plan_type
+                ? status.subscription.plan_type.toUpperCase()
+                : "FREE"}
             </Text>
 
             <Text style={styles.rowLabel}>Usage this month</Text>
             <Text style={styles.rowValue}>
-              {status
-                ? `${status.usedThisMonth}/${status.monthlyLimit}`
+              {/* Maps current_usage/usage_limit */}
+              {status?.subscription
+                ? `${status.subscription.current_usage}/${status.subscription.usage_limit}`
                 : "-"}
             </Text>
 
             <Text style={styles.rowLabel}>Remaining</Text>
             <Text style={styles.rowValue}>
-              {status ? status.remainingThisMonth : "-"}
+              {/* Maps remaining */}
+              {status?.subscription ? status.subscription.remaining : "-"}
             </Text>
 
-            <Text style={styles.rowLabel}>Paid Tier</Text>
+            <Text style={styles.rowLabel}>Expires At</Text>
             <Text style={styles.rowValue}>
-              {status?.priceLabel ?? "$49/month"}
+              {/* Maps expires_at to a readable date */}
+              {status?.subscription?.expires_at
+                ? new Date(status.subscription.expires_at).toLocaleDateString()
+                : "-"}
             </Text>
           </>
         )}
 
         {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
 
-        <Pressable
-          style={[styles.upgradeButton, busyCheckout && { opacity: 0.6 }]}
-          disabled={busyCheckout}
-          onPress={onUpgrade}
-        >
-          <Text style={styles.upgradeText}>
-            {busyCheckout ? "Starting Checkout..." : "Upgrade to Paid"}
-          </Text>
-        </Pressable>
+        {/* ✅ Logic check to hide upgrade button if already on Pro */}
+        {status?.subscription?.plan_type !== "pro" && (
+          <Pressable
+            style={[styles.upgradeButton, busyCheckout && { opacity: 0.6 }]}
+            disabled={busyCheckout}
+            onPress={onUpgrade}
+          >
+            <Text style={styles.upgradeText}>
+              {busyCheckout ? "Starting Checkout..." : "Upgrade to Pro"}
+            </Text>
+          </Pressable>
+        )}
 
         <Pressable style={styles.logoutButton} onPress={logout}>
           <Text style={styles.logoutText}>Log Out</Text>

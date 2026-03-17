@@ -22,7 +22,6 @@ type AuthContextValue = {
   token: string | null;
   email: string | null;
   login: (email: string, password: string) => Promise<void>;
-  // ✅ UPDATED: Added role to the type definition
   signup: (
     name: string,
     email: string,
@@ -93,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmail(session.email);
         await saveSession(session);
       },
-      // ✅ FIXED: Matches the 4 arguments required for role-based signup
       async signup(
         name: string,
         inputEmail: string,

@@ -14,6 +14,7 @@ type AuthApiResponse = {
     id: number;
     name: string;
     email: string;
+    role: string; // Added role to the user response type
   };
   token: string;
 };
@@ -29,16 +30,17 @@ export type GenerateResponseResult = {
 };
 
 export type SubscriptionStatus = {
-  plan: "free" | "paid";
-  monthlyLimit: number;
-  usedThisMonth: number;
-  remainingThisMonth: number;
-  canGenerate: boolean;
-  priceLabel: string;
+  success: boolean;
+  subscription: {
+    plan_type: string;
+    usage_limit: number;
+    current_usage: number;
+    remaining: number;
+    expires_at: string;
+  };
 };
 
 const API_BASE_URL = BASE_URL;
-// const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
   file: "File Note",
@@ -51,7 +53,7 @@ async function apiRequest<T>(
   token?: string,
 ): Promise<T> {
   if (!API_BASE_URL) {
-    throw new Error("Missing EXPO_PUBLIC_API_BASE_URL");
+    throw new Error("Missing API_BASE_URL");
   }
 
   const url = `${API_BASE_URL}${path}`;
@@ -117,11 +119,12 @@ export async function loginWithEmail(
 export async function signupWithEmail(
   name: string,
   email: string,
+  role: string,
   password: string,
 ): Promise<AuthSession> {
   const data = await apiRequest<AuthApiResponse>("/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, role, password }),
   });
 
   return {
@@ -131,10 +134,7 @@ export async function signupWithEmail(
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  if (!API_BASE_URL) {
-    return;
-  }
-
+  if (!API_BASE_URL) return;
   await apiRequest<{ ok: true }>("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
@@ -145,10 +145,7 @@ export async function resetPassword(
   token: string,
   newPassword: string,
 ): Promise<void> {
-  if (!API_BASE_URL) {
-    return;
-  }
-
+  if (!API_BASE_URL) return;
   await apiRequest<{ ok: true }>("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, newPassword }),
@@ -159,8 +156,12 @@ export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  const res = await apiRequest<{ success?: boolean; data?: string; message?: string }>(
-    "/drafts/generate",
+  const res = await apiRequest<{
+    success?: boolean;
+    data?: string;
+    message?: string;
+  }>(
+    "/drafts/generate-test",
     {
       method: "POST",
       body: JSON.stringify({
@@ -182,22 +183,23 @@ export async function getSubscriptionStatus(
 ): Promise<SubscriptionStatus> {
   if (!API_BASE_URL) {
     return {
-      plan: "free",
-      monthlyLimit: 10,
-      usedThisMonth: 0,
-      remainingThisMonth: 10,
-      canGenerate: true,
-      priceLabel: "$49/month",
+      success: true,
+      subscription: {
+        plan_type: "free",
+        usage_limit: 5,
+        current_usage: 0,
+        remaining: 5,
+        expires_at: new Date().toISOString(),
+      },
     };
   }
 
   return apiRequest<SubscriptionStatus>(
-    "/v1/subscription/status",
+    "/subscriptions/my-plan",
     { method: "GET" },
     token,
   );
 }
-
 export async function createCheckoutSession(
   token: string,
 ): Promise<{ checkoutUrl: string }> {
@@ -206,7 +208,7 @@ export async function createCheckoutSession(
   }
 
   return apiRequest<{ checkoutUrl: string }>(
-    "/v1/subscription/checkout",
+    "/subscriptions/s",
     {
       method: "POST",
       body: JSON.stringify({}),
