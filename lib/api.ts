@@ -200,18 +200,16 @@ export async function getSubscriptionStatus(
     token,
   );
 }
-export async function createCheckoutSession(
-  token: string,
-): Promise<{ checkoutUrl: string }> {
-  if (!API_BASE_URL) {
-    return { checkoutUrl: "https://stripe.com" };
-  }
 
+export async function upgradeSubscription(
+  token: string,
+  planType: "pro" | "enterprise",
+): Promise<{ checkoutUrl: string }> {
   return apiRequest<{ checkoutUrl: string }>(
-    "/subscriptions/s",
+    "/subscriptions/upgrade",
     {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ planType }),
     },
     token,
   );
