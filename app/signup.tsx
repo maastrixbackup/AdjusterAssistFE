@@ -1,20 +1,20 @@
+import { useAuth } from "@/providers/auth-provider";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
-    ActivityIndicator,
-    Image,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "@/providers/auth-provider";
 
 const fontRegular = "Roboto";
 const fontMedium = "Roboto-Medium";
@@ -25,6 +25,7 @@ const SignupScreen: React.FC = () => {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState("ca");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -36,7 +37,7 @@ const SignupScreen: React.FC = () => {
   const abstractImg = require("../assets/images/abstract1.png");
 
   async function handleSignup() {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !role || !password || !confirmPassword) {
       setErrorMessage("All fields are required.");
       return;
     }
@@ -50,7 +51,7 @@ const SignupScreen: React.FC = () => {
       setLoading(true);
       setErrorMessage(null);
 
-      await signup(name.trim(), email.trim(), password);
+      await signup(name.trim(),  email.trim(), role, password);
       if (Platform.OS === "web") {
         window.alert("Signup Successful\n\nYour account has been created.");
         router.replace("/login");
@@ -123,6 +124,19 @@ const SignupScreen: React.FC = () => {
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
+              />
+            </View>
+
+            {/* Role  */}
+
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={20} color="#9CA3AF" />
+              <TextInput
+                placeholder="Role"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input}
+                value={role}
+                onChangeText={setRole}
               />
             </View>
 

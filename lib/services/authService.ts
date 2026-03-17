@@ -1,5 +1,5 @@
-import { removeToken, saveToken } from "@/lib/utils/storage";
 import { apiRequest } from "@/lib/services/apiClient";
+import { removeToken, saveToken } from "@/lib/utils/storage";
 
 type AuthApiResponse = {
   success: boolean;
@@ -36,11 +36,13 @@ export async function loginUser(
 export async function signupUser(
   name: string,
   email: string,
+  role: string,
   password: string,
 ): Promise<AuthApiResponse> {
   const response = await apiRequest<AuthApiResponse>("/auth/signup", "POST", {
     name,
     email,
+    role,
     password,
   });
 
@@ -61,9 +63,10 @@ export async function loginWithEmail(
 export async function signupWithEmail(
   name: string,
   email: string,
+  role: string,
   password: string,
 ): Promise<void> {
-  await signupUser(name, email, password);
+  await signupUser(name, email, role, password);
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
