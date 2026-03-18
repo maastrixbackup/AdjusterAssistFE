@@ -14,12 +14,19 @@ type AuthApiResponse = {
     id: number;
     name: string;
     email: string;
+    role: string;
   };
   token: string;
 };
 
+/**
+ * UPDATED: Matches your required JSON payload exactly
+ */
 export type GenerateResponseRequest = {
+  fileId: number;
   type: OutputType;
+  userInput: string;
+  shouldSave: boolean;
 };
 
 export type GenerateResponseResult = {
@@ -29,16 +36,17 @@ export type GenerateResponseResult = {
 };
 
 export type SubscriptionStatus = {
-  plan: "free" | "paid";
-  monthlyLimit: number;
-  usedThisMonth: number;
-  remainingThisMonth: number;
-  canGenerate: boolean;
-  priceLabel: string;
+  success: boolean;
+  subscription: {
+    plan_type: string;
+    usage_limit: number;
+    current_usage: number;
+    remaining: number;
+    expires_at: string;
+  };
 };
 
 const API_BASE_URL = BASE_URL;
-// const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
   file: "File Note",
@@ -51,7 +59,7 @@ async function apiRequest<T>(
   token?: string,
 ): Promise<T> {
   if (!API_BASE_URL) {
-    throw new Error("Missing EXPO_PUBLIC_API_BASE_URL");
+    throw new Error("Missing API_BASE_URL");
   }
 
   const url = `${API_BASE_URL}${path}`;
@@ -117,11 +125,12 @@ export async function loginWithEmail(
 export async function signupWithEmail(
   name: string,
   email: string,
+  role: string,
   password: string,
 ): Promise<AuthSession> {
   const data = await apiRequest<AuthApiResponse>("/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, role, password }),
   });
 
   return {
@@ -130,50 +139,41 @@ export async function signupWithEmail(
   };
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
-  if (!API_BASE_URL) {
-    return;
-  }
-
-  await apiRequest<{ ok: true }>("/auth/forgot-password", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
-}
-
-export async function resetPassword(
-  token: string,
-  newPassword: string,
-): Promise<void> {
-  if (!API_BASE_URL) {
-    return;
-  }
-
-  await apiRequest<{ ok: true }>("/auth/reset-password", {
-    method: "POST",
-    body: JSON.stringify({ token, newPassword }),
-  });
-}
-
+/**
+ * UPDATED: Uses the explicit payload structure and handles credit-based failures
+ */
 export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  const res = await apiRequest<{ success?: boolean; data?: string; message?: string }>(
+  // Update the type definition here to match your real API response
+  const res = await apiRequest<{
+    success: boolean;
+    message: string;
+    data: {
+      draftId: number;
+      claim_number: string;
+      client_name: string;
+      content: string; // This is what we need!
+    };
+  }>(
     "/drafts/generate",
     {
       method: "POST",
-      body: JSON.stringify({
-        type: payload.type,
-      }),
+      body: JSON.stringify(payload),
     },
     token,
   );
 
+  if (res.success === false) {
+    throw new Error(res.message || "Insufficient credits.");
+  }
+
   return {
     responseType: payload.type,
-    responseTypeLabel: responseTypeLabels[payload.type],
-    responseText: res.data ?? res.message ?? "",
+    responseTypeLabel: responseTypeLabels[payload.type] || "Response",
+    // FIX: Access res.data.content instead of just res.data
+    responseText: res.data?.content ?? res.message ?? "No content generated",
   };
 }
 
@@ -182,34 +182,33 @@ export async function getSubscriptionStatus(
 ): Promise<SubscriptionStatus> {
   if (!API_BASE_URL) {
     return {
-      plan: "free",
-      monthlyLimit: 10,
-      usedThisMonth: 0,
-      remainingThisMonth: 10,
-      canGenerate: true,
-      priceLabel: "$49/month",
+      success: true,
+      subscription: {
+        plan_type: "free",
+        usage_limit: 5,
+        current_usage: 0,
+        remaining: 5,
+        expires_at: new Date().toISOString(),
+      },
     };
   }
 
   return apiRequest<SubscriptionStatus>(
-    "/v1/subscription/status",
+    "/subscriptions/my-plan",
     { method: "GET" },
     token,
   );
 }
 
-export async function createCheckoutSession(
+export async function upgradeSubscription(
   token: string,
+  planType: "pro" | "enterprise",
 ): Promise<{ checkoutUrl: string }> {
-  if (!API_BASE_URL) {
-    return { checkoutUrl: "https://stripe.com" };
-  }
-
   return apiRequest<{ checkoutUrl: string }>(
-    "/v1/subscription/checkout",
+    "/subscriptions/upgrade",
     {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ planType }),
     },
     token,
   );
