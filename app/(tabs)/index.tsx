@@ -2,11 +2,12 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,14 +42,12 @@ const recentResponses = [
     type: "Email Response:",
     subject: "Roof Inspection Summary",
     date: "Mar 12, 2026",
-    italicSubject: false,
   },
   {
     id: "2",
     type: "File Note:",
     subject: "Water Damage Assessment",
     date: "Mar 10, 2026",
-    italicSubject: true,
   },
 ];
 
@@ -59,6 +58,7 @@ export default function HomeScreen() {
   const [claimDetails, setClaimDetails] = useState("");
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isFetchingStatus, setIsFetchingStatus] = useState(true);
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -68,19 +68,21 @@ export default function HomeScreen() {
       if (!token) return;
       try {
         const next = await getSubscriptionStatus(token);
-        if (mounted) setStatus(next);
+        if (mounted) {
+          setStatus(next);
+          setIsFetchingStatus(false);
+        }
       } catch {
-        if (mounted) setStatus(null);
+        if (mounted) setIsFetchingStatus(false);
       }
     }
     loadStatus();
     return () => { mounted = false; };
   }, [token]);
 
-  async function onGenerate() {
-    if (!token) return;
+  const onGenerate = useCallback(async () => {
+    if (!token || isGenerating) return;
 
-    // 1. Validation
     if (!request.trim()) {
       Toast.show({
         type: 'error',
@@ -90,7 +92,6 @@ export default function HomeScreen() {
       return;
     }
 
-    // 2. Local Credit Check
     if (status && status.subscription.remaining <= 0) {
       Alert.alert(
         "No Credits Remaining",
@@ -102,7 +103,6 @@ export default function HomeScreen() {
 
     setIsGenerating(true);
     try {
-      // Mapping to required backend structure
       const payload: GenerateResponseRequest = {
         fileId: 1,
         type: outputTypeMap[selectedOutput],
@@ -111,12 +111,6 @@ export default function HomeScreen() {
       };
 
       const result = await generateResponse(token, payload);
-
-      /**
-       * UPDATED: Passing the actual draft text to the response screen.
-       * generateResponse in api.ts should now return result.responseText 
-       * extracted from res.data.content.
-       */
       router.push({
         pathname: "/response",
         params: {
@@ -127,19 +121,14 @@ export default function HomeScreen() {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate response";
-
-      if (message.includes("credits") || message.includes("plan")) {
-        Alert.alert("Subscription Notice", message);
-      } else {
-        Toast.show({ type: 'error', text1: 'Generation Failed', text2: message });
-      }
+      Toast.show({ type: 'error', text1: 'Generation Failed', text2: message });
     } finally {
       setIsGenerating(false);
     }
-  }
+  }, [token, request, claimDetails, selectedOutput, status, isGenerating]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F3F5F8" }}>
+    <View style={styles.mainContainer}>
       <StatusBar style="light" translucent />
 
       <LinearGradient
@@ -153,9 +142,13 @@ export default function HomeScreen() {
             <Image source={logo} style={styles.logo} />
             <View style={styles.headerActions}>
               <View style={styles.creditPill}>
-                <Text style={styles.creditText}>
-                  {status ? `${status.subscription.remaining} Credits` : "---"}
-                </Text>
+                {isFetchingStatus ? (
+                  <ActivityIndicator size="small" color="#f3e353" />
+                ) : (
+                  <Text style={styles.creditText}>
+                    {status ? `${status.subscription.remaining} Credits` : "0 Credits"}
+                  </Text>
+                )}
               </View>
               <Pressable style={styles.bellWrap}>
                 <Ionicons name="notifications-outline" size={28} color="#FFFFFF" />
@@ -170,6 +163,7 @@ export default function HomeScreen() {
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.cardSection}>
           <Text style={styles.sectionTitle}>1. Select Output Type</Text>
@@ -198,6 +192,8 @@ export default function HomeScreen() {
             placeholder="e.g., The carrier is delaying payment on Claim #4451..."
             placeholderTextColor="#94A3B8"
             style={[styles.textArea, styles.requestArea]}
+            autoCorrect={false}
+            spellCheck={false}
           />
 
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
@@ -210,6 +206,8 @@ export default function HomeScreen() {
             placeholder="Property details or specific loss notes..."
             placeholderTextColor="#94A3B8"
             style={[styles.textArea, styles.claimArea]}
+            autoCorrect={false}
+            spellCheck={false}
           />
 
           <Pressable
@@ -259,44 +257,31 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  mainContainer: { flex: 1, backgroundColor: "#F3F5F8" },
   headerGradient: {
     paddingBottom: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
-  headerContent: {
-    paddingHorizontal: 20,
-  },
+  headerContent: { paddingHorizontal: 20 },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 10,
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-  },
-  logo: {
-    width: 140,
-    height: 40,
-    resizeMode: "contain",
-  },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  logo: { width: 140, height: 40, resizeMode: "contain" },
   creditPill: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    minWidth: 90, // Prevents layout jump when number loads
+    alignItems: 'center',
   },
-  creditText: {
-    color: '#f3e353',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  bellWrap: {
-    position: "relative",
-  },
+  creditText: { color: '#f3e353', fontSize: 12, fontWeight: '700' },
+  bellWrap: { position: "relative" },
   badge: {
     position: "absolute",
     right: -2,
@@ -310,29 +295,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  content: {
-    flex: 1,
-    marginTop: -10,
-  },
-  contentContainer: {
-    paddingBottom: 30,
-    paddingHorizontal: 16,
-  },
+  badgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  content: { flex: 1, marginTop: -10 },
+  contentContainer: { paddingBottom: 30, paddingHorizontal: 16 },
   cardSection: {
     backgroundColor: '#FFF',
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 },
+      android: { elevation: 3 },
+    }),
   },
   sectionTitle: {
     color: "#1E293B",
@@ -342,24 +316,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  optional: {
-    color: "#94A3B8",
-    fontSize: 12,
-    fontWeight: '400',
-  },
+  optional: { color: "#94A3B8", fontSize: 12, fontWeight: '400' },
   segmented: {
     flexDirection: "row",
     backgroundColor: "#F1F5F9",
     borderRadius: 12,
     padding: 4,
   },
-  segmentButton: {
-    flex: 1,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
+  segmentButton: { flex: 1, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 8 },
   segmentButtonActive: {
     backgroundColor: "#FFF",
     shadowColor: "#000",
@@ -368,15 +332,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  segmentText: {
-    fontSize: 13,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  segmentTextActive: {
-    color: "#0F172A",
-    fontWeight: "800",
-  },
+  segmentText: { fontSize: 13, color: "#64748B", fontWeight: "600" },
+  segmentTextActive: { color: "#0F172A", fontWeight: "800" },
   textArea: {
     borderRadius: 12,
     padding: 15,
@@ -403,11 +360,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  generateText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-  },
+  generateText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
   recentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -415,15 +368,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 4,
   },
-  viewAll: {
-    color: '#276bbd',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  cardsWrap: {
-    marginTop: 12,
-    gap: 12,
-  },
+  viewAll: { color: '#276bbd', fontWeight: '700', fontSize: 13 },
+  cardsWrap: { marginTop: 12, gap: 12 },
   card: {
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
@@ -442,21 +388,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  cardTextWrap: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: "#334155",
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  cardTitleStrong: {
-    fontWeight: "800",
-    color: '#1E293B',
-  },
-  cardDate: {
-    marginTop: 2,
-    color: "#94A3B8",
-    fontSize: 12,
-  },
+  cardTextWrap: { flex: 1 },
+  cardTitle: { color: "#334155", fontSize: 14, fontWeight: '500' },
+  cardTitleStrong: { fontWeight: "800", color: '#1E293B' },
+  cardDate: { marginTop: 2, color: "#94A3B8", fontSize: 12 },
 });
