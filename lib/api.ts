@@ -19,9 +19,35 @@ type AuthApiResponse = {
   token: string;
 };
 
-/**
- * UPDATED: Matches your required JSON payload exactly
- */
+export interface ClaimFile {
+  id: number;
+  user_id: number;
+  claim_number: string;
+  policy_number: string | null;
+  client_name: string;
+  status: string;
+  created_at: string;
+}
+
+export interface RecentDraft {
+  id: number;
+  file_id: number;
+  user_id: number;
+  draft_type: OutputType;
+  content: string;
+  created_at: string;
+  claim_number: string;
+  client_name: string;
+}
+
+export interface Draft {
+  id: number;
+  file_id: number;
+  type: OutputType;
+  content: string;
+  created_at: string;
+}
+
 export type GenerateResponseRequest = {
   fileId: number;
   type: OutputType;
@@ -53,6 +79,9 @@ const responseTypeLabels: Record<OutputType, string> = {
   escalation: "Escalation Response",
 };
 
+/**
+ * Core API Helper
+ */
 async function apiRequest<T>(
   path: string,
   init: RequestInit,
@@ -63,49 +92,34 @@ async function apiRequest<T>(
   }
 
   const url = `${API_BASE_URL}${path}`;
-  const method = init.method ?? "GET";
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init.headers ?? {}),
   };
 
-  console.log("[API REQUEST]", {
-    url,
-    method,
-    body: init.body ?? null,
-  });
-
-  let response: Response;
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       ...init,
       headers,
     });
+
+    const json = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        json?.message || `Request failed with status ${response.status}`,
+      );
+    }
+
+    return json as T;
   } catch (error) {
-    console.log("[API NETWORK ERROR]", {
-      url,
-      method,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    console.error(`[API ERROR] ${path}:`, error);
     throw error;
   }
-
-  const json = await response.json().catch(() => ({}));
-  console.log("[API RESPONSE]", {
-    url,
-    method,
-    status: response.status,
-    ok: response.ok,
-    data: json,
-  });
-
-  if (!response.ok) {
-    throw new Error(json?.message ?? "Request failed");
-  }
-
-  return json as T;
 }
+
+/* --- Auth Actions --- */
 
 export async function loginWithEmail(
   email: string,
@@ -115,11 +129,7 @@ export async function loginWithEmail(
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
-
-  return {
-    token: data.token,
-    email: data.user.email,
-  };
+  return { token: data.token, email: data.user.email };
 }
 
 export async function signupWithEmail(
@@ -132,32 +142,54 @@ export async function signupWithEmail(
     method: "POST",
     body: JSON.stringify({ name, email, role, password }),
   });
-
-  return {
-    token: data.token,
-    email: data.user.email,
-  };
+  return { token: data.token, email: data.user.email };
 }
 
-/**
- * UPDATED: Uses the explicit payload structure and handles credit-based failures
- */
+/* --- File & Workspace Actions --- */
+export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
+  try {
+    const response = await apiRequest<{ success: boolean; files: ClaimFile[] }>(
+      "/files/my-files",
+      { method: "GET" },
+      token,
+    );
+
+    console.log("[API DEBUG] Raw Files Data:", response.files);
+    return response.files || [];
+  } catch (error) {
+    console.error("[API ERROR] getMyFiles failed:", error);
+    return []; // Return empty array so the UI doesn't crash
+  }
+};
+
+// Helper for the next screen: Fetching drafts for a specific file
+export async function getFileDrafts(
+  token: string,
+  fileId: number,
+): Promise<Draft[]> {
+  const res = await apiRequest<{ success: boolean; drafts: Draft[] }>(
+    `/files/${fileId}/drafts`,
+    { method: "GET" },
+    token,
+  );
+  return res.drafts || [];
+}
+
+/* --- Generation & Subscription --- */
+
 export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  // Update the type definition here to match your real API response
   const res = await apiRequest<{
     success: boolean;
     message: string;
     data: {
       draftId: number;
-      claim_number: string;
-      client_name: string;
-      content: string; // This is what we need!
+      content: string;
     };
   }>(
-    "/drafts/generate",
+    "/drafts/generate-test",
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -165,34 +197,16 @@ export async function generateResponse(
     token,
   );
 
-  if (res.success === false) {
-    throw new Error(res.message || "Insufficient credits.");
-  }
-
   return {
     responseType: payload.type,
     responseTypeLabel: responseTypeLabels[payload.type] || "Response",
-    // FIX: Access res.data.content instead of just res.data
-    responseText: res.data?.content ?? res.message ?? "No content generated",
+    responseText: res.data?.content ?? "No content generated",
   };
 }
 
 export async function getSubscriptionStatus(
   token: string,
 ): Promise<SubscriptionStatus> {
-  if (!API_BASE_URL) {
-    return {
-      success: true,
-      subscription: {
-        plan_type: "free",
-        usage_limit: 5,
-        current_usage: 0,
-        remaining: 5,
-        expires_at: new Date().toISOString(),
-      },
-    };
-  }
-
   return apiRequest<SubscriptionStatus>(
     "/subscriptions/my-plan",
     { method: "GET" },
@@ -213,3 +227,20 @@ export async function upgradeSubscription(
     token,
   );
 }
+
+export const getRecentDrafts = async (
+  token: string,
+): Promise<RecentDraft[]> => {
+  try {
+    const response = await apiRequest<{
+      success: boolean;
+      data: RecentDraft[];
+    }>("/drafts/recent", { method: "GET" }, token);
+
+    console.log("[API DEBUG] Recent Drafts:", response.data?.length);
+    return response.data || [];
+  } catch (error) {
+    console.error("[API ERROR] getRecentDrafts failed:", error);
+    return [];
+  }
+};

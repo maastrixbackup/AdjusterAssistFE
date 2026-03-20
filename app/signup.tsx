@@ -2,43 +2,46 @@ import { useAuth } from "@/providers/auth-provider";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const fontRegular = "Roboto";
-const fontMedium = "Roboto-Medium";
-const fontBold = "Roboto-Bold";
+const { width } = Dimensions.get("window");
+type RoleType = "pa" | "ca";
 
-const SignupScreen: React.FC = () => {
+export default function SignupScreen() {
   const { signup } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("ca");
+  const [role, setRole] = useState<RoleType>("ca");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
-  const abstractImg = require("../assets/images/abstract1.png");
 
   async function handleSignup() {
-    if (!name || !email || !role || !password || !confirmPassword) {
-      setErrorMessage("All fields are required.");
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+      setErrorMessage("Please fill in all fields.");
       return;
     }
 
@@ -47,23 +50,23 @@ const SignupScreen: React.FC = () => {
       return;
     }
 
+    setLoading(true);
+    setErrorMessage(null);
+
     try {
-      setLoading(true);
-      setErrorMessage(null);
+      await signup(name.trim(), email.trim(), role, password);
+      
+      const successTitle = "Account Created";
+      const successMsg = "Your adjuster profile is ready. Please log in.";
 
-      await signup(name.trim(),  email.trim(), role, password);
       if (Platform.OS === "web") {
-        window.alert("Signup Successful\n\nYour account has been created.");
+        window.alert(`${successTitle}\n\n${successMsg}`);
         router.replace("/login");
-        return;
+      } else {
+        Alert.alert(successTitle, successMsg, [
+          { text: "Log In Now", onPress: () => router.replace("/login") },
+        ]);
       }
-
-      Alert.alert("Signup Successful", "Your account has been created.", [
-        {
-          text: "OK",
-          onPress: () => router.replace("/login"),
-        },
-      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Signup failed";
       setErrorMessage(message);
@@ -73,269 +76,198 @@ const SignupScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaProvider>
-      <LinearGradient
-        colors={["#1E63B6", "#052146"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+    <View style={styles.mainContainer}>
+      <StatusBar style="light" />
+      
+      {/* Background Layer */}
+      <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={StyleSheet.absoluteFill} />
+      
+      {/* Decorative Background Effects (Glass Orbs) */}
+      <View style={[styles.orb, styles.orbTop]} />
+      <View style={[styles.orb, styles.orbBottom]} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <SafeAreaView edges={["top"]} style={styles.safe}>
-          <LinearGradient
-            colors={["#1E63B6", "#052146"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.header}
-          >
-            <Image source={abstractImg} style={styles.molecule} />
-
-            <View style={styles.logoContainer}>
-              <Image source={logoImg} style={styles.logo} />
-            </View>
-          </LinearGradient>
-
-          <View style={styles.container}>
-            <Text style={styles.title}>Create Account</Text>
-
-            <Text style={styles.subtitle}>Sign up to get started.</Text>
-
-            {/* Name */}
-
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color="#9CA3AF" />
-              <TextInput
-                placeholder="Full Name"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-              />
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <SafeAreaView style={styles.safeArea}>
+            
+            <View style={styles.headerSection}>
+              <View style={styles.logoBadge}>
+                <Image source={logoImg} style={styles.logo} />
+              </View>
+              <Text style={styles.welcomeText}>Create Account</Text>
+              <Text style={styles.brandSubtitle}>Join the next generation of adjusting</Text>
             </View>
 
-            {/* Email */}
-
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
-              <TextInput
-                placeholder="Email Address"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-
-            {/* Role  */}
-
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color="#9CA3AF" />
-              <TextInput
-                placeholder="Role"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                value={role}
-                onChangeText={setRole}
-              />
-            </View>
-
-            {/* Password */}
-
-            <View style={styles.inputWrapper}>
-              <Feather name="lock" size={20} color="#9CA3AF" />
-              <TextInput
-                placeholder="Password"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-              />
-
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={20}
-                  color="#9CA3AF"
+            <View style={styles.card}>
+              {/* Name Input */}
+              <View style={[styles.inputContainer, focusedInput === "name" && styles.inputActive]}>
+                <Feather name="user" size={18} color={focusedInput === "name" ? "#276bbd" : "#94A3B8"} />
+                <TextInput
+                  placeholder="Full Name"
+                  placeholderTextColor="#94A3B8"
+                  style={styles.input}
+                  value={name}
+                  onChangeText={(t) => { setName(t); setErrorMessage(null); }}
+                  onFocus={() => setFocusedInput("name")}
+                  onBlur={() => setFocusedInput(null)}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
 
-            {/* Confirm Password */}
+              {/* Email Input */}
+              <View style={[styles.inputContainer, focusedInput === "email" && styles.inputActive]}>
+                <Feather name="mail" size={18} color={focusedInput === "email" ? "#276bbd" : "#94A3B8"} />
+                <TextInput
+                  placeholder="Email Address"
+                  placeholderTextColor="#94A3B8"
+                  style={styles.input}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={(t) => { setEmail(t); setErrorMessage(null); }}
+                  onFocus={() => setFocusedInput("email")}
+                  onBlur={() => setFocusedInput(null)}
+                />
+              </View>
 
-            <View style={styles.inputWrapper}>
-              <Feather name="lock" size={20} color="#9CA3AF" />
-              <TextInput
-                placeholder="Confirm Password"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
-            </View>
+              {/* Role Selector */}
+              <Text style={styles.label}>Select Your Role</Text>
+              <View style={styles.roleRow}>
+                <Pressable
+                  style={[styles.roleButton, role === "ca" && styles.roleButtonActive]}
+                  onPress={() => setRole("ca")}
+                >
+                  <Ionicons name="business" size={16} color={role === "ca" ? "#FFF" : "#64748B"} />
+                  <Text style={[styles.roleButtonText, role === "ca" && styles.roleButtonTextActive]}>Carrier (CA)</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.roleButton, role === "pa" && styles.roleButtonActive]}
+                  onPress={() => setRole("pa")}
+                >
+                  <Ionicons name="shield-checkmark" size={16} color={role === "pa" ? "#FFF" : "#64748B"} />
+                  <Text style={[styles.roleButtonText, role === "pa" && styles.roleButtonTextActive]}>Public (PA)</Text>
+                </Pressable>
+              </View>
 
-            {errorMessage ? (
-              <Text style={styles.error}>{errorMessage}</Text>
-            ) : null}
+              {/* Password */}
+              <View style={[styles.inputContainer, focusedInput === "pass" && styles.inputActive]}>
+                <Feather name="lock" size={18} color={focusedInput === "pass" ? "#276bbd" : "#94A3B8"} />
+                <TextInput
+                  placeholder="Password"
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry={!showPassword}
+                  style={styles.input}
+                  value={password}
+                  onChangeText={(t) => { setPassword(t); setErrorMessage(null); }}
+                  onFocus={() => setFocusedInput("pass")}
+                  onBlur={() => setFocusedInput(null)}
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
+                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#94A3B8" />
+                </Pressable>
+              </View>
 
-            {/* Signup Button */}
+              {/* Confirm Password */}
+              <View style={[styles.inputContainer, focusedInput === "confirm" && styles.inputActive]}>
+                <Feather name="shield" size={18} color={focusedInput === "confirm" ? "#276bbd" : "#94A3B8"} />
+                <TextInput
+                  placeholder="Confirm Password"
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry={!showPassword}
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChangeText={(t) => { setConfirmPassword(t); setErrorMessage(null); }}
+                  onFocus={() => setFocusedInput("confirm")}
+                  onBlur={() => setFocusedInput(null)}
+                />
+              </View>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleSignup}
-              disabled={loading}
-            >
-              <LinearGradient
-                colors={["#092f61", "#1E63B6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.buttonGradient}
+              {errorMessage && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+                onPress={handleSignup}
+                disabled={loading}
               >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.buttonText}>Sign Up</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient colors={["#276bbd", "#1E63B6"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGradient}>
+                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Create Account</Text>}
+                </LinearGradient>
+              </Pressable>
 
-            {/* Login Link */}
-
-            <Text style={styles.signup}>
-              Already have an account?{" "}
-              <Text
-                style={styles.signupLink}
-                onPress={() => router.push("/login")}
-              >
-                Log In
-              </Text>
-            </Text>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-    </SafeAreaProvider>
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>Already have an account?</Text>
+                <Pressable onPress={() => router.push("/login")}>
+                  <Text style={styles.loginLink}>Log In</Text>
+                </Pressable>
+              </View>
+            </View>
+          </SafeAreaView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
-};
-
-export default SignupScreen;
+}
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
+  mainContainer: { flex: 1, backgroundColor: "#0B3C7A" },
+  
+  // Background Orbs
+  orb: {
+    position: 'absolute',
+    width: width * 0.8,
+    height: width * 0.8,
+    borderRadius: (width * 0.8) / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  orbTop: {
+    top: -width * 0.2,
+    right: -width * 0.2,
+  },
+  orbBottom: {
+    bottom: -width * 0.1,
+    left: -width * 0.3,
   },
 
-  header: {
-    height: 110,
-    justifyContent: "center",
-    overflow: "hidden",
-  },
+  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+  safeArea: { flex: 1, paddingHorizontal: 24 },
+  headerSection: { alignItems: "center", marginBottom: 30, marginTop: 20 },
+  logoBadge: { backgroundColor: "rgba(255,255,255,0.1)", padding: 12, borderRadius: 20, marginBottom: 15, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  logo: { width: 180, height: 40, resizeMode: "contain" },
+  welcomeText: { fontSize: 26, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
+  brandSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: "500" },
 
-  molecule: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: 220,
-    height: 120,
-    resizeMode: "cover",
-    opacity: 0.25,
-  },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 30, padding: 24, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
+  label: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+  
+  roleRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  roleButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 45, borderRadius: 12, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
+  roleButtonActive: { backgroundColor: "#276bbd", borderColor: "#276bbd" },
+  roleButtonText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  roleButtonTextActive: { color: "#FFFFFF" },
 
-  logoContainer: {
-    paddingLeft: 24,
-  },
+  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 14, paddingHorizontal: 15, height: 54, marginBottom: 14 },
+  inputActive: { borderColor: "#276bbd", backgroundColor: "#FFF" },
+  input: { flex: 1, marginLeft: 10, fontSize: 15, color: "#1E293B", fontWeight: "500" },
 
-  logo: {
-    width: 220,
-    resizeMode: "contain",
-  },
+  errorBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 12, borderRadius: 12, marginBottom: 15, gap: 8 },
+  errorText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
 
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    marginTop: -8,
-    padding: 18,
-    paddingTop: 28,
-  },
+  submitBtn: { borderRadius: 14, overflow: "hidden", marginTop: 10, elevation: 3 },
+  btnGradient: { height: 56, justifyContent: "center", alignItems: "center" },
+  btnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 12,
-    fontFamily: fontBold,
-  },
-
-  subtitle: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginVertical: 10,
-    fontSize: 14,
-    fontFamily: fontRegular,
-  },
-
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3E8EF",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 52,
-    marginTop: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-
-  input: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
-    color: "#111827",
-    fontFamily: fontRegular,
-  },
-
-  button: {
-    marginTop: 24,
-  },
-
-  buttonGradient: {
-    height: 52,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    fontFamily: fontMedium,
-  },
-
-  signup: {
-    textAlign: "center",
-    marginTop: 20,
-    color: "#6B7280",
-    fontSize: 14,
-    fontFamily: fontRegular,
-  },
-
-  signupLink: {
-    color: "#0B5ED7",
-    fontWeight: "600",
-    fontFamily: fontMedium,
-  },
-
-  error: {
-    marginTop: 8,
-    color: "#B42318",
-    textAlign: "center",
-    fontFamily: fontMedium,
-  },
+  footer: { flexDirection: "row", justifyContent: "center", marginTop: 20, gap: 5 },
+  footerText: { color: "#64748B", fontSize: 14, fontWeight: "500" },
+  loginLink: { color: "#276bbd", fontSize: 14, fontWeight: "700" },
 });
