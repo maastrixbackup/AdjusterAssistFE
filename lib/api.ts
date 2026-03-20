@@ -31,6 +31,14 @@ export interface ClaimFile {
   draft_count?: number;
 }
 
+// Data structure for creating a new file from the frontend
+export interface CreateFileRequest {
+  client_name: string;
+  policy_number: string | null;
+  claim_number: string;
+  status: string;
+}
+
 export interface RecentDraft {
   id: number;
   file_id: number;
@@ -45,9 +53,11 @@ export interface RecentDraft {
 export interface Draft {
   id: number;
   file_id: number;
-  type: OutputType;
+  draft_type: string;
   content: string;
   created_at: string;
+  claim_number?: string;
+  client_name?: string;
 }
 
 export type GenerateResponseRequest = {
@@ -76,7 +86,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true; // Set to false to disable logs in production
+const DEBUG_MODE = true;
 
 const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
@@ -85,7 +95,7 @@ const responseTypeLabels: Record<OutputType, string> = {
 };
 
 /**
- * Core API Helper with Enhanced Logging
+ * Core API Helper
  */
 async function apiRequest<T>(
   path: string,
@@ -103,36 +113,23 @@ async function apiRequest<T>(
     ...(init.headers ?? {}),
   };
 
-  // --- PRE-REQUEST LOGGING ---
   if (DEBUG_MODE) {
     console.log(
       `%c [API REQUEST] ${init.method || "GET"} -> ${url}`,
       "color: #0ea5e9; font-weight: bold",
     );
-    if (init.body) {
-      console.log(
-        `%c Body:`,
-        "color: #6366f1",
-        JSON.parse(init.body as string),
-      );
-    }
   }
 
   try {
-    const response = await fetch(url, {
-      ...init,
-      headers,
-    });
-
+    const response = await fetch(url, { ...init, headers });
     const json = await response.json().catch(() => ({}));
 
-    // --- POST-REQUEST LOGGING ---
     if (DEBUG_MODE) {
       console.log(
         `%c [API RESPONSE] ${response.status} <- ${path}`,
         `color: ${response.ok ? "#10b981" : "#f43f5e"}; font-weight: bold`,
+        json,
       );
-      console.log(`%c Data:`, "color: #8b5cf6", json);
     }
 
     if (!response.ok) {
@@ -193,18 +190,19 @@ export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
   }
 };
 
+/**
+ * UPDATED: Now accepts data from the App Frontend modal
+ */
 export const createFile = async (
   token: string,
+  fileData: CreateFileRequest, // Pass data from the UI
 ): Promise<{ success: boolean; file: ClaimFile }> => {
   try {
     const response = await apiRequest<{ success: boolean; file: ClaimFile }>(
-      "/files/create",
+      "/files/new",
       {
         method: "POST",
-        body: JSON.stringify({
-          client_name: "New Client",
-          status: "open",
-        }),
+        body: JSON.stringify(fileData),
       },
       token,
     );
@@ -235,10 +233,7 @@ export async function generateResponse(
   const res = await apiRequest<{
     success: boolean;
     message: string;
-    data: {
-      content: string;
-      fileId: number;
-    };
+    data: { content: string; fileId: number };
   }>(
     "/drafts/generate-test",
     {
@@ -298,14 +293,13 @@ export async function upgradeSubscription(
 }
 
 export const getRecentDrafts = async (
-token: string, p0: number,
+  token: string,
 ): Promise<RecentDraft[]> => {
   try {
     const response = await apiRequest<{
       success: boolean;
       data: RecentDraft[];
     }>("/drafts/recent", { method: "GET" }, token);
-
     return response.data || [];
   } catch (error) {
     console.error("Error fetching recent drafts:", error);
@@ -328,4 +322,27 @@ export const getDraftsByFile = async (
     console.error(`Error fetching drafts for file ${fileId}:`, error);
     return [];
   }
+};
+
+export const AllDraftsofUser = async (token: string): Promise<Draft[]> => {
+  const response = await apiRequest<{
+    success: boolean;
+    data: Draft[];
+    count: number;
+  }>("/drafts/history", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.success) {
+    throw new Error("Failed to fetch draft history");
+  }
+
+  // Log only the count as requested
+  console.log(`Total Drafts Fetched: ${response.count}`);
+
+  return response.data || []; // Return the .data array
 };

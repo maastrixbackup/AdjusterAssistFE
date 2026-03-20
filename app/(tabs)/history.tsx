@@ -1,9 +1,9 @@
-import { Draft, getDraftsByFile } from "@/lib/api";
+import { AllDraftsofUser, Draft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // For that molded look
-import { router, useLocalSearchParams } from "expo-router";
-import { StatusBar } from "expo-status-bar"; // Import StatusBar
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,27 +18,37 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DraftsListScreen() {
-  const { fileId, claimNumber } = useLocalSearchParams();
   const { token } = useAuth();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDrafts = useCallback(async () => {
-    if (!token || !fileId) return;
+    if (!token) return;
     try {
-      const data = await getDraftsByFile(token, Number(fileId));
-      const sortedDrafts = data.sort((a, b) => 
+      if (!refreshing) setLoading(true);
+      
+      const data = await AllDraftsofUser(token);
+      
+      // Ensure data is an array (handling cases where apiRequest might return {drafts: []})
+      const draftList = Array.isArray(data) ? data : (data as any).drafts || [];
+      
+      const sortedDrafts = draftList.sort((a: Draft, b: Draft) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+
       setDrafts(sortedDrafts);
+      
+      // Console log only the count as requested
+      console.log(`Total Drafts Fetched: ${sortedDrafts.length}`);
+
     } catch (err) {
-      console.error("Error fetching drafts:", err);
+      console.error("Error fetching global history.",err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, fileId]);
+  }, [token, refreshing]);
 
   useEffect(() => {
     fetchDrafts();
@@ -50,8 +60,8 @@ export default function DraftsListScreen() {
   };
 
   const renderDraft = ({ item }: { item: Draft }) => {
-    const isEmail = item.type === 'email';
-    const isEscalation = item.type === 'escalation';
+    const isEmail = item.draft_type === 'email';
+    const isEscalation = item.draft_type === 'escalation';
     
     return (
       <Pressable 
@@ -64,8 +74,9 @@ export default function DraftsListScreen() {
             pathname: "/response",
             params: { 
               text: item.content, 
-              type: item.type,
-              fileId: fileId 
+              type: item.draft_type,
+              fileId: item.file_id?.toString(),
+              alreadySaved: "true" 
             }
           });
         }}
@@ -78,12 +89,16 @@ export default function DraftsListScreen() {
         <View style={styles.cardMain}>
           <View style={styles.cardHeader}>
             <View style={styles.typeBadge}>
-              <Text style={styles.typeBadgeText}>{item.type?.toUpperCase() || "DRAFT"}</Text>
+              <Text style={styles.typeBadgeText}>{item.draft_type?.toUpperCase() || "DRAFT"}</Text>
             </View>
             <Text style={styles.dateText}>
               {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
             </Text>
           </View>
+
+          {item.claim_number && (
+             <Text style={styles.claimNoText}>Claim: {item.claim_number}</Text>
+          )}
 
           <Text style={styles.contentPreview} numberOfLines={2}>
             {item.content || "Empty draft content..."}
@@ -97,7 +112,7 @@ export default function DraftsListScreen() {
                 </Text>
             </View>
             <View style={styles.openAction}>
-                <Text style={styles.openText}>View</Text>
+                <Text style={styles.openText}>Review</Text>
                 <Ionicons name="chevron-forward" size={12} color="#0F4C9C" />
             </View>
           </View>
@@ -129,7 +144,7 @@ export default function DraftsListScreen() {
                     </View>
 
                     <View style={styles.claimBadge}>
-                        <Text style={styles.claimText}>{claimNumber || "Files"}</Text>
+                        <Text style={styles.claimText}>History</Text>
                     </View>
                 </View>
             </SafeAreaView>
@@ -139,7 +154,7 @@ export default function DraftsListScreen() {
       {loading && !refreshing ? (
         <View style={styles.loaderCenter}>
           <ActivityIndicator size="small" color="#0F4C9C" />
-          <Text style={styles.loaderSub}>Syncing Archive...</Text>
+          <Text style={styles.loaderSub}>Syncing History...</Text>
         </View>
       ) : (
         <FlatList
@@ -153,17 +168,17 @@ export default function DraftsListScreen() {
           }
           ListHeaderComponent={
             <View style={styles.listHeader}>
-                <Text style={styles.headerCount}>{drafts.length} Saved Generations</Text>
+                <Text style={styles.headerCount}>{drafts.length} Total Saved Generations</Text>
                 <View style={styles.headerLine} />
             </View>
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
-                <MaterialCommunityIcons name="cloud-search-outline" size={40} color="#CBD5E1" />
+                <MaterialCommunityIcons name="history" size={40} color="#CBD5E1" />
               </View>
-              <Text style={styles.emptyTitle}>No Drafts Found</Text>
-              <Text style={styles.emptySubtitle}>Your generated AI responses for this file will appear here.</Text>
+              <Text style={styles.emptyTitle}>No History Found</Text>
+              <Text style={styles.emptySubtitle}>Your generated responses saved across all files will appear here.</Text>
             </View>
           }
         />
@@ -171,7 +186,6 @@ export default function DraftsListScreen() {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
   headerContainer: {
@@ -235,6 +249,7 @@ const styles = StyleSheet.create({
   typeBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   typeBadgeText: { fontSize: 9, fontWeight: '900', color: '#475569' },
   dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '700' },
+  claimNoText: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 4 },
   contentPreview: { fontSize: 15, color: '#1E293B', fontWeight: '500', lineHeight: 22, marginBottom: 14 },
   
   cardFooter: { 

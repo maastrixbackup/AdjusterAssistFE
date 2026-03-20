@@ -1,8 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Make sure to install this
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +17,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// 1. Import your API and Auth provider
 import { saveDraft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -26,8 +26,10 @@ type Params = {
   text?: string;
   type?: string;
   outputType?: OutputType;
-  fileId?: string; 
+  fileId?: string;
 };
+
+const SAVED_DRAFTS_KEY = "@session_saved_drafts";
 
 const defaultLabels: Record<string, string> = {
   email: "Email Response",
@@ -36,11 +38,10 @@ const defaultLabels: Record<string, string> = {
 };
 
 export default function ResponseScreen() {
-  // 2. Access the real token from your provider
-  const { token } = useAuth(); 
+  const { token } = useAuth();
   const params = useLocalSearchParams<Params>();
   const insets = useSafeAreaInsets();
-  
+
   const [copying, setCopying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -52,43 +53,47 @@ export default function ResponseScreen() {
 
   const responseTypeLabel = params.type || defaultLabels[params.outputType || "email"] || "Generated Output";
 
-  function onBack() {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
-    }
-  }
+  // Check session storage to see if this specific text was already saved
+  useEffect(() => {
+    const checkSavedStatus = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(SAVED_DRAFTS_KEY);
+        if (stored) {
+          const savedList: string[] = JSON.parse(stored);
+          // We check if the current response text exists in our session "saved" list
+          if (savedList.includes(responseText)) {
+            setIsSaved(true);
+          } else {
+            setIsSaved(false);
+          }
+        }
+      } catch (e) {
+        console.error("Error reading session storage", e);
+      }
+    };
 
-  /**
-   * SAVE LOGIC
-   */
+    checkSavedStatus();
+    setSaving(false);
+    setCopying(false);
+  }, [responseText, params.fileId]);
+
   async function onSave() {
-    // 1. Validate File ID (Workspace)
     const fId = params.fileId;
     if (!fId || fId === "undefined" || fId === "null") {
-      Alert.alert(
-        "Workspace Missing", 
-        "This draft is not linked to a workspace. Please go back and ensure a file is selected.",
-        [{ text: "OK" }]
-      );
+      Alert.alert("Workspace Missing", "This draft is not linked to a workspace.");
       return;
     }
 
-    // 2. Token Validation & Sanitization
     if (!token) {
-      Alert.alert("Session Expired", "Please log in again to save drafts.");
+      Alert.alert("Session Expired", "Please log in again.");
       router.replace("/login");
       return;
     }
 
-    // Defensive check: ensure no accidental "Bearer " prefix exists in the variable itself
     const sanitizedToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
 
     try {
       setSaving(true);
-      
-      // 3. API call to save the draft
       const result = await saveDraft(
         sanitizedToken,
         Number(fId),
@@ -97,24 +102,38 @@ export default function ResponseScreen() {
       );
 
       if (result.success) {
+        // 1. Update UI State
         setIsSaved(true);
+        
+        // 2. Persist to Session Storage so it stays "Saved" when navigating back/forth
+        const stored = await AsyncStorage.getItem(SAVED_DRAFTS_KEY);
+        const savedList: string[] = stored ? JSON.parse(stored) : [];
+        if (!savedList.includes(responseText)) {
+          savedList.push(responseText);
+          await AsyncStorage.setItem(SAVED_DRAFTS_KEY, JSON.stringify(savedList));
+        }
+
         Alert.alert("Success", "Draft saved to workspace successfully.");
       }
     } catch (error: any) {
       console.error("[SAVE ERROR]:", error);
-      // Backend errors (like JWT malformed) will be caught here
       Alert.alert("Save Failed", error.message || "An unexpected error occurred.");
     } finally {
       setSaving(false);
     }
   }
 
+  function onBack() {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  }
+
   const onShare = async () => {
     try {
-      await Share.share({
-        message: responseText,
-        title: responseTypeLabel,
-      });
+      await Share.share({ message: responseText, title: responseTypeLabel });
     } catch (error) {
       console.log("Share error:", error);
     }
@@ -124,10 +143,10 @@ export default function ResponseScreen() {
     try {
       setCopying(true);
       await Clipboard.setStringAsync(responseText);
+      setTimeout(() => setCopying(false), 2000);
     } catch {
       Alert.alert("Error", "Failed to copy text.");
-    } finally {
-      setTimeout(() => setCopying(false), 2000);
+      setCopying(false);
     }
   }
 
@@ -135,10 +154,7 @@ export default function ResponseScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      <LinearGradient
-        colors={["#276bbd", "#0B3C7A"]}
-        style={[styles.header, { paddingTop: insets.top }]}
-      >
+      <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
           <Pressable onPress={onBack} style={styles.iconButton}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
@@ -168,19 +184,15 @@ export default function ResponseScreen() {
             <Text style={styles.cardHeaderLabel}>AI GENERATED CONTENT</Text>
             <View style={styles.cardHeaderLine} />
           </View>
-          
           <Text style={styles.bodyText}>{responseText}</Text>
-          
           <View style={styles.cardFooter}>
             <Text style={styles.footerNote}>Check for accuracy before sending.</Text>
           </View>
         </View>
       </ScrollView>
 
-      {/* FOOTER ACTIONS */}
       <View style={[styles.floatingFooter, { paddingBottom: insets.bottom + 20 }]}>
         <View style={styles.buttonRow}>
-          
           <Pressable onPress={onCopy} style={styles.secondaryButton}>
             <Ionicons name={copying ? "checkmark" : "copy-outline"} size={20} color="#0B3C7A" />
             <Text style={styles.secondaryButtonText}>{copying ? "Copied" : "Copy"}</Text>
@@ -216,73 +228,27 @@ export default function ResponseScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   header: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    height: 64,
-  },
+  headerContent: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, height: 64 },
   headerTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
   iconButton: { padding: 8 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20 },
   metaRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
-  typeBadge: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    backgroundColor: "#DBEAFE", 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 12, 
-    gap: 6 
-  },
+  typeBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#DBEAFE", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6 },
   typeText: { color: "#1E40AF", fontSize: 13, fontWeight: "700" },
   timestamp: { color: "#64748B", fontSize: 12 },
-  documentCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
+  documentCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 24, borderWidth: 1, borderColor: "#E2E8F0" },
   cardHeader: { marginBottom: 20, flexDirection: "row", alignItems: "center", gap: 10 },
   cardHeaderLabel: { fontSize: 10, color: "#94A3B8", fontWeight: "800" },
   cardHeaderLine: { flex: 1, height: 1, backgroundColor: "#F1F5F9" },
   bodyText: { color: "#334155", fontSize: 16, lineHeight: 28 },
   cardFooter: { marginTop: 30, paddingTop: 20, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
   footerNote: { fontSize: 12, color: "#94A3B8", textAlign: "center" },
-  floatingFooter: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#FFF",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-  },
+  floatingFooter: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#FFF", paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#E2E8F0" },
   buttonRow: { flexDirection: "row", gap: 12 },
-  secondaryButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#276bbd",
-    borderRadius: 16,
-    height: 56,
-    gap: 8,
-  },
+  secondaryButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#276bbd", borderRadius: 16, height: 56, gap: 8 },
   secondaryButtonText: { color: "#0B3C7A", fontWeight: "700", fontSize: 15 },
   primaryButton: { flex: 2, borderRadius: 16, overflow: "hidden" },
-  buttonGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 56,
-    gap: 10,
-  },
+  buttonGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", height: 56, gap: 10 },
   buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
 });

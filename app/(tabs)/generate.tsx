@@ -6,9 +6,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,13 +19,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
 import {
+  ClaimFile,
+  createFile,
+  generateResponse,
   GenerateResponseRequest,
+  getMyFiles,
+  getRecentDrafts,
+  getSubscriptionStatus,
   OutputType,
   RecentDraft,
   SubscriptionStatus,
-  generateResponse,
-  getRecentDrafts,
-  getSubscriptionStatus,
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -40,6 +43,16 @@ const outputTypeMap: Record<OutputMode, OutputType> = {
 
 export default function GenerateScreen() {
   const { token } = useAuth();
+
+  const [workspaces, setWorkspaces] = useState<ClaimFile[]>([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(null);
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
+  const [newClaim, setNewClaim] = useState("");
+  const [newPolicy, setNewPolicy] = useState("");
+  const [newClient, setNewClient] = useState("");
+
   const [selectedOutput, setSelectedOutput] = useState<OutputMode>("Email");
   const [request, setRequest] = useState("");
   const [claimDetails, setClaimDetails] = useState("");
@@ -52,50 +65,80 @@ export default function GenerateScreen() {
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      const [statusData, draftsData] = await Promise.all([
+      const [statusData, draftsData, filesData] = await Promise.all([
         getSubscriptionStatus(token),
-        getRecentDrafts(token, 1),
+        getRecentDrafts(token),
+        getMyFiles(token),
       ]);
-
       setStatus(statusData);
       setRecentDrafts(draftsData ?? []);
+      setWorkspaces(filesData ?? []);
+      
+      if (filesData && filesData.length > 0 && !selectedWorkspace) {
+        setSelectedWorkspace(filesData[0]);
+      }
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, selectedWorkspace]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, []);
+
+  const handleCreateWorkspace = async () => {
+    if (!token) return;
+    if (!newClaim || !newClient) {
+      Toast.show({ type: "error", text1: "Missing Info", text2: "Claim # and Client Name are required." });
+      return;
+    }
+
+    setIsCreatingFile(true);
+    try {
+      const response = await createFile(token, {
+        client_name: newClient,
+        policy_number: newPolicy || null,
+        claim_number: newClaim,
+        status: "active",
+      });
+
+      if (response.success) {
+        const newFile = response.file;
+        setWorkspaces((prev) => [newFile, ...prev]);
+        setSelectedWorkspace(newFile);
+        setIsModalVisible(false);
+        setNewClaim("");
+        setNewPolicy("");
+        setNewClient("");
+        Toast.show({ type: "success", text1: "Workspace Ready" });
+      }
+    } catch (error: any) {
+      Toast.show({ type: "error", text1: "Creation Failed" });
+    } finally {
+      setIsCreatingFile(false);
+    }
+  };
 
   const onGenerate = useCallback(async () => {
     if (!token) return router.replace("/login");
-
-    if (!request.trim()) {
-      Toast.show({
-        type: "error",
-        text1: "Content Required",
-        text2: "Describe the scenario to generate a draft.",
-      });
+    if (!selectedWorkspace) {
+      Toast.show({ type: "error", text1: "No Workspace" });
       return;
     }
 
     setIsGenerating(true);
     try {
       const payload: GenerateResponseRequest = {
-        fileId: 1,
+        fileId: selectedWorkspace.id,
         type: outputTypeMap[selectedOutput],
-        userInput: `${request.trim()}${
-          claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""
-        }`,
+        userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
         shouldSave: true,
       };
 
       const result = await generateResponse(token, payload);
-
       router.push({
         pathname: "/response",
         params: {
@@ -105,32 +148,28 @@ export default function GenerateScreen() {
           fileId: result.fileId.toString(),
         },
       });
-
       setRequest("");
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Generation Failed",
-        text2: error.message || "API Error",
-      });
+      Toast.show({ type: "error", text1: "Generation Failed" });
     } finally {
       setIsGenerating(false);
     }
-  }, [token, request, claimDetails, selectedOutput, fetchData]);
+  }, [token, request, claimDetails, selectedOutput, selectedWorkspace, fetchData]);
 
-  const getDraftIcon = (item: RecentDraft) => {
-    const kind = item.draft_type?.toLowerCase?.() || item.content?.toLowerCase?.();
-
-    if (kind === "email") return "mail-unread-outline";
-    if (kind === "file") return "document-text-outline";
-    if (kind === "escalation") return "alert-circle-outline";
-    return "document-outline";
-  };
-
-  const getDraftLabel = (item: RecentDraft) => {
-    return item.claim_number || item.content || "Draft";
+  // FIXED: Added check for undefined type
+  const handleHistoryPress = (draft: RecentDraft) => {
+    const typeStr = draft.draft_type || 'email';
+    router.push({
+      pathname: "/response",
+      params: {
+        outputType: typeStr as OutputType,
+        type: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
+        text: draft.content || "No content found.",
+        fileId: draft.file_id?.toString() || "null",
+      },
+    });
   };
 
   if (isLoading && !refreshing) {
@@ -145,459 +184,176 @@ export default function GenerateScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
 
-      <LinearGradient
-        colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
+      <LinearGradient colors={["#0F4C9C", "#123C78"]} style={styles.headerGradient}>
         <SafeAreaView edges={["top"]} style={styles.safeHeader}>
           <View style={styles.navBar}>
             <Pressable onPress={() => router.back()} style={styles.iconBtn}>
               <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </Pressable>
-
             <Text style={styles.navTitle}>AI Studio</Text>
-
             <View style={styles.creditBadge}>
               <View style={styles.statusDot} />
-              <Text style={styles.creditValue}>
-                {status?.subscription?.remaining ?? 0} Credits
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.heroCard}>
-            <View style={styles.heroIconWrap}>
-              <MaterialCommunityIcons name="robot-excited-outline" size={24} color="#FFFFFF" />
-            </View>
-
-            <View style={styles.heroContent}>
-              <Text style={styles.heroTitle}>Generate premium claim drafts</Text>
-              <Text style={styles.heroSubtitle}>
-                Create polished emails, file notes, and escalations with structured AI assistance.
-              </Text>
+              <Text style={styles.creditValue}>{status?.subscription?.remaining ?? 0} Credits</Text>
             </View>
           </View>
         </SafeAreaView>
       </LinearGradient>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                fetchData();
-              }}
-            />
-          }
-        >
-          <Text style={styles.sectionLabel}>Select Output Mode</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          
+          <Text style={styles.sectionLabel}>Active Workspace</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workspaceScroll}>
+            <Pressable style={styles.addWorkspaceBtn} onPress={() => setIsModalVisible(true)}>
+              <Ionicons name="add" size={20} color="#0F4C9C" />
+              <Text style={styles.addWorkspaceText}>New File</Text>
+            </Pressable>
+            {workspaces.map((ws) => (
+              <Pressable
+                key={ws.id}
+                onPress={() => setSelectedWorkspace(ws)}
+                style={[styles.workspaceItem, selectedWorkspace?.id === ws.id && styles.workspaceItemActive]}
+              >
+                <MaterialCommunityIcons 
+                  name={selectedWorkspace?.id === ws.id ? "folder-open" : "folder"} 
+                  size={18} color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"} 
+                />
+                <Text style={[styles.workspaceText, selectedWorkspace?.id === ws.id && styles.workspaceTextActive]}>
+                  {ws.client_name || ws.claim_number}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
 
+          <Text style={styles.sectionLabel}>Output Format</Text>
           <View style={styles.tabContainer}>
-            {outputModes.map((mode) => {
-              const isActive = mode === selectedOutput;
-              return (
-                <Pressable
-                  key={mode}
-                  onPress={() => setSelectedOutput(mode)}
-                  style={[styles.tabItem, isActive && styles.tabItemActive]}
-                >
-                  <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                    {mode}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {outputModes.map((mode) => (
+              <Pressable key={mode} onPress={() => setSelectedOutput(mode)} style={[styles.tabItem, mode === selectedOutput && styles.tabItemActive]}>
+                <Text style={[styles.tabText, mode === selectedOutput && styles.tabTextActive]}>{mode}</Text>
+              </Pressable>
+            ))}
           </View>
 
           <View style={styles.glassCard}>
             <View style={styles.fieldGroup}>
               <View style={styles.fieldHeader}>
-                <View style={styles.iconCircle}>
-                  <MaterialCommunityIcons
-                    name="text-box-search-outline"
-                    size={16}
-                    color="#0F4C9C"
-                  />
-                </View>
+                <View style={styles.iconCircle}><MaterialCommunityIcons name="text-box-search-outline" size={16} color="#0F4C9C" /></View>
                 <Text style={styles.inputLabel}>Scenario Description</Text>
               </View>
-
-              <TextInput
-                value={request}
-                onChangeText={setRequest}
-                multiline
-                placeholder="Briefly describe what you want to achieve..."
-                placeholderTextColor="#94A3B8"
-                style={styles.mainTextInput}
-              />
+              <TextInput value={request} onChangeText={setRequest} multiline placeholder="What do you want to achieve?" placeholderTextColor="#94A3B8" style={styles.mainTextInput} />
             </View>
-
             <View style={styles.cardDivider} />
-
             <View style={styles.fieldGroup}>
               <View style={styles.fieldHeader}>
-                <View style={[styles.iconCircle, { backgroundColor: "#F1F5F9" }]}>
-                  <MaterialCommunityIcons name="paperclip" size={16} color="#475569" />
-                </View>
-                <Text style={styles.inputLabel}>Policy Context (Optional)</Text>
+                <View style={[styles.iconCircle, { backgroundColor: "#F1F5F9" }]}><MaterialCommunityIcons name="paperclip" size={16} color="#475569" /></View>
+                <Text style={styles.inputLabel}>Policy Context</Text>
               </View>
-
-              <TextInput
-                value={claimDetails}
-                onChangeText={setClaimDetails}
-                multiline
-                placeholder="Add claim #, policy limits, or specific clauses..."
-                placeholderTextColor="#94A3B8"
-                style={styles.subTextInput}
-              />
+              <TextInput value={claimDetails} onChangeText={setClaimDetails} multiline placeholder="Optional details..." placeholderTextColor="#94A3B8" style={styles.subTextInput} />
             </View>
           </View>
 
-          <Pressable
-            onPress={onGenerate}
-            disabled={isGenerating}
-            style={({ pressed }) => [
-              styles.generateBtn,
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <LinearGradient
-              colors={["#0F4C9C", "#1E3A8A"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientBtn}
-            >
-              {isGenerating ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Text style={styles.btnText}>Draft Intelligence</Text>
-                  <MaterialCommunityIcons name="auto-fix" size={20} color="#FFF" />
-                </>
-              )}
+          <Pressable onPress={onGenerate} disabled={isGenerating} style={styles.generateBtn}>
+            <LinearGradient colors={["#0F4C9C", "#1E3A8A"]} style={styles.gradientBtn}>
+              {isGenerating ? <ActivityIndicator color="#FFF" /> : <><Text style={styles.btnText}>Draft Intelligence</Text><MaterialCommunityIcons name="auto-fix" size={20} color="#FFF" /></>}
             </LinearGradient>
           </Pressable>
 
           <View style={styles.historyHeader}>
             <Text style={styles.historyTitle}>Recent Generations</Text>
-            <Pressable onPress={() => router.push("/")}>
-              <Ionicons name="grid-outline" size={18} color="#0F4C9C" />
-            </Pressable>
           </View>
-
           <View style={styles.historyList}>
             {recentDrafts.map((item) => (
-              <View key={item.id} style={styles.historyItem}>
-                <View style={styles.historyIconBox}>
-                  <Ionicons
-                    name={getDraftIcon(item) as any}
-                    size={20}
-                    color="#0F4C9C"
-                  />
-                </View>
-
+              <Pressable key={item.id} onPress={() => handleHistoryPress(item)} style={({ pressed }) => [styles.historyItem, pressed && { opacity: 0.7 }]}>
+                <View style={styles.historyIconBox}><Ionicons name="document-text-outline" size={20} color="#0F4C9C" /></View>
                 <View style={styles.historyContent}>
-                  <Text style={styles.historyTypeTag}>{getDraftLabel(item)}</Text>
-                  <Text style={styles.historyText} numberOfLines={1}>
-                    {item.content || item.content || "Processing draft..."}
-                  </Text>
+                  <Text style={styles.historyTypeTag}>{item.claim_number || "Draft"}</Text>
+                  <Text style={styles.historyText} numberOfLines={1}>{item.content}</Text>
                 </View>
-
                 <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-              </View>
+              </Pressable>
             ))}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>New Workspace File</Text>
+              <Pressable onPress={() => setIsModalVisible(false)}><Ionicons name="close" size={24} color="#94A3B8" /></Pressable>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalLabel}>Claim Number</Text>
+              <TextInput style={styles.modalInput} value={newClaim} onChangeText={setNewClaim} />
+              <Text style={styles.modalLabel}>Policy Number</Text>
+              <TextInput style={styles.modalInput} value={newPolicy} onChangeText={setNewPolicy} />
+              <Text style={styles.modalLabel}>Client Name</Text>
+              <TextInput style={styles.modalInput} value={newClient} onChangeText={setNewClient} />
+              <Pressable style={styles.modalActionBtn} onPress={handleCreateWorkspace} disabled={isCreatingFile}>
+                {isCreatingFile ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalActionText}>Initialize Workspace</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Toast />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#FFF",
-  },
-  headerGradient: {
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: "hidden",
-  },
-  safeHeader: {
-    paddingHorizontal: 18,
-    paddingBottom: 18,
-  },
-  navBar: {
-    minHeight: 64,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  navTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -0.4,
-  },
-  creditBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#22C55E",
-  },
-  creditValue: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  heroCard: {
-    marginTop: 18,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  heroIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.14)",
-    marginRight: 14,
-  },
-  heroContent: {
-    flex: 1,
-  },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "800",
-    lineHeight: 25,
-  },
-  heroSubtitle: {
-    marginTop: 6,
-    color: "rgba(255,255,255,0.80)",
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#94A3B8",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 14,
-    marginLeft: 4,
-    marginTop: 6,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#E2E8F0",
-    borderRadius: 18,
-    padding: 6,
-    marginBottom: 28,
-  },
-  tabItem: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 14,
-  },
-  tabItemActive: {
-    backgroundColor: "#FFF",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tabText: {
-    fontSize: 14,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  tabTextActive: {
-    color: "#0F4C9C",
-    fontWeight: "800",
-  },
-  glassCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 28,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#FFF",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
-    shadowRadius: 24,
-    elevation: 2,
-  },
-  fieldGroup: {
-    marginVertical: 4,
-  },
-  fieldHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 12,
-  },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  mainTextInput: {
-    fontSize: 16,
-    color: "#334155",
-    minHeight: 60,
-    textAlignVertical: "top",
-    lineHeight: 22,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: "#F1F5F9",
-    marginVertical: 20,
-    marginHorizontal: -10,
-  },
-  subTextInput: {
-    fontSize: 15,
-    color: "#475569",
-    minHeight: 20,
-    textAlignVertical: "top",
-    lineHeight: 20,
-  },
-  generateBtn: {
-    marginTop: 30,
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#0F4C9C",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  gradientBtn: {
-    height: 64,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  btnText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  historyHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 40,
-    marginBottom: 20,
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0F172A",
-    letterSpacing: -0.3,
-  },
-  historyList: {
-    gap: 14,
-  },
-  historyItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF",
-    padding: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-  },
-  historyIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#EAF2FF",
-  },
-  historyContent: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  historyTypeTag: {
-    fontSize: 10,
-    fontWeight: "900",
-    color: "#94A3B8",
-    letterSpacing: 1,
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  historyText: {
-    fontSize: 14,
-    color: "#1E293B",
-    fontWeight: "600",
-  },
+  mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  headerGradient: { borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: "hidden" },
+  safeHeader: { paddingHorizontal: 18, paddingBottom: 18 },
+  navBar: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  iconBtn: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
+  navTitle: { fontSize: 19, fontWeight: "800", color: "#FFFFFF" },
+  creditBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" },
+  creditValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  sectionLabel: { fontSize: 11, fontWeight: "800", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14, marginTop: 10 },
+  workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
+  workspaceItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 8 },
+  workspaceItemActive: { backgroundColor: '#0F4C9C', borderColor: '#0F4C9C' },
+  workspaceText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
+  workspaceTextActive: { color: '#FFF' },
+  addWorkspaceBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#0F4C9C', gap: 4 },
+  addWorkspaceText: { fontSize: 14, fontWeight: '800', color: '#0F4C9C' },
+  tabContainer: { flexDirection: "row", backgroundColor: "#E2E8F0", borderRadius: 18, padding: 6, marginBottom: 28 },
+  tabItem: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 14 },
+  tabItemActive: { backgroundColor: "#FFF" },
+  tabText: { fontSize: 14, color: "#64748B", fontWeight: "600" },
+  tabTextActive: { color: "#0F4C9C", fontWeight: "800" },
+  glassCard: { backgroundColor: "#FFF", borderRadius: 28, padding: 20, borderWidth: 1, borderColor: "#FFF" },
+  fieldGroup: { marginVertical: 4 },
+  fieldHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  iconCircle: { width: 28, height: 28, borderRadius: 10, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
+  inputLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  mainTextInput: { fontSize: 16, color: "#334155", minHeight: 60, textAlignVertical: "top" },
+  cardDivider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 20 },
+  subTextInput: { fontSize: 15, color: "#475569", minHeight: 20, textAlignVertical: "top" },
+  generateBtn: { marginTop: 30, borderRadius: 20, overflow: "hidden" },
+  gradientBtn: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  btnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  historyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 40, marginBottom: 20 },
+  historyTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
+  historyList: { gap: 14 },
+  historyItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF", padding: 14, borderRadius: 20, borderWidth: 1, borderColor: "#F1F5F9" },
+  historyIconBox: { width: 48, height: 48, borderRadius: 14, backgroundColor: "#EAF2FF", alignItems: "center", justifyContent: "center" },
+  historyContent: { flex: 1, marginLeft: 16 },
+  historyTypeTag: { fontSize: 10, fontWeight: "900", color: "#94A3B8", textTransform: "uppercase" },
+  historyText: { fontSize: 14, color: "#1E293B", fontWeight: "600" },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, minHeight: 450 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  modalBody: { gap: 16 },
+  modalLabel: { fontSize: 12, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase' },
+  modalInput: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', fontSize: 15, color: '#0F172A' },
+  modalActionBtn: { backgroundColor: '#0F4C9C', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginTop: 10 },
+  modalActionText: { color: '#FFF', fontSize: 16, fontWeight: '800' }
 });

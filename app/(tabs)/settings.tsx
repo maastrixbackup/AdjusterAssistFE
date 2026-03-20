@@ -90,6 +90,8 @@ export default function SettingsScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
+
+      
       
       {/* Brand-Consistent Custom Header */}
       <View style={styles.headerStack}>
@@ -257,7 +259,7 @@ const styles = StyleSheet.create({
   headerStack: {
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#212f52',
     overflow: 'hidden',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 12 },
@@ -310,7 +312,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
+    shadowColor: '#1f325f',
     shadowOffset: { width: 0, height: 15 },
     shadowOpacity: 0.06,
     shadowRadius: 20,
