@@ -62,6 +62,7 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
+    
       <Tabs.Screen
         name="index"
         options={{
@@ -78,7 +79,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="history"
         options={{
           title: "History",
           tabBarLabel: "History",

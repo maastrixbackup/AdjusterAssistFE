@@ -27,6 +27,8 @@ export interface ClaimFile {
   client_name: string;
   status: string;
   created_at: string;
+  updated_at?: string;
+  draft_count?: number;
 }
 
 export interface RecentDraft {
@@ -55,10 +57,12 @@ export type GenerateResponseRequest = {
   shouldSave: boolean;
 };
 
+// Updated to include fileId so the ResponseScreen knows where to save
 export type GenerateResponseResult = {
   responseType: OutputType;
   responseTypeLabel: string;
   responseText: string;
+  fileId: number;
 };
 
 export type SubscriptionStatus = {
@@ -146,6 +150,9 @@ export async function signupWithEmail(
 }
 
 /* --- File & Workspace Actions --- */
+/**
+ * Fetch all files belonging to the logged-in user
+ */
 export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
   try {
     const response = await apiRequest<{ success: boolean; files: ClaimFile[] }>(
@@ -154,15 +161,42 @@ export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
       token,
     );
 
-    console.log("[API DEBUG] Raw Files Data:", response.files);
+    // Return the array directly for the FlatList
     return response.files || [];
   } catch (error) {
     console.error("[API ERROR] getMyFiles failed:", error);
-    return []; // Return empty array so the UI doesn't crash
+    throw error; // Throw so the UI can show a Toast error
   }
 };
 
-// Helper for the next screen: Fetching drafts for a specific file
+/**
+ * Create a new workspace/file with auto-generated details
+ */
+export const createFile = async (
+  token: string,
+): Promise<{ success: boolean; file: ClaimFile }> => {
+  try {
+    const response = await apiRequest<{ success: boolean; file: ClaimFile }>(
+      "/files/create",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          // You can pass default values here if needed,
+          // otherwise the backend handles the "Gemini-style" auto-naming
+          client_name: "New Client",
+          status: "open",
+        }),
+      },
+      token,
+    );
+
+    return response;
+  } catch (error) {
+    console.error("[API ERROR] createFile failed:", error);
+    throw error;
+  }
+};
+
 export async function getFileDrafts(
   token: string,
   fileId: number,
@@ -175,7 +209,7 @@ export async function getFileDrafts(
   return res.drafts || [];
 }
 
-/* --- Generation & Subscription --- */
+/* --- Generation, Saving & Subscription --- */
 
 export async function generateResponse(
   token: string,
@@ -185,8 +219,8 @@ export async function generateResponse(
     success: boolean;
     message: string;
     data: {
-      draftId: number;
       content: string;
+      fileId: number;
     };
   }>(
     "/drafts/generate-test",
@@ -201,7 +235,28 @@ export async function generateResponse(
     responseType: payload.type,
     responseTypeLabel: responseTypeLabels[payload.type] || "Response",
     responseText: res.data?.content ?? "No content generated",
+    fileId: payload.fileId,
   };
+}
+
+/**
+ * NEW: Save a generated draft to the database
+ */
+export async function saveDraft(
+  token: string,
+  fileId: number,
+  type: OutputType,
+  content: string,
+): Promise<{ success: boolean; draftId: number }> {
+  const res = await apiRequest<{ success: boolean; data: { draftId: number } }>(
+    "/drafts/save",
+    {
+      method: "POST",
+      body: JSON.stringify({ fileId, type, content }),
+    },
+    token,
+  );
+  return { success: res.success, draftId: res.data.draftId };
 }
 
 export async function getSubscriptionStatus(
@@ -237,10 +292,28 @@ export const getRecentDrafts = async (
       data: RecentDraft[];
     }>("/drafts/recent", { method: "GET" }, token);
 
-    console.log("[API DEBUG] Recent Drafts:", response.data?.length);
     return response.data || [];
   } catch (error) {
     console.error("[API ERROR] getRecentDrafts failed:", error);
+    return [];
+  }
+};
+
+export const getDraftsByFile = async (
+  token: string,
+  fileId: number,
+): Promise<Draft[]> => {
+  try {
+    const response = await apiRequest<{ success: boolean; drafts: Draft[] }>(
+      `/files/${fileId}/drafts`,
+      { method: "GET" },
+      token,
+    );
+
+    return response.drafts || [];
+  } catch (error) {
+    console.error(`[API ERROR] Fetching drafts for file ${fileId}:`, error);
+    // Returning an empty array so the UI can show the "No Drafts" state
     return [];
   }
 };
