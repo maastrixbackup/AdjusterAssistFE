@@ -57,7 +57,6 @@ export type GenerateResponseRequest = {
   shouldSave: boolean;
 };
 
-// Updated to include fileId so the ResponseScreen knows where to save
 export type GenerateResponseResult = {
   responseType: OutputType;
   responseTypeLabel: string;
@@ -77,14 +76,16 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
+const DEBUG_MODE = true; // Set to false to disable logs in production
+
 const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
-  file: "File Note",
+  file: "File",
   escalation: "Escalation Response",
 };
 
 /**
- * Core API Helper
+ * Core API Helper with Enhanced Logging
  */
 async function apiRequest<T>(
   path: string,
@@ -102,6 +103,21 @@ async function apiRequest<T>(
     ...(init.headers ?? {}),
   };
 
+  // --- PRE-REQUEST LOGGING ---
+  if (DEBUG_MODE) {
+    console.log(
+      `%c [API REQUEST] ${init.method || "GET"} -> ${url}`,
+      "color: #0ea5e9; font-weight: bold",
+    );
+    if (init.body) {
+      console.log(
+        `%c Body:`,
+        "color: #6366f1",
+        JSON.parse(init.body as string),
+      );
+    }
+  }
+
   try {
     const response = await fetch(url, {
       ...init,
@@ -109,6 +125,15 @@ async function apiRequest<T>(
     });
 
     const json = await response.json().catch(() => ({}));
+
+    // --- POST-REQUEST LOGGING ---
+    if (DEBUG_MODE) {
+      console.log(
+        `%c [API RESPONSE] ${response.status} <- ${path}`,
+        `color: ${response.ok ? "#10b981" : "#f43f5e"}; font-weight: bold`,
+      );
+      console.log(`%c Data:`, "color: #8b5cf6", json);
+    }
 
     if (!response.ok) {
       throw new Error(
@@ -118,7 +143,11 @@ async function apiRequest<T>(
 
     return json as T;
   } catch (error) {
-    console.error(`[API ERROR] ${path}:`, error);
+    console.error(
+      `%c [API ERROR] ${path}:`,
+      "color: #ef4444; font-weight: bold",
+      error,
+    );
     throw error;
   }
 }
@@ -150,9 +179,7 @@ export async function signupWithEmail(
 }
 
 /* --- File & Workspace Actions --- */
-/**
- * Fetch all files belonging to the logged-in user
- */
+
 export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
   try {
     const response = await apiRequest<{ success: boolean; files: ClaimFile[] }>(
@@ -160,18 +187,12 @@ export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
       { method: "GET" },
       token,
     );
-
-    // Return the array directly for the FlatList
     return response.files || [];
   } catch (error) {
-    console.error("[API ERROR] getMyFiles failed:", error);
-    throw error; // Throw so the UI can show a Toast error
+    throw error;
   }
 };
 
-/**
- * Create a new workspace/file with auto-generated details
- */
 export const createFile = async (
   token: string,
 ): Promise<{ success: boolean; file: ClaimFile }> => {
@@ -181,18 +202,14 @@ export const createFile = async (
       {
         method: "POST",
         body: JSON.stringify({
-          // You can pass default values here if needed,
-          // otherwise the backend handles the "Gemini-style" auto-naming
           client_name: "New Client",
           status: "open",
         }),
       },
       token,
     );
-
     return response;
   } catch (error) {
-    console.error("[API ERROR] createFile failed:", error);
     throw error;
   }
 };
@@ -239,9 +256,6 @@ export async function generateResponse(
   };
 }
 
-/**
- * NEW: Save a generated draft to the database
- */
 export async function saveDraft(
   token: string,
   fileId: number,
@@ -284,7 +298,7 @@ export async function upgradeSubscription(
 }
 
 export const getRecentDrafts = async (
-  token: string,
+token: string, p0: number,
 ): Promise<RecentDraft[]> => {
   try {
     const response = await apiRequest<{
@@ -294,7 +308,7 @@ export const getRecentDrafts = async (
 
     return response.data || [];
   } catch (error) {
-    console.error("[API ERROR] getRecentDrafts failed:", error);
+    console.error("Error fetching recent drafts:", error);
     return [];
   }
 };
@@ -309,11 +323,9 @@ export const getDraftsByFile = async (
       { method: "GET" },
       token,
     );
-
     return response.drafts || [];
   } catch (error) {
-    console.error(`[API ERROR] Fetching drafts for file ${fileId}:`, error);
-    // Returning an empty array so the UI can show the "No Drafts" state
+    console.error(`Error fetching drafts for file ${fileId}:`, error);
     return [];
   }
 };

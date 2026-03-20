@@ -1,9 +1,20 @@
 import { Draft, getDraftsByFile } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient"; // For that molded look
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { StatusBar } from "expo-status-bar"; // Import StatusBar
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DraftsListScreen() {
@@ -11,76 +22,244 @@ export default function DraftsListScreen() {
   const { token } = useAuth();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDrafts = useCallback(async () => {
+    if (!token || !fileId) return;
+    try {
+      const data = await getDraftsByFile(token, Number(fileId));
+      const sortedDrafts = data.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setDrafts(sortedDrafts);
+    } catch (err) {
+      console.error("Error fetching drafts:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token, fileId]);
 
   useEffect(() => {
-    async function fetchDrafts() {
-      if (!token || !fileId) return;
-      try {
-        const data = await getDraftsByFile(token, Number(fileId));
-        setDrafts(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchDrafts();
-  }, [fileId]);
+  }, [fetchDrafts]);
 
-  const renderDraft = ({ item }: { item: Draft }) => (
-    <Pressable style={styles.draftCard}>
-      <View style={[styles.typeIndicator, { backgroundColor: item.type === 'email' ? '#DBEAFE' : '#FEE2E2' }]}>
-        <Ionicons 
-            name={item.type === 'email' ? "mail" : "document-text"} 
-            size={18} 
-            color={item.type === 'email' ? "#2563EB" : "#DC2626"} 
-        />
-      </View>
-      <View style={{ flex: 1, marginLeft: 12 }}>
-        <Text style={styles.draftTitle} numberOfLines={1}>{item.content || "No Content"}</Text>
-        <Text style={styles.draftDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-    </Pressable>
-  );
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDrafts();
+  };
+
+  const renderDraft = ({ item }: { item: Draft }) => {
+    const isEmail = item.type === 'email';
+    const isEscalation = item.type === 'escalation';
+    
+    return (
+      <Pressable 
+        style={({ pressed }) => [
+          styles.draftCard,
+          pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+        ]}
+        onPress={() => {
+          router.push({
+            pathname: "/response",
+            params: { 
+              text: item.content, 
+              type: item.type,
+              fileId: fileId 
+            }
+          });
+        }}
+      >
+        <View style={[
+          styles.typeIndicator, 
+          { backgroundColor: isEmail ? '#0F4C9C' : isEscalation ? '#E11D48' : '#334155' }
+        ]} />
+        
+        <View style={styles.cardMain}>
+          <View style={styles.cardHeader}>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>{item.type?.toUpperCase() || "DRAFT"}</Text>
+            </View>
+            <Text style={styles.dateText}>
+              {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </Text>
+          </View>
+
+          <Text style={styles.contentPreview} numberOfLines={2}>
+            {item.content || "Empty draft content..."}
+          </Text>
+
+          <View style={styles.cardFooter}>
+            <View style={styles.footerInfo}>
+                <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                <Text style={styles.footerTime}>
+                    {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+            </View>
+            <View style={styles.openAction}>
+                <Text style={styles.openText}>View</Text>
+                <Ionicons name="chevron-forward" size={12} color="#0F4C9C" />
+            </View>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1E293B" />
-        </Pressable>
-        <View style={{ marginLeft: 15 }}>
-          <Text style={styles.headerTitle}>Claim Drafts</Text>
-          <Text style={styles.headerSubtitle}>#{claimNumber}</Text>
-        </View>
+    <View style={styles.mainWrapper}>
+      <StatusBar style="light" /> 
+      
+      <View style={styles.headerContainer}>
+        <LinearGradient
+            colors={["#0F172A", "#0F4C9C"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
+        >
+            <SafeAreaView edges={["top"]}>
+                <View style={styles.navBar}>
+                    <Pressable onPress={() => router.back()} style={styles.backCircle}>
+                        <Ionicons name="arrow-back" size={20} color="#FFF" />
+                    </Pressable>
+                    
+                    <View style={styles.titleStack}>
+                        <Text style={styles.navSubtitle}>Intelligence Archive</Text>
+                        <Text style={styles.navTitle}>Generation Log</Text>
+                    </View>
+
+                    <View style={styles.claimBadge}>
+                        <Text style={styles.claimText}>{claimNumber || "Files"}</Text>
+                    </View>
+                </View>
+            </SafeAreaView>
+        </LinearGradient>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#276bbd" style={{ marginTop: 50 }} />
+      {loading && !refreshing ? (
+        <View style={styles.loaderCenter}>
+          <ActivityIndicator size="small" color="#0F4C9C" />
+          <Text style={styles.loaderSub}>Syncing Archive...</Text>
+        </View>
       ) : (
         <FlatList
           data={drafts}
           renderItem={renderDraft}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ padding: 20 }}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0F4C9C" />
+          }
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+                <Text style={styles.headerCount}>{drafts.length} Saved Generations</Text>
+                <View style={styles.headerLine} />
+            </View>
+          }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No drafts generated for this claim yet.</Text>
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconCircle}>
+                <MaterialCommunityIcons name="cloud-search-outline" size={40} color="#CBD5E1" />
+              </View>
+              <Text style={styles.emptyTitle}>No Drafts Found</Text>
+              <Text style={styles.emptySubtitle}>Your generated AI responses for this file will appear here.</Text>
+            </View>
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: '#FFF' },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B' },
-  headerSubtitle: { fontSize: 14, color: '#64748B' },
-  draftCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#F1F5F9' },
-  typeIndicator: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  draftTitle: { fontSize: 14, fontWeight: '700', color: '#334155' },
-  draftDate: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-  emptyText: { textAlign: 'center', color: '#94A3B8', marginTop: 40 }
+  mainWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
+  headerContainer: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  headerGradient: {
+    paddingBottom: 20,
+  },
+  navBar: {
+    height: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  backCircle: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  titleStack: { alignItems: 'center' },
+  navSubtitle: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 },
+  navTitle: { fontSize: 19, fontWeight: '800', color: '#FFFFFF' },
+  claimBadge: { backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  claimText: { color: '#0F172A', fontSize: 11, fontWeight: '800' },
+  
+  loaderCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loaderSub: { marginTop: 12, color: '#94A3B8', fontSize: 13, fontWeight: '600' },
+  
+  listContainer: { padding: 20, paddingBottom: 40 },
+  listHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
+  headerCount: { fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' },
+  headerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+
+  draftCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    flexDirection: 'row', 
+    marginBottom: 16, 
+    overflow: 'hidden',
+    borderWidth: 1, 
+    borderColor: '#E2E8F0',
+    ...Platform.select({
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 },
+      android: { elevation: 3 }
+    })
+  },
+  typeIndicator: { width: 5 },
+  cardMain: { flex: 1, padding: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  typeBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  typeBadgeText: { fontSize: 9, fontWeight: '900', color: '#475569' },
+  dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '700' },
+  contentPreview: { fontSize: 15, color: '#1E293B', fontWeight: '500', lineHeight: 22, marginBottom: 14 },
+  
+  cardFooter: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC'
+  },
+  footerInfo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerTime: { fontSize: 11, color: '#94A3B8', fontWeight: '600' },
+  openAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  openText: { fontSize: 13, color: '#0F4C9C', fontWeight: '800' },
+
+  emptyContainer: { alignItems: 'center', marginTop: 80, paddingHorizontal: 40 },
+  emptyIconCircle: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 40, 
+    backgroundColor: '#F1F5F9', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginBottom: 20
+  },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B' },
+  emptySubtitle: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 8, lineHeight: 22 },
 });

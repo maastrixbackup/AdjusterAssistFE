@@ -31,7 +31,7 @@ type Params = {
 
 const defaultLabels: Record<string, string> = {
   email: "Email Response",
-  file: "File Note",
+  file: "File",
   escalation: "Escalation Response",
 };
 

@@ -145,7 +145,7 @@ export default function HomeScreen() {
                 style={statusStyle.text}
               />
               <Text style={[styles.statusTextBase, statusStyle.text]}>
-                {(item.status || "Unknown").toUpperCase()}
+                {(item.status || "Unknown")}
               </Text>
             </View>
           </View>
