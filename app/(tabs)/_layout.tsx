@@ -62,6 +62,7 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
+
       <Tabs.Screen
         name="index"
         options={{
@@ -69,17 +70,18 @@ export default function TabLayout() {
           headerShown: false,
           tabBarLabel: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={24} 
-              name={focused ? "home" : "home-outline"} 
-              color={color} 
+            <Ionicons
+              size={24}
+              name={focused ? "home" : "home-outline"}
+              color={color}
             />
           ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="history"
         options={{
+          headerShown: false,
           title: "History",
           tabBarLabel: "History",
           tabBarIcon: ({ color, focused }) => (
@@ -91,6 +93,8 @@ export default function TabLayout() {
           ),
         }}
       />
+
+
       <Tabs.Screen
         name="guides"
         options={{
@@ -108,17 +112,34 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
+          headerShown: false,
           title: "Settings",
           tabBarLabel: "Settings",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              size={24} 
-              name={focused ? "settings" : "settings-outline"} 
-              color={color} 
+            <Ionicons
+              size={24}
+              name={focused ? "settings" : "settings-outline"}
+              color={color}
             />
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="generate"
+        options={{
+          headerShown: false,
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="response"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
+
     </Tabs>
   );
 }

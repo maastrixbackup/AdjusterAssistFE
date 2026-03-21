@@ -1,16 +1,21 @@
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
-import Toast from 'react-native-toast-message'; // Import Toast
+import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from 'react-native-toast-message';
 
 import {
   getSubscriptionStatus,
@@ -23,12 +28,9 @@ const { width } = Dimensions.get("window");
 
 export default function SettingsScreen() {
   const { token, email, logout } = useAuth();
-
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyCheckout, setBusyCheckout] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
   const prevPlanRef = useRef<string | null>(null);
 
   const loadSubscription = useCallback(async (showLoading = true) => {
@@ -37,32 +39,21 @@ export default function SettingsScreen() {
       return;
     }
     if (showLoading) setLoading(true);
-    setErrorMessage(null);
-
     try {
       const response = await getSubscriptionStatus(token);
-      
-      // Detect if the plan upgraded since last check
       if (prevPlanRef.current && prevPlanRef.current !== response.subscription.plan_type) {
         if (response.subscription.plan_type !== 'free') {
-          // Professional Toast Notification
           Toast.show({
             type: 'success',
-            text1: 'Upgrade Successful! 🚀',
-            text2: `You are now on the ${response.subscription.plan_type.toUpperCase()} plan.`,
-            position: 'top',
-            visibilityTime: 4000,
-            autoHide: true,
-            topOffset: 60,
+            text1: 'Plan Synced ⚡',
+            text2: `Enjoy your ${response.subscription.plan_type.toUpperCase()} features.`,
           });
         }
       }
-      
       prevPlanRef.current = response.subscription.plan_type;
       setStatus(response);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to load subscription";
-      setErrorMessage(message);
+      console.error("Sync Error:", error);
     } finally {
       setLoading(false);
     }
@@ -77,24 +68,15 @@ export default function SettingsScreen() {
   const onUpgrade = async () => {
     if (!token || busyCheckout || !status?.subscription) return;
     setBusyCheckout(true);
-    setErrorMessage(null);
-
-    const currentPlan = status.subscription.plan_type;
-    const targetPlan = currentPlan === "pro" ? "enterprise" : "pro";
-
+    const targetPlan = status.subscription.plan_type === "pro" ? "enterprise" : "pro";
     try {
       const { checkoutUrl } = await upgradeSubscription(token, targetPlan);
-      if (checkoutUrl) {
-        await Linking.openURL(checkoutUrl);
-      }
+      if (checkoutUrl) await Linking.openURL(checkoutUrl);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to start checkout";
-      setErrorMessage(message);
-      
-      Toast.show({
-        type: 'error',
-        text1: 'Checkout Error',
-        text2: message,
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Billing Error', 
+        text2: 'Unable to reach payment gateway.' 
       });
     } finally {
       setBusyCheckout(false);
@@ -105,352 +87,287 @@ export default function SettingsScreen() {
     ? (status.subscription.current_usage / status.subscription.usage_limit) * 100 
     : 0;
 
-  const userInitial = email ? email.charAt(0).toUpperCase() : "R";
-
   return (
     <View style={styles.screen}>
-      <ScrollView 
-        contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadSubscription} tintColor="#6366F1" />}
-      >
-        {/* Profile Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarGradient}>
-              <Text style={styles.avatarText}>{userInitial}</Text>
-            </View>
-            <View style={styles.onlineBadge} />
-          </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.greeting}>Hey there!</Text>
-            <Text style={styles.emailText} numberOfLines={1}>{email ?? "Developer"}</Text>
-          </View>
-        </View>
+      <StatusBar style="light" />
 
-        {/* Subscription Card */}
-        <View style={styles.mainCard}>
+      
+      
+      {/* Brand-Consistent Custom Header */}
+      <View style={styles.headerStack}>
+        <LinearGradient
+          colors={["#0F172A", "#0F4C9C"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          <SafeAreaView edges={["top"]}>
+            <View style={styles.headerContent}>
+              <View style={styles.profileSection}>
+                <View style={styles.avatarWrapper}>
+                  <LinearGradient
+                    colors={["#38BDF8", "#0EA5E9"]}
+                    style={styles.avatarGradient}
+                  >
+                    <Text style={styles.avatarChar}>{email?.[0].toUpperCase() || "U"}</Text>
+                  </LinearGradient>
+                  <View style={styles.statusDot} />
+                </View>
+                <View style={styles.metaInfo}>
+                  <Text style={styles.headerTitle}>Account Settings</Text>
+                  <Text style={styles.headerSubtitle} numberOfLines={1}>{email}</Text>
+                </View>
+              </View>
+              <Pressable 
+                style={({ pressed }) => [styles.exitBtn, pressed && { opacity: 0.6 }]} 
+                onPress={logout}
+              >
+                <Ionicons name="power" size={20} color="#FFF" />
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </View>
+
+      <ScrollView 
+        contentContainerStyle={styles.scrollBody}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={loading} 
+            onRefresh={loadSubscription} 
+            tintColor="#0F4C9C" 
+            progressViewOffset={20}
+          />
+        }
+      >
+        {/* Subscription Engine Card */}
+        <View style={styles.card}>
           <View style={styles.cardTop}>
             <View>
-              <Text style={styles.cardLabel}>MEMBERSHIP</Text>
-              <Text style={styles.planName}>
-                {status?.subscription?.plan_type?.toUpperCase() ?? "FREE"}
-              </Text>
+              <Text style={styles.labelCaps}>ENGINE STATUS</Text>
+              <Text style={styles.planTitle}>{status?.subscription?.plan_type?.toUpperCase() || "FREE"}</Text>
             </View>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>Verified Account</Text>
-            </View>
-          </View>
-
-          {/* Usage Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Monthly Credits</Text>
-              <Text style={styles.progressValue}>
-                {status?.subscription?.current_usage ?? 0}
-                <Text style={{ color: '#94A3B8' }}> / {status?.subscription?.usage_limit ?? 0}</Text>
-              </Text>
-            </View>
-            <View style={styles.barTrack}>
-              <View style={[styles.barFill, { width: `${Math.min(usagePercentage, 100)}%` }]}>
-                <View style={styles.barGlow} />
-              </View>
-            </View>
-            <View style={styles.remainingBadge}>
-               <Text style={styles.remainingText}>
-                 🚀 {status?.subscription?.remaining ?? 0} credits left
-               </Text>
+            <View style={styles.badge}>
+              <Ionicons name="shield-checkmark" size={14} color="#0EA5E9" />
+              <Text style={styles.badgeText}>ENCRYPTED</Text>
             </View>
           </View>
 
-          <View style={styles.detailsRow}>
-             <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>NEXT BILLING</Text>
-                <Text style={styles.detailValue}>
-                  {status?.subscription?.expires_at 
-                    ? new Date(status.subscription.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) 
-                    : "---"}
-                </Text>
-             </View>
-             <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>PLAN TIER</Text>
-                <Text style={styles.detailValue}>Monthly</Text>
-             </View>
+          <View style={styles.usageContainer}>
+            <View style={styles.usageText}>
+              <Text style={styles.usageLabel}>AI Generation Credits</Text>
+              <Text style={styles.usageNumbers}>
+                {status?.subscription?.current_usage || 0}
+                <Text style={styles.usageLimit}> / {status?.subscription?.usage_limit || 0}</Text>
+              </Text>
+            </View>
+            
+            <View style={styles.barFrame}>
+              <LinearGradient
+                colors={["#0EA5E9", "#6366F1"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={[styles.barFill, { width: `${Math.min(usagePercentage, 100)}%` }]}
+              />
+            </View>
+            
+            <View style={styles.pillRow}>
+              <MaterialCommunityIcons name="lightning-bolt" size={14} color="#F59E0B" />
+              <Text style={styles.pillText}>
+                {status?.subscription?.remaining || 0} Credits available for use
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>RENEWAL</Text>
+              <Text style={styles.statValue}>
+                {status?.subscription?.expires_at 
+                  ? new Date(status.subscription.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) 
+                  : "Never"}
+              </Text>
+            </View>
+            <View style={styles.verticalLine} />
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>NETWORK</Text>
+              <Text style={[styles.statValue, { color: '#10B981' }]}>Online</Text>
+            </View>
           </View>
 
           {status?.subscription?.plan_type !== "enterprise" && (
-            <Pressable
+            <Pressable 
+              onPress={onUpgrade}
               style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && { transform: [{ scale: 0.97 }] },
-                busyCheckout && { opacity: 0.7 }
+                styles.primaryBtn,
+                pressed && { transform: [{ scale: 0.98 }] }
               ]}
               disabled={busyCheckout}
-              onPress={onUpgrade}
             >
-              <Text style={styles.primaryButtonText}>
-                {busyCheckout
-                  ? "Contacting Stripe..."
-                  : status?.subscription?.plan_type === "pro"
-                    ? "Upgrade to Enterprise"
-                    : "Get Pro Access"}
-              </Text>
+              <LinearGradient
+                colors={["#0F172A", "#334155"]}
+                style={styles.btnGradient}
+              >
+                <Text style={styles.btnText}>
+                  {busyCheckout ? "Opening Billing..." : "Upgrade Subscription"}
+                </Text>
+                <Ionicons name="arrow-forward-circle" size={20} color="#FFF" />
+              </LinearGradient>
             </Pressable>
           )}
         </View>
 
-        {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Preferences</Text>
+        {/* Preferences Menu */}
+        <Text style={styles.sectionTitle}>System Preferences</Text>
         
-        <Pressable style={styles.menuItem}>
-          <Text style={styles.menuItemText}>Notification Settings</Text>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
+        <View style={styles.menuCard}>
+          <Pressable style={styles.menuItem}>
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#F1F5F9' }]}>
+                <Ionicons name="notifications" size={18} color="#475569" />
+              </View>
+              <Text style={styles.menuLabel}>Notification Controls</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+          </Pressable>
 
-        <Pressable style={[styles.menuItem, { marginTop: 8 }]} onPress={logout}>
-          <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Log Out</Text>
-          <Text style={[styles.chevron, { color: '#EF4444' }]}>›</Text>
-        </Pressable>
+          <View style={styles.hr} />
 
-        {errorMessage && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </View>
-        )}
+          <Pressable style={styles.menuItem} onPress={logout}>
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#FFF1F2' }]}>
+                <Ionicons name="log-out" size={18} color="#E11D48" />
+              </View>
+              <Text style={[styles.menuLabel, { color: '#E11D48' }]}>Sign Out of Device</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#FECACA" />
+          </Pressable>
+        </View>
 
-        <Text style={styles.buildInfo}>Rudra-Dev Environment • v1.0.8</Text>
+        <View style={styles.footer}>
+          <Text style={styles.version}>VERSION 1.0.8 • PRODUCTION BUILD</Text>
+          <Text style={styles.copyright}>Powered by ClaimScope Cloud Architecture</Text>
+        </View>
       </ScrollView>
-      {/* Required for Toast to render */}
-      <Toast /> 
+      <Toast />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
+  screen: { flex: 1, backgroundColor: "#F8FAFC" },
+  headerStack: {
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    backgroundColor: '#212f52',
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 12 },
+      android: { elevation: 10 }
+    })
   },
-  container: {
-    padding: 24,
-    paddingTop: 70,
-  },
-  headerRow: {
+  headerGradient: { paddingBottom: 25 },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 35,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 15,
   },
-  avatarContainer: {
-    position: 'relative',
-  },
+  profileSection: { flexDirection: 'row', alignItems: 'center' },
+  avatarWrapper: { width: 54, height: 54, position: 'relative' },
   avatarGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#276bbd',
-    justifyContent: 'center',
+    flex: 1,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  onlineBadge: {
+  avatarChar: { fontSize: 22, fontWeight: '900', color: '#FFF' },
+  statusDot: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#22C55E',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#10B981',
     borderWidth: 3,
-    borderColor: '#F8FAFC',
+    borderColor: '#0F172A',
   },
-  headerTextContainer: {
-    marginLeft: 16,
-    flex: 1,
+  metaInfo: { marginLeft: 16 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2, width: 180 },
+  exitBtn: { 
+    width: 42, height: 42, borderRadius: 12, 
+    backgroundColor: 'rgba(255,255,255,0.1)', 
+    alignItems: 'center', justifyContent: 'center' 
   },
-  greeting: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1E293B',
-  },
-  emailText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  mainCard: {
+
+  scrollBody: { padding: 20, paddingTop: 30 },
+  card: {
     backgroundColor: '#FFF',
-    borderRadius: 32,
+    borderRadius: 28,
     padding: 24,
-    shadowColor: "#000",
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#1f325f',
     shadowOffset: { width: 0, height: 15 },
     shadowOpacity: 0.06,
-    shadowRadius: 25,
-    elevation: 8,
+    shadowRadius: 20,
+    elevation: 5,
   },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 25,
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
+  labelCaps: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1.5 },
+  planTitle: { fontSize: 32, fontWeight: '900', color: '#0F172A', marginTop: 4 },
+  badge: { 
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F9FF', 
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start', gap: 5
   },
-  cardLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 1.2,
+  badgeText: { fontSize: 10, fontWeight: '800', color: '#0EA5E9' },
+
+  usageContainer: { marginBottom: 25 },
+  usageText: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  usageLabel: { fontSize: 14, fontWeight: '700', color: '#334155' },
+  usageNumbers: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  usageLimit: { color: '#94A3B8', fontWeight: '400' },
+  barFrame: { height: 10, backgroundColor: '#F1F5F9', borderRadius: 5, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 5 },
+  pillRow: { 
+    flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 6, 
+    backgroundColor: '#FFFBEB', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8
   },
-  planName: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#114acf',
+  pillText: { fontSize: 12, fontWeight: '700', color: '#B45309' },
+
+  statsRow: { 
+    flexDirection: 'row', paddingVertical: 20, borderTopWidth: 1, 
+    borderBottomWidth: 1, borderColor: '#F8FAFC', marginBottom: 24 
   },
-  statusPill: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  statBox: { flex: 1, alignItems: 'center' },
+  statLabel: { fontSize: 9, fontWeight: '900', color: '#94A3B8', marginBottom: 4 },
+  statValue: { fontSize: 14, fontWeight: '800', color: '#1E293B' },
+  verticalLine: { width: 1, height: '100%', backgroundColor: '#F1F5F9' },
+
+  primaryBtn: { borderRadius: 20, overflow: 'hidden' },
+  btnGradient: { 
+    paddingVertical: 18, flexDirection: 'row', 
+    alignItems: 'center', justifyContent: 'center', gap: 10 
   },
-  statusPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748B',
+  btnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+
+  sectionTitle: { 
+    fontSize: 12, fontWeight: '900', color: '#94A3B8', 
+    marginTop: 40, marginBottom: 16, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 1.5
   },
-  progressContainer: {
-    marginBottom: 25,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  progressValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  barTrack: {
-    height: 12,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: '#276bbd',
-    borderRadius: 6,
-  },
-  barGlow: {
-    position: 'absolute',
-    right: 0,
-    width: 15,
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  remainingBadge: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  remainingText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#4F46E5',
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 20,
-    marginBottom: 25,
-  },
-  detailItem: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94A3B8',
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginTop: 2,
-  },
-  primaryButton: {
-    height: 56,
-    backgroundColor: '#0F172A',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-  },
-  primaryButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#94A3B8',
-    marginTop: 35,
-    marginBottom: 15,
-    marginLeft: 5,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  menuItem: {
-    backgroundColor: '#FFF',
-    padding: 18,
-    borderRadius: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  menuItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  chevron: {
-    fontSize: 20,
-    color: '#CBD5E1',
-    fontWeight: '300',
-  },
-  errorBox: {
-    marginTop: 20,
-    backgroundColor: '#FEF2F2',
-    padding: 15,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  buildInfo: {
-    textAlign: 'center',
-    color: '#CBD5E1',
-    fontSize: 10,
-    marginTop: 40,
-    marginBottom: 20,
-  }
+  menuCard: { backgroundColor: '#FFF', borderRadius: 24, paddingVertical: 8, borderWidth: 1, borderColor: '#F1F5F9' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, paddingHorizontal: 20 },
+  menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  iconCircle: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  menuLabel: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+  hr: { height: 1, backgroundColor: '#F8FAFC', marginHorizontal: 20 },
+
+  footer: { marginTop: 50, marginBottom: 40, alignItems: 'center' },
+  version: { color: '#CBD5E1', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  copyright: { color: '#E2E8F0', fontSize: 11, fontWeight: '600', marginTop: 6 }
 });
