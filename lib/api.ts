@@ -235,7 +235,7 @@ export async function generateResponse(
     message: string;
     data: { content: string; fileId: number };
   }>(
-    "/drafts/generate-test",
+    "/drafts/generate",
     {
       method: "POST",
       body: JSON.stringify(payload),

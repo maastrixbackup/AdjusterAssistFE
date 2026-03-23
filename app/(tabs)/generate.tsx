@@ -136,7 +136,7 @@ export default function GenerateScreen() {
         fileId: selectedWorkspace.id,
         type: outputTypeMap[selectedOutput],
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
-        shouldSave: true,
+        shouldSave: false
       };
 
       const result = await generateResponse(token, payload);
@@ -147,6 +147,7 @@ export default function GenerateScreen() {
           type: result.responseTypeLabel,
           text: result.responseText,
           fileId: result.fileId.toString(),
+          alreadySaved: "false",
         },
       });
       setRequest("");
@@ -170,6 +171,7 @@ export default function GenerateScreen() {
         type: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
         text: draft.content || "No content found.",
         fileId: draft.file_id?.toString() || "null",
+        alreadySaved: "true",
       },
     });
   };
