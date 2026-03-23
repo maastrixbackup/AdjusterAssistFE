@@ -73,7 +73,7 @@ export default function GenerateScreen() {
       setStatus(statusData);
       setRecentDrafts(draftsData ?? []);
       setWorkspaces(filesData ?? []);
-      
+
       if (filesData && filesData.length > 0 && !selectedWorkspace) {
         setSelectedWorkspace(filesData[0]);
       }
@@ -116,6 +116,7 @@ export default function GenerateScreen() {
         Toast.show({ type: "success", text1: "Workspace Ready" });
       }
     } catch (error: any) {
+      console.log(error)
       Toast.show({ type: "error", text1: "Creation Failed" });
     } finally {
       setIsCreatingFile(false);
@@ -135,7 +136,7 @@ export default function GenerateScreen() {
         fileId: selectedWorkspace.id,
         type: outputTypeMap[selectedOutput],
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
-        shouldSave: true,
+        shouldSave: false
       };
 
       const result = await generateResponse(token, payload);
@@ -146,12 +147,14 @@ export default function GenerateScreen() {
           type: result.responseTypeLabel,
           text: result.responseText,
           fileId: result.fileId.toString(),
+          alreadySaved: "false",
         },
       });
       setRequest("");
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
+      console.log(error)
       Toast.show({ type: "error", text1: "Generation Failed" });
     } finally {
       setIsGenerating(false);
@@ -168,9 +171,16 @@ export default function GenerateScreen() {
         type: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
         text: draft.content || "No content found.",
         fileId: draft.file_id?.toString() || "null",
+        alreadySaved: "true",
       },
     });
   };
+
+  const onClickRefresh = async() =>{
+    // console.log("Refresh Clicked")
+    if(!token)return;
+    await getRecentDrafts(token)
+  }
 
   if (isLoading && !refreshing) {
     return (
@@ -201,7 +211,7 @@ export default function GenerateScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
+
           <Text style={styles.sectionLabel}>Active Workspace</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workspaceScroll}>
             <Pressable style={styles.addWorkspaceBtn} onPress={() => setIsModalVisible(true)}>
@@ -214,9 +224,9 @@ export default function GenerateScreen() {
                 onPress={() => setSelectedWorkspace(ws)}
                 style={[styles.workspaceItem, selectedWorkspace?.id === ws.id && styles.workspaceItemActive]}
               >
-                <MaterialCommunityIcons 
-                  name={selectedWorkspace?.id === ws.id ? "folder-open" : "folder"} 
-                  size={18} color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"} 
+                <MaterialCommunityIcons
+                  name={selectedWorkspace?.id === ws.id ? "folder-open" : "folder"}
+                  size={18} color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
                 />
                 <Text style={[styles.workspaceText, selectedWorkspace?.id === ws.id && styles.workspaceTextActive]}>
                   {ws.client_name || ws.claim_number}
@@ -260,11 +270,35 @@ export default function GenerateScreen() {
 
           <View style={styles.historyHeader}>
             <Text style={styles.historyTitle}>Recent Generations</Text>
+
+            {/* NEW: Refresh Trigger */}
+            <Pressable
+              onPress={onClickRefresh} 
+              style={({ pressed }) => [
+                styles.refreshBadge,
+                pressed && { opacity: 0.6 }
+              ]}
+            >
+              <Ionicons
+                name={isLoading ? "sync" : "refresh-outline"}
+                size={12}
+                color="#0F4C9C"
+                style={isLoading && { transform: [{ rotate: '45deg' }] }} // Subtle visual cue when loading
+              />
+              <Text style={styles.refreshText}>{isLoading ? "Syncing..." : "Refresh"}</Text>
+            </Pressable>
           </View>
+
           <View style={styles.historyList}>
             {recentDrafts.map((item) => (
-              <Pressable key={item.id} onPress={() => handleHistoryPress(item)} style={({ pressed }) => [styles.historyItem, pressed && { opacity: 0.7 }]}>
-                <View style={styles.historyIconBox}><Ionicons name="document-text-outline" size={20} color="#0F4C9C" /></View>
+              <Pressable
+                key={item.id || item.content} // Fallback to content if ID is missing for session drafts
+                onPress={() => handleHistoryPress(item)}
+                style={({ pressed }) => [styles.historyItem, pressed && { opacity: 0.7 }]}
+              >
+                <View style={styles.historyIconBox}>
+                  <Ionicons name="document-text-outline" size={20} color="#0F4C9C" />
+                </View>
                 <View style={styles.historyContent}>
                   <Text style={styles.historyTypeTag}>{item.claim_number || "Draft"}</Text>
                   <Text style={styles.historyText} numberOfLines={1}>{item.content}</Text>
@@ -318,7 +352,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: "800", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14, marginTop: 10 },
   workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
   workspaceItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 8 },
-  workspaceItemActive: { backgroundColor: '#0F4C9C', borderColor: '#0F4C9C' },
+  workspaceItemActive: { backgroundColor: '#0F4C9C', borderColor: '#0f4c9c' },
   workspaceText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
   workspaceTextActive: { color: '#FFF' },
   addWorkspaceBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#0F4C9C', gap: 4 },
@@ -339,7 +373,6 @@ const styles = StyleSheet.create({
   generateBtn: { marginTop: 30, borderRadius: 20, overflow: "hidden" },
   gradientBtn: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
   btnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
-  historyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 40, marginBottom: 20 },
   historyTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
   historyList: { gap: 14 },
   historyItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF", padding: 14, borderRadius: 20, borderWidth: 1, borderColor: "#F1F5F9" },
@@ -355,5 +388,27 @@ const styles = StyleSheet.create({
   modalLabel: { fontSize: 12, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase' },
   modalInput: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', fontSize: 15, color: '#0F172A' },
   modalActionBtn: { backgroundColor: '#0F4C9C', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginTop: 10 },
-  modalActionText: { color: '#FFF', fontSize: 16, fontWeight: '800' }
+  modalActionText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginTop:12
+  },
+  refreshBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE', // Light blue background
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  refreshText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F4C9C',
+    textTransform: 'uppercase',
+  },
 });

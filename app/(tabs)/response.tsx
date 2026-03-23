@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Make sure to install this
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Back for local logging
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -27,9 +27,11 @@ type Params = {
   type?: string;
   outputType?: OutputType;
   fileId?: string;
+  alreadySaved?: string;
 };
 
-const SAVED_DRAFTS_KEY = "@session_saved_drafts";
+// Local storage key for "Generation Log"
+const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
 
 const defaultLabels: Record<string, string> = {
   email: "Email Response",
@@ -44,43 +46,70 @@ export default function ResponseScreen() {
 
   const [copying, setCopying] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
 
-  const responseText = useMemo(() => {
-    if (!params.text) return "No response available.";
-    return params.text;
-  }, [params.text]);
+  // Local UI state for the Green "Saved" button
+  const [isSaved, setIsSaved] = useState(params.alreadySaved === "true");
 
+  const responseText = useMemo(() => params.text || "No response available.", [params.text]);
   const responseTypeLabel = params.type || defaultLabels[params.outputType || "email"] || "Generated Output";
 
-  // Check session storage to see if this specific text was already saved
+  /**
+   * 1. AUTOMATIC LOCAL SESSION SAVE
+   * Runs once when screen opens to log the generation locally.
+   */
   useEffect(() => {
-    const checkSavedStatus = async () => {
+    const logToSession = async () => {
+      // If we came from history, don't re-log it
+      if (params.alreadySaved === "true") return;
+
       try {
-        const stored = await AsyncStorage.getItem(SAVED_DRAFTS_KEY);
-        if (stored) {
-          const savedList: string[] = JSON.parse(stored);
-          // We check if the current response text exists in our session "saved" list
-          if (savedList.includes(responseText)) {
-            setIsSaved(true);
-          } else {
-            setIsSaved(false);
-          }
+        const rawData = await AsyncStorage.getItem(SESSION_HISTORY_KEY);
+        let currentData = rawData ? JSON.parse(rawData) : [];
+
+        // Avoid duplicate logs for the exact same text
+        const exists = currentData.some((item: any) => item.content === responseText);
+
+        if (!exists) {
+          const newEntry = {
+            id: Date.now(),
+            content: responseText,
+            draft_type: params.outputType || 'email',
+            file_id: params.fileId,
+            created_at: new Date().toISOString(),
+          };
+          currentData.unshift(newEntry);
+          await AsyncStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(currentData.slice(0, 50))); // Keep last 50
         }
       } catch (e) {
-        console.error("Error reading session storage", e);
+        console.error("Local Session Log Error:", e);
       }
     };
 
-    checkSavedStatus();
-    setSaving(false);
-    setCopying(false);
-  }, [responseText, params.fileId]);
+    logToSession();
+  }, [responseText]);
 
+
+
+  useEffect(() => {
+    // Whenever params.text changes (a new generation), 
+    // reset the saved state based on the new params.
+    setIsSaved(params.alreadySaved === "true");
+
+    // Also reset the internal saving spinner just in case
+    setSaving(false);
+  }, [params.text, params.alreadySaved]);
+
+
+  /**
+   * 2. MANUAL DB SAVE
+   * Only fires if the user specifically clicks the button.
+   */
   async function onSave() {
+    if (isSaved || saving) return;
+
     const fId = params.fileId;
     if (!fId || fId === "undefined" || fId === "null") {
-      Alert.alert("Workspace Missing", "This draft is not linked to a workspace.");
+      Alert.alert("Workspace Missing", "Link a workspace to save to DB.");
       return;
     }
 
@@ -90,10 +119,10 @@ export default function ResponseScreen() {
       return;
     }
 
-    const sanitizedToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
-
     try {
       setSaving(true);
+      const sanitizedToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
+
       const result = await saveDraft(
         sanitizedToken,
         Number(fId),
@@ -101,36 +130,18 @@ export default function ResponseScreen() {
         responseText
       );
 
-      if (result.success) {
-        // 1. Update UI State
+      if (result) {
         setIsSaved(true);
-        
-        // 2. Persist to Session Storage so it stays "Saved" when navigating back/forth
-        const stored = await AsyncStorage.getItem(SAVED_DRAFTS_KEY);
-        const savedList: string[] = stored ? JSON.parse(stored) : [];
-        if (!savedList.includes(responseText)) {
-          savedList.push(responseText);
-          await AsyncStorage.setItem(SAVED_DRAFTS_KEY, JSON.stringify(savedList));
-        }
-
-        Alert.alert("Success", "Draft saved to workspace successfully.");
+        Alert.alert("Success", "Draft synced to database.");
       }
     } catch (error: any) {
-      console.error("[SAVE ERROR]:", error);
-      Alert.alert("Save Failed", error.message || "An unexpected error occurred.");
+      Alert.alert("Save Failed", error.message || "DB Connection error.");
     } finally {
       setSaving(false);
     }
   }
 
-  function onBack() {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
-    }
-  }
-
+  // ... (Keep onShare and onCopy functions as they were)
   const onShare = async () => {
     try {
       await Share.share({ message: responseText, title: responseTypeLabel });
@@ -145,7 +156,6 @@ export default function ResponseScreen() {
       await Clipboard.setStringAsync(responseText);
       setTimeout(() => setCopying(false), 2000);
     } catch {
-      Alert.alert("Error", "Failed to copy text.");
       setCopying(false);
     }
   }
@@ -153,10 +163,10 @@ export default function ResponseScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
-          <Pressable onPress={onBack} style={styles.iconButton}>
+          <Pressable onPress={() => router.back()} style={styles.iconButton}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </Pressable>
           <Text style={styles.headerTitle}>Review Draft</Text>
@@ -198,8 +208,8 @@ export default function ResponseScreen() {
             <Text style={styles.secondaryButtonText}>{copying ? "Copied" : "Copy"}</Text>
           </Pressable>
 
-          <Pressable 
-            onPress={onSave} 
+          <Pressable
+            onPress={onSave}
             disabled={saving || isSaved}
             style={[styles.primaryButton, (saving || isSaved) && { opacity: 0.8 }]}
           >

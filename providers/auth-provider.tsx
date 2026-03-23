@@ -108,8 +108,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout() {
         setToken(null);
         setEmail(null);
-        void logoutUser();
+
+        // 1. Clear the Auth Session (Token/Email)
         void saveSession(null);
+
+        void AsyncStorage.removeItem("@session_saved_drafts_data");
+        void AsyncStorage.removeItem("@session_saved_drafts");
+
+        // 3. Call the API logout if necessary
+        void logoutUser();
       },
       async sendPasswordReset(inputEmail: string) {
         await requestPasswordReset(inputEmail);

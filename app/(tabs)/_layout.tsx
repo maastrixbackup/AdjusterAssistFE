@@ -140,6 +140,14 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="file-draft-history"
+        options={{
+          headerShown: false,
+          href: null,
+        }}
+      />
+     
     </Tabs>
   );
 }

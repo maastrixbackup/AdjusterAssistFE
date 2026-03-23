@@ -86,7 +86,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
@@ -235,7 +235,7 @@ export async function generateResponse(
     message: string;
     data: { content: string; fileId: number };
   }>(
-    "/drafts/generate-test",
+    "/drafts/generate",
     {
       method: "POST",
       body: JSON.stringify(payload),
