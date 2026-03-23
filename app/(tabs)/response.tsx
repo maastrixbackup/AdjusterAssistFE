@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Make sure to install this
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -27,10 +27,13 @@ type Params = {
   type?: string;
   outputType?: OutputType;
   fileId?: string;
-  alreadySaved: string;
+  alreadySaved?: string; 
 };
 
-const SAVED_DRAFTS_KEY = "@session_saved_drafts";
+// Key for the ID list (to toggle the green button)
+const SAVED_IDS_KEY = "@session_saved_drafts"; 
+// Key for the full history objects (to show in the History Screen)
+const SAVED_DATA_KEY = "@session_saved_drafts_data";
 
 const defaultLabels: Record<string, string> = {
   email: "Email Response",
@@ -47,38 +50,47 @@ export default function ResponseScreen() {
   const [saving, setSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(params.alreadySaved === "true");
 
-  const responseText = useMemo(() => {
-    if (!params.text) return "No response available.";
-    return params.text;
-  }, [params.text]);
-
+  const responseText = useMemo(() => params.text || "No response available.", [params.text]);
   const responseTypeLabel = params.type || defaultLabels[params.outputType || "email"] || "Generated Output";
 
+  // EFFECT 1: Check if already saved in DB session
+  // EFFECT 2: Automatically save every generation to LOCAL Session Storage
   useEffect(() => {
-    const checkSavedStatus = async () => {
-      // If we are viewing a draft from the history/database, keep it as "Saved"
-      if (params.alreadySaved === "true") {
-        setIsSaved(true);
-        return;
-      }
-
-      // If it's a fresh generation, check the session cache
+    const handleAutoSessionSave = async () => {
       try {
-        const stored = await AsyncStorage.getItem(SAVED_DRAFTS_KEY);
-        if (stored) {
-          const savedList: string[] = JSON.parse(stored);
-          // Only set to true if THIS specific content was already saved in this session
-          setIsSaved(savedList.includes(responseText));
-        } else {
-          setIsSaved(false);
+        // 1. Check if this specific text was already marked as "Saved to DB"
+        const savedIds = await AsyncStorage.getItem(SAVED_IDS_KEY);
+        if (savedIds) {
+          const idList: string[] = JSON.parse(savedIds);
+          if (idList.includes(responseText)) setIsSaved(true);
+        }
+
+        // 2. AUTOMATICALLY save to History Session Storage (Local only)
+        // We do this so the user can see it in "Generation Log" even if they don't click Save
+        const rawData = await AsyncStorage.getItem(SAVED_DATA_KEY);
+        let currentData = rawData ? JSON.parse(rawData) : [];
+
+        // Check if this specific generation is already in the log to prevent duplicates
+        const exists = currentData.some((item: any) => item.content === responseText);
+        
+        if (!exists && params.alreadySaved !== "true") {
+          const newLogEntry = {
+            id: Date.now(),
+            content: responseText,
+            draft_type: params.outputType || 'email',
+            file_id: params.fileId,
+            created_at: new Date().toISOString(),
+          };
+          currentData.unshift(newLogEntry); // Add to start of list
+          await AsyncStorage.setItem(SAVED_DATA_KEY, JSON.stringify(currentData));
         }
       } catch (e) {
-        setIsSaved(false);
+        console.error("Session Save Error:", e);
       }
     };
 
-    checkSavedStatus();
-  }, [responseText, params.alreadySaved]);
+    handleAutoSessionSave();
+  }, [responseText]);
 
   async function onSave() {
     if (isSaved || saving) return;
@@ -106,34 +118,24 @@ export default function ResponseScreen() {
         responseText
       );
 
-      // Assuming your API returns an object with success or the saved object itself
       if (result) {
-        // 1. Update UI State immediately
         setIsSaved(true);
 
-        // 2. Persist to Session Storage to prevent the "automatic save" glitch on next view
-        const stored = await AsyncStorage.getItem(SAVED_DRAFTS_KEY);
+        // Record that this specific content is now officially saved to DB
+        const stored = await AsyncStorage.getItem(SAVED_IDS_KEY);
         const savedList: string[] = stored ? JSON.parse(stored) : [];
         if (!savedList.includes(responseText)) {
           savedList.push(responseText);
-          await AsyncStorage.setItem(SAVED_DRAFTS_KEY, JSON.stringify(savedList));
+          await AsyncStorage.setItem(SAVED_IDS_KEY, JSON.stringify(savedList));
         }
 
-        Alert.alert("Success", "Draft saved to workspace successfully.");
+        Alert.alert("Success", "Draft synced to workspace database.");
       }
     } catch (error: any) {
       console.error("[SAVE ERROR]:", error);
       Alert.alert("Save Failed", error.message || "An unexpected error occurred.");
     } finally {
       setSaving(false);
-    }
-  }
-
-  function onBack() {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
     }
   }
 
@@ -151,7 +153,6 @@ export default function ResponseScreen() {
       await Clipboard.setStringAsync(responseText);
       setTimeout(() => setCopying(false), 2000);
     } catch {
-      Alert.alert("Error", "Failed to copy text.");
       setCopying(false);
     }
   }
@@ -162,7 +163,7 @@ export default function ResponseScreen() {
 
       <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
-          <Pressable onPress={onBack} style={styles.iconButton}>
+          <Pressable onPress={() => router.back()} style={styles.iconButton}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </Pressable>
           <Text style={styles.headerTitle}>Review Draft</Text>
@@ -219,7 +220,7 @@ export default function ResponseScreen() {
                 <>
                   <Ionicons name={isSaved ? "cloud-done" : "cloud-upload-outline"} size={20} color="#FFF" />
                   <Text style={styles.buttonText}>
-                    {isSaved ? "Saved" : "Save to Workspace"}
+                    {isSaved ? "Saved to Workspace" : "Save to Workspace"}
                   </Text>
                 </>
               )}

@@ -1,6 +1,7 @@
 import { AllDraftsofUser, Draft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -17,33 +18,54 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const SAVED_DATA_KEY = "@session_saved_drafts_data";
+
+// Extended Draft type to include source tracking
+type EnhancedDraft = Draft & { source: 'db' | 'session' };
+
 export default function DraftsListScreen() {
   const { token } = useAuth();
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [drafts, setDrafts] = useState<EnhancedDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchDrafts = useCallback(async () => {
+  const fetchMergedHistory = useCallback(async () => {
     if (!token) return;
     try {
       if (!refreshing) setLoading(true);
+
+      // 1. Fetch from DB
+      const dbData = await AllDraftsofUser(token);
+      const dbList: Draft[] = Array.isArray(dbData) ? dbData : (dbData as any).drafts || [];
+      const dbDrafts: EnhancedDraft[] = dbList.map(d => ({ ...d, source: 'db' }));
+
+      // 2. Fetch from Session Storage
+      const sessionRaw = await AsyncStorage.getItem(SAVED_DATA_KEY);
+      const sessionList: Draft[] = sessionRaw ? JSON.parse(sessionRaw) : [];
+      const sessionDrafts: EnhancedDraft[] = sessionList.map(d => ({ ...d, source: 'session' }));
+
+      // 3. Merge and De-duplicate (DB version wins if content is same)
+      const combined = [...dbDrafts, ...sessionDrafts];
       
-      const data = await AllDraftsofUser(token);
-      
-      // Ensure data is an array (handling cases where apiRequest might return {drafts: []})
-      const draftList = Array.isArray(data) ? data : (data as any).drafts || [];
-      
-      const sortedDrafts = draftList.sort((a: Draft, b: Draft) => 
+      // Use a Map to filter by content to avoid showing the same draft twice
+      const uniqueMap = new Map<string, EnhancedDraft>();
+      combined.forEach(item => {
+        const existing = uniqueMap.get(item.content);
+        // If it doesn't exist OR if the existing one is from session and current is from DB, overwrite
+        if (!existing || (existing.source === 'session' && item.source === 'db')) {
+          uniqueMap.set(item.content, item);
+        }
+      });
+
+      const sorted = Array.from(uniqueMap.values()).sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      setDrafts(sortedDrafts);
-      
-      // Console log only the count as requested
-      console.log(`Total Drafts Fetched: ${sortedDrafts.length}`);
+      setDrafts(sorted);
+      console.log(`History Synced: ${dbDrafts.length} DB, ${sessionDrafts.length} Session`);
 
     } catch (err) {
-      console.error("Error fetching global history.",err);
+      console.error("Error fetching merged history.", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,17 +73,18 @@ export default function DraftsListScreen() {
   }, [token, refreshing]);
 
   useEffect(() => {
-    fetchDrafts();
-  }, [fetchDrafts]);
+    fetchMergedHistory();
+  }, [fetchMergedHistory]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchDrafts();
+    fetchMergedHistory();
   };
 
-  const renderDraft = ({ item }: { item: Draft }) => {
+  const renderDraft = ({ item }: { item: EnhancedDraft }) => {
     const isEmail = item.draft_type === 'email';
     const isEscalation = item.draft_type === 'escalation';
+    const isSynced = item.source === 'db';
     
     return (
       <Pressable 
@@ -76,20 +99,33 @@ export default function DraftsListScreen() {
               text: item.content, 
               type: item.draft_type,
               fileId: item.file_id?.toString(),
-              alreadySaved: "true" 
+              alreadySaved: isSynced ? "true" : "false" 
             }
           });
         }}
       >
         <View style={[
           styles.typeIndicator, 
-          { backgroundColor: isEmail ? '#0F4C9C' : isEscalation ? '#E11D48' : '#334155' }
+          { backgroundColor: isEmail ? '#0F4C9C' : isEscalation ? '#E11D48' : '#fdfa2d' }
         ]} />
         
         <View style={styles.cardMain}>
           <View style={styles.cardHeader}>
-            <View style={styles.typeBadge}>
-              <Text style={styles.typeBadgeText}>{item.draft_type?.toUpperCase() || "DRAFT"}</Text>
+            <View style={styles.badgeRow}>
+                <View style={styles.typeBadge}>
+                    <Text style={styles.typeBadgeText}>{item.draft_type?.toUpperCase() || "DRAFT"}</Text>
+                </View>
+                {/* SOURCE TAG */}
+                <View style={[styles.sourceTag, isSynced ? styles.syncedTag : styles.sessionTag]}>
+                    <Ionicons 
+                        name={isSynced ? "cloud-done" : "time-outline"} 
+                        size={8} 
+                        color={isSynced ? "#059669" : "#D97706"} 
+                    />
+                    <Text style={[styles.sourceTagText, { color: isSynced ? "#059669" : "#D97706" }]}>
+                        {isSynced ? "SYNCED" : "SESSION"}
+                    </Text>
+                </View>
             </View>
             <Text style={styles.dateText}>
               {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
@@ -106,13 +142,13 @@ export default function DraftsListScreen() {
 
           <View style={styles.cardFooter}>
             <View style={styles.footerInfo}>
-                <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
                 <Text style={styles.footerTime}>
                     {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
             </View>
             <View style={styles.openAction}>
-                <Text style={styles.openText}>Review</Text>
+                <Text style={styles.openText}>Review Draft</Text>
                 <Ionicons name="chevron-forward" size={12} color="#0F4C9C" />
             </View>
           </View>
@@ -160,7 +196,7 @@ export default function DraftsListScreen() {
         <FlatList
           data={drafts}
           renderItem={renderDraft}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -168,7 +204,7 @@ export default function DraftsListScreen() {
           }
           ListHeaderComponent={
             <View style={styles.listHeader}>
-                <Text style={styles.headerCount}>{drafts.length} Total Saved Generations</Text>
+                <Text style={styles.headerCount}>{drafts.length} Total Logs</Text>
                 <View style={styles.headerLine} />
             </View>
           }
@@ -186,6 +222,7 @@ export default function DraftsListScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
   headerContainer: {
@@ -246,8 +283,15 @@ const styles = StyleSheet.create({
   typeIndicator: { width: 5 },
   cardMain: { flex: 1, padding: 16 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   typeBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   typeBadgeText: { fontSize: 9, fontWeight: '900', color: '#475569' },
+  
+  sourceTag: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5 },
+  syncedTag: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
+  sessionTag: { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
+  sourceTagText: { fontSize: 7, fontWeight: '900' },
+
   dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '700' },
   claimNoText: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 4 },
   contentPreview: { fontSize: 15, color: '#1E293B', fontWeight: '500', lineHeight: 22, marginBottom: 14 },

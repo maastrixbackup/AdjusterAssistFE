@@ -111,7 +111,7 @@ export default function HomeScreen() {
         ]}
         onPress={() =>
           router.push({
-            pathname: "/history",
+            pathname: "/file-draft-history",
             params: {
               fileId: item.id,
               claimNumber: item.claim_number,
