@@ -116,6 +116,7 @@ export default function GenerateScreen() {
         Toast.show({ type: "success", text1: "Workspace Ready" });
       }
     } catch (error: any) {
+      console.log(error)
       Toast.show({ type: "error", text1: "Creation Failed" });
     } finally {
       setIsCreatingFile(false);
@@ -152,6 +153,7 @@ export default function GenerateScreen() {
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
+      console.log(error)
       Toast.show({ type: "error", text1: "Generation Failed" });
     } finally {
       setIsGenerating(false);
