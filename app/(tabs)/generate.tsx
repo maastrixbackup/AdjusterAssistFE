@@ -31,6 +31,7 @@ import {
   SubscriptionStatus,
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { toast } from "sonner-native";
 
 type OutputMode = "Email" | "File Note" | "Escalation";
 const outputModes: OutputMode[] = ["Email", "File Note", "Escalation"];
@@ -92,7 +93,7 @@ export default function GenerateScreen() {
   const handleCreateWorkspace = async () => {
     if (!token) return;
     if (!newClaim || !newClient) {
-      Toast.show({ type: "error", text1: "Missing Info", text2: "Claim # and Client Name are required." });
+      toast.warning("Missing information")
       return;
     }
 
@@ -113,11 +114,11 @@ export default function GenerateScreen() {
         setNewClaim("");
         setNewPolicy("");
         setNewClient("");
-        Toast.show({ type: "success", text1: "Workspace Ready" });
+        toast.success("Workspace created successfully")
       }
     } catch (error: any) {
       console.log(error)
-      Toast.show({ type: "error", text1: "Creation Failed" });
+      toast.error("unable to create workspace")
     } finally {
       setIsCreatingFile(false);
     }
@@ -216,7 +217,7 @@ export default function GenerateScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workspaceScroll}>
             <Pressable style={styles.addWorkspaceBtn} onPress={() => setIsModalVisible(true)}>
               <Ionicons name="add" size={20} color="#0F4C9C" />
-              <Text style={styles.addWorkspaceText}>New File</Text>
+              <Text style={styles.addWorkspaceText}>New Workspace</Text>
             </Pressable>
             {workspaces.map((ws) => (
               <Pressable

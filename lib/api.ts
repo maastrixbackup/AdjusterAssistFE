@@ -125,11 +125,7 @@ async function apiRequest<T>(
     const json = await response.json().catch(() => ({}));
 
     if (DEBUG_MODE) {
-      console.log(
-        `%c [API RESPONSE] ${response.status} <- ${path}`,
-        `color: ${response.ok ? "#10b981" : "#f43f5e"}; font-weight: bold`,
-        json,
-      );
+      console.log(`%c [API RESPONSE] ${response.status} <- ${path}`, json);
     }
 
     if (!response.ok) {
@@ -235,7 +231,7 @@ export async function generateResponse(
     message: string;
     data: { content: string; fileId: number };
   }>(
-    "/drafts/generate",
+    "/drafts/generate-test",
     {
       method: "POST",
       body: JSON.stringify(payload),

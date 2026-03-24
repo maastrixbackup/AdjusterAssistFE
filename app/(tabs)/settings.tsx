@@ -22,6 +22,7 @@ import {
   upgradeSubscription
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { toast } from "sonner-native";
 
 const { width } = Dimensions.get("window");
 
@@ -62,8 +63,10 @@ export default function SettingsScreen() {
     try {
       const { checkoutUrl } = await upgradeSubscription(token, targetPlan);
       if (checkoutUrl) await Linking.openURL(checkoutUrl);
+      toast.success(`Plan Upgraded to ${targetPlan}`)
     } catch (error) {
-      Toast.show({ type: 'error', text1: 'Billing Error', text2: 'Unable to reach payment gateway.' });
+      toast.error("Unable to react payment gateway")
+      console.log(error)
     } finally {
       setBusyCheckout(false);
     }
@@ -171,7 +174,7 @@ export default function SettingsScreen() {
           {status?.subscription?.plan_type !== "enterprise" && (
             <Pressable onPress={onUpgrade} style={({ pressed }) => [styles.upgradeBtn, pressed && { transform: [{ scale: 0.97 }] }]}>
               <LinearGradient colors={["#1E293B", "#0F172A"]} style={styles.upgradeGradient}>
-                <Text style={styles.upgradeBtnText}>Optimize Your Plan</Text>
+                <Text style={styles.upgradeBtnText}>Upgrade Your Plan</Text>
                 <Ionicons name="rocket" size={18} color="#FFF" />
               </LinearGradient>
             </Pressable>
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 25 },
   planBadge: { flex: 1 },
   planLabel: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
-  planName: { fontSize: 28, fontWeight: '900', color: '#0F172A', marginTop: 4 },
+  planName: { fontSize: 28, fontWeight: '900', color: '#0010ec', marginTop: 4 },
   secureBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
   secureText: { fontSize: 9, fontWeight: '900', color: '#10B981' },
 
