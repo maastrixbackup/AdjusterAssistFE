@@ -6,19 +6,19 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Share,
   StatusBar,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { saveDraft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { toast } from "sonner-native";
 
 type OutputType = "email" | "file" | "escalation";
 
@@ -109,12 +109,12 @@ export default function ResponseScreen() {
 
     const fId = params.fileId;
     if (!fId || fId === "undefined" || fId === "null") {
-      Alert.alert("Workspace Missing", "Link a workspace to save to DB.");
+      toast.warning("Workspace is missing")
       return;
     }
 
     if (!token) {
-      Alert.alert("Session Expired", "Please log in again.");
+      toast.warning("Session Expired")
       router.replace("/login");
       return;
     }
@@ -132,10 +132,15 @@ export default function ResponseScreen() {
 
       if (result) {
         setIsSaved(true);
-        Alert.alert("Success", "Draft synced to database.");
+        toast.success("Success", {
+          description: "Draft has been saved to your workspace.",
+        });
       }
     } catch (error: any) {
-      Alert.alert("Save Failed", error.message || "DB Connection error.");
+      toast.error("Error", {
+        description:"Save failed"
+      })
+      console.log(error)
     } finally {
       setSaving(false);
     }
@@ -155,6 +160,7 @@ export default function ResponseScreen() {
       setCopying(true);
       await Clipboard.setStringAsync(responseText);
       setTimeout(() => setCopying(false), 2000);
+      toast.success("Copied to Clipboard")
     } catch {
       setCopying(false);
     }

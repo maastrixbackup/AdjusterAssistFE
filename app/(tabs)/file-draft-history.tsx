@@ -85,8 +85,8 @@ export default function FileHistoryScreen() {
     const isEmail = item.draft_type === 'email';
     const isEscalation = item.draft_type === 'escalation';
     
-    // Logic Fix: It is only synced if it came from the 'db' source or has a real numeric ID
-    const isSynced = item.source === 'db' || (!!item.id && !isNaN(Number(item.id)));
+    const isSynced = item.source === 'db';
+
 
     return (
       <Pressable

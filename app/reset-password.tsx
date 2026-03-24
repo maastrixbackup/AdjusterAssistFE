@@ -1,244 +1,310 @@
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 import { useAuth } from "@/providers/auth-provider";
 
-const fontRegular = "Roboto";
-const fontMedium = "Roboto-Medium";
-const fontBold = "Roboto-Bold";
-
 export default function ResetPasswordScreen() {
   const { resetPassword } = useAuth();
+
   const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
-  const abstractImg = require("../assets/images/abstract1.png");
 
   async function handleResetPassword() {
     if (!token.trim() || !newPassword.trim()) {
-      setMessage("Token and new password are required.");
+      toast.error("Required Fields", {
+        description:
+          "Please enter both the reset token and your new password.",
+      });
       return;
     }
 
-    setLoading(true);
-    setMessage(null);
-
     try {
-      await resetPassword(token.trim(), newPassword);
-      setMessage("Password reset successful. Please login.");
-      router.replace("/login");
-    } catch (error) {
-      const text =
-        error instanceof Error ? error.message : "Unable to reset password";
-      setMessage(text);
+      setLoading(true);
+
+      await toast.promise(resetPassword(token.trim(), newPassword), {
+        loading: "Updating your password...",
+        success: () => {
+          setTimeout(() => router.replace("/login"), 1500);
+          return "Password updated! Redirecting...";
+        },
+        error: (err) =>
+          err instanceof Error
+            ? err.message
+            : "Unable to reset password",
+      });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <SafeAreaProvider>
+    <View style={styles.root}>
+      {/* ✅ Status bar fix */}
+      <StatusBar barStyle="light-content" backgroundColor="#052146" />
+
+      {/* ✅ Full-screen gradient (critical fix) */}
       <LinearGradient
         colors={["#1E63B6", "#052146"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ flex: 1 }}
-      >
-        <SafeAreaView edges={["top"]} style={styles.safe}>
-          <LinearGradient
-            colors={["#1E63B6", "#052146"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.header}
-          >
-            <Image source={abstractImg} style={styles.molecule} />
-            <View style={styles.logoContainer}>
-              <Image source={logoImg} style={styles.logo} />
-            </View>
-          </LinearGradient>
+        style={StyleSheet.absoluteFill}
+      />
 
-          <View style={styles.container}>
-            <Text style={styles.title}>Set New Password</Text>
+      {/* Header */}
+      <SafeAreaView edges={["top"]} style={styles.headerSafe}>
+        <Image source={logoImg} style={styles.logo} />
+      </SafeAreaView>
+
+      {/* Content */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.formCard}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons
+                name="shield-lock-outline"
+                size={32}
+                color="#1E63B6"
+              />
+            </View>
+
+            <Text style={styles.title}>Secure Reset</Text>
             <Text style={styles.subtitle}>
-              Paste the token from email and enter a new password.
+              Enter the verification token sent to your email and choose a strong new password.
             </Text>
 
-            <View style={styles.inputWrapper}>
-              <Ionicons name="key-outline" size={20} color="#9CA3AF" />
-              <TextInput
-                value={token}
-                onChangeText={setToken}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="Reset Token"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
-            </View>
-
-            <View style={styles.inputWrapper}>
-              <Feather name="lock" size={20} color="#9CA3AF" />
-              <TextInput
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="New Password"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={20}
-                  color="#9CA3AF"
+            {/* TOKEN */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Reset Token</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="key-outline" size={20} color="#94A3B8" />
+                <TextInput
+                  value={token}
+                  onChangeText={setToken}
+                  placeholder="Paste token here..."
+                  placeholderTextColor="#CBD5E1"
+                  style={styles.input}
                 />
-              </TouchableOpacity>
+              </View>
             </View>
 
-            {message ? <Text style={styles.message}>{message}</Text> : null}
+            {/* PASSWORD */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>New Password</Text>
+              <View style={styles.inputWrapper}>
+                <Feather name="lock" size={20} color="#94A3B8" />
+                <TextInput
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showPassword}
+                  placeholder="Min. 8 characters"
+                  placeholderTextColor="#CBD5E1"
+                  style={styles.input}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
 
+            {/* BUTTON */}
             <TouchableOpacity
               style={styles.button}
               onPress={handleResetPassword}
               disabled={loading}
             >
               <LinearGradient
-                colors={["#092f61", "#1E63B6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                colors={["#276bbd", "#0B3C7A"]}
                 style={styles.buttonGradient}
               >
                 {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={styles.buttonText}>Reset Password</Text>
+                  <>
+                    <Text style={styles.buttonText}>
+                      Update Password
+                    </Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={18}
+                      color="#FFF"
+                      style={{ marginLeft: 8 }}
+                    />
+                  </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.replace("/login")}>
-              <Text style={styles.link}>Back to login</Text>
+            <TouchableOpacity
+              onPress={() => router.replace("/login")}
+              style={styles.backButton}
+            >
+              <Text style={styles.backText}>Return to Login</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
-      </LinearGradient>
-    </SafeAreaProvider>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
+    backgroundColor: "#052146", // 🔥 must match gradient end
   },
-  header: {
-    height: 110,
-    justifyContent: "center",
-    overflow: "hidden",
+
+  headerSafe: {
+    alignItems: "center",
+    paddingTop: 20,
+    paddingBottom: 10,
   },
-  molecule: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: 220,
-    height: 120,
-    resizeMode: "cover",
-    opacity: 0.25,
-  },
-  logoContainer: {
-    paddingLeft: 24,
-  },
+
   logo: {
-    width: 220,
+    width: 200,
+    height: 50,
     resizeMode: "contain",
   },
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    marginTop: -8,
-    padding: 18,
-    paddingTop: 28,
+
+  keyboardView: { flex: 1 },
+
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
+
+  formCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    paddingTop: 40,
+    marginTop: 40, // ✅ no negative margin
+
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+      },
+      android: { elevation: 10 },
+    }),
+  },
+
+  iconCircle: {
+    position: "absolute",
+    top: -35,
+    alignSelf: "center",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "#F8FAFC",
+  },
+
   title: {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: "800",
     textAlign: "center",
-    marginTop: 12,
-    fontFamily: fontBold,
+    color: "#1E293B",
+    marginBottom: 8,
   },
+
   subtitle: {
     textAlign: "center",
-    color: "#6B7280",
-    marginVertical: 10,
+    color: "#64748B",
     fontSize: 14,
-    fontFamily: fontRegular,
+    lineHeight: 20,
+    marginBottom: 24,
   },
+
+  inputContainer: { marginBottom: 20 },
+
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569",
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3E8EF",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
     borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 52,
-    marginTop: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    paddingHorizontal: 16,
+    height: 56,
   },
+
   input: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
-    color: "#111827",
-    fontFamily: fontRegular,
+    marginLeft: 12,
+    fontSize: 15,
+    color: "#1E293B",
   },
-  message: {
-    marginTop: 10,
-    textAlign: "center",
-    color: "#334155",
-    fontFamily: fontMedium,
-  },
-  button: {
-    marginTop: 24,
-  },
+
+  button: { marginTop: 10 },
+
   buttonGradient: {
-    height: 52,
-    borderRadius: 12,
+    height: 58,
+    borderRadius: 16,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
+
   buttonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600",
-    fontFamily: fontMedium,
+    fontWeight: "800",
   },
-  link: {
-    marginTop: 16,
-    color: "#0B5ED7",
-    textAlign: "center",
+
+  backButton: {
+    marginTop: 20,
+    alignSelf: "center",
+  },
+
+  backText: {
+    color: "#64748B",
     fontSize: 14,
-    fontFamily: fontMedium,
+    fontWeight: "600",
   },
 });

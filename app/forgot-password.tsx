@@ -1,235 +1,280 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 import { useAuth } from "@/providers/auth-provider";
 
-const fontRegular = "Roboto";
-const fontMedium = "Roboto-Medium";
-const fontBold = "Roboto-Bold";
-
 export default function ForgotPasswordScreen() {
   const { sendPasswordReset } = useAuth();
-
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
-  const abstractImg = require("../assets/images/abstract1.png");
 
   async function handleReset() {
     if (!email.trim()) {
-      setMessage("Please enter your email.");
+      toast.error("Email Required", {
+        description: "Please enter your email address to continue.",
+      });
       return;
     }
 
-    setLoading(true);
-    setMessage(null);
-
     try {
-      await sendPasswordReset(email.trim());
-      setMessage("If this email exists, a reset link has been sent.");
-    } catch (error) {
-      const text =
-        error instanceof Error ? error.message : "Unable to process request";
-      setMessage(text);
+      setLoading(true);
+      await sendPasswordReset(email)
+      toast.success("Reset password link sent to email")
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <SafeAreaProvider>
+    <View style={styles.root}>
+      {/* 🔥 Fix 1: Status bar styling */}
+      <StatusBar barStyle="light-content" backgroundColor="#052146" />
+
+      {/* 🔥 Fix 2: Full background gradient */}
       <LinearGradient
         colors={["#1E63B6", "#052146"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ flex: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* 🔥 Header */}
+      <SafeAreaView edges={["top"]} style={styles.headerSafe}>
+        <Image source={logoImg} style={styles.logo} />
+      </SafeAreaView>
+
+      {/* 🔥 Content */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboardView}
       >
-        <SafeAreaView edges={["top"]} style={styles.safe}>
-          {/* Header */}
-
-          <LinearGradient
-            colors={["#1E63B6", "#052146"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.header}
-          >
-            <Image source={abstractImg} style={styles.molecule} />
-
-            <View style={styles.logoContainer}>
-              <Image source={logoImg} style={styles.logo} />
-            </View>
-          </LinearGradient>
-
-          {/* Body */}
-
-          <View style={styles.container}>
-            <Text style={styles.title}>Reset Password</Text>
-
-            <Text style={styles.subtitle}>
-              Enter your email to receive reset instructions.
-            </Text>
-
-            {/* Email Input */}
-
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
-
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                placeholder="Email Address"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.formCard}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons
+                name="email-fast-outline"
+                size={32}
+                color="#1E63B6"
               />
             </View>
 
-            {message ? <Text style={styles.message}>{message}</Text> : null}
+            <Text style={styles.title}>Recovery</Text>
+            <Text style={styles.subtitle}>
+              Enter your email and we&apos;ll send you a secure token to reset your password.
+            </Text>
 
-            {/* Button */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Registered Email</Text>
+
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="#94A3B8" />
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="name@company.com"
+                  placeholderTextColor="#CBD5E1"
+                  style={styles.input}
+                />
+              </View>
+            </View>
 
             <TouchableOpacity
               style={styles.button}
               onPress={handleReset}
               disabled={loading}
+              activeOpacity={0.8}
             >
               <LinearGradient
-                colors={["#092f61", "#1E63B6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                colors={["#276bbd", "#0B3C7A"]}
                 style={styles.buttonGradient}
               >
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.buttonText}>Send Reset Link</Text>
+                  <>
+                    <Text style={styles.buttonText}>
+                      Send Instructions
+                    </Text>
+                    <Ionicons
+                      name="send"
+                      size={16}
+                      color="#FFF"
+                      style={{ marginLeft: 10 }}
+                    />
+                  </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Back to login */}
+            <View style={styles.footerLinks}>
+              <TouchableOpacity
+                onPress={() => router.replace("/login")}
+              >
+                <Text style={styles.backText}>Back to Login</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.replace("/login")}>
-              <Text style={styles.link}>Back to login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/reset-password")}>
-              <Text style={styles.link}>Have token? Reset now</Text>
-            </TouchableOpacity>
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <TouchableOpacity
+                onPress={() => router.push("/reset-password")}
+                style={styles.tokenButton}
+              >
+                <Text style={styles.tokenText}>
+                  I already have a token
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color="#1E63B6"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
-        </SafeAreaView>
-      </LinearGradient>
-    </SafeAreaProvider>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
+    backgroundColor: "#052146", // 🔥 critical
   },
 
-  header: {
-    height: 110,
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-
-  molecule: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: 220,
-    height: 120,
-    resizeMode: "cover",
-    opacity: 0.25,
-  },
-
-  logoContainer: {
-    paddingLeft: 24,
+  headerSafe: {
+    alignItems: "center",
+    paddingTop: 20,
+    paddingBottom: 20,
   },
 
   logo: {
     width: 220,
+    height: 60,
     resizeMode: "contain",
   },
 
-  container: {
+  keyboardView: {
     flex: 1,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+
+  formCard: {
     backgroundColor: "#FFFFFF",
-    marginTop: -8,
-    padding: 18,
-    paddingTop: 28,
+    borderRadius: 24,
+    padding: 24,
+    paddingTop: 48,
+    marginTop: 40,
+
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 15,
+      },
+      android: { elevation: 8 },
+    }),
+  },
+
+  iconCircle: {
+    position: "absolute",
+    top: -35,
+    alignSelf: "center",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 6,
+    borderColor: "#F8FAFC",
   },
 
   title: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "900",
     textAlign: "center",
-    marginTop: 12,
-    fontFamily: fontBold,
+    color: "#0F172A",
+    marginBottom: 8,
   },
 
   subtitle: {
     textAlign: "center",
-    color: "#6B7280",
-    marginVertical: 10,
+    color: "#64748B",
     fontSize: 14,
-    fontFamily: fontRegular,
+    lineHeight: 22,
+    marginBottom: 28,
+  },
+
+  inputContainer: { marginBottom: 24 },
+
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#334155",
+    marginBottom: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
 
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E3E8EF",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 52,
-    marginTop: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 58,
   },
 
   input: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
-    color: "#111827",
-    fontFamily: fontRegular,
+    marginLeft: 12,
+    fontSize: 16,
+    color: "#1E293B",
+    fontWeight: "600",
   },
 
-  message: {
-    marginTop: 10,
-    textAlign: "center",
-    color: "#334155",
-    fontFamily: fontMedium,
-  },
-
-  button: {
-    marginTop: 24,
-  },
+  button: { marginTop: 8 },
 
   buttonGradient: {
-    height: 52,
-    borderRadius: 12,
+    height: 60,
+    borderRadius: 18,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -237,15 +282,53 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600",
-    fontFamily: fontMedium,
+    fontWeight: "800",
   },
 
-  link: {
-    marginTop: 16,
-    color: "#0B5ED7",
-    textAlign: "center",
+  footerLinks: {
+    marginTop: 24,
+    alignItems: "center",
+  },
+
+  backText: {
+    color: "#64748B",
     fontSize: 14,
-    fontFamily: fontMedium,
+    fontWeight: "700",
+  },
+
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    marginVertical: 20,
+  },
+
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E2E8F0",
+  },
+
+  dividerText: {
+    marginHorizontal: 12,
+    color: "#94A3B8",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  tokenButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 8,
+  },
+
+  tokenText: {
+    color: "#1E63B6",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });
