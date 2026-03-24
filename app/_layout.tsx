@@ -44,6 +44,7 @@ export default function RootLayout() {
                   fontSize: 15,
                   fontWeight: "600",
                 },
+                animation:"fade",
                 headerBackground: () => (
                   <LinearGradient
                     colors={["#276bbd", "#0B3C7A"]}

@@ -155,8 +155,8 @@ export default function GenerateScreen() {
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
-      console.log(error)
-      Toast.show({ type: "error", text1: "Generation Failed" });
+      toast.error("Unable too generate response")
+      // console.log(error)
     } finally {
       setIsGenerating(false);
     }

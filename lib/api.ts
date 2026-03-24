@@ -114,10 +114,7 @@ async function apiRequest<T>(
   };
 
   if (DEBUG_MODE) {
-    console.log(
-      `%c [API REQUEST] ${init.method || "GET"} -> ${url}`,
-      "color: #0ea5e9; font-weight: bold",
-    );
+    console.log(`%c [API REQUEST] ${init.method || "GET"} -> ${url}`);
   }
 
   try {
@@ -136,11 +133,8 @@ async function apiRequest<T>(
 
     return json as T;
   } catch (error) {
-    console.error(
-      `%c [API ERROR] ${path}:`,
-      "color: #ef4444; font-weight: bold",
-      error,
-    );
+    /// Screen error
+    console.error(`%c [API ERROR] ${path}:`, error);
     throw error;
   }
 }
