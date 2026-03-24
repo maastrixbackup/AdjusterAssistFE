@@ -6,14 +6,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Share,
   StatusBar,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -110,12 +109,11 @@ export default function ResponseScreen() {
 
     const fId = params.fileId;
     if (!fId || fId === "undefined" || fId === "null") {
-      Alert.alert("Workspace Missing", "Link a workspace to save to DB.");
+      toast.warning("Workspace is missing")
       return;
     }
 
     if (!token) {
-      // Alert.alert("Session Expired", "Please log in again.");
       toast.warning("Session Expired")
       router.replace("/login");
       return;

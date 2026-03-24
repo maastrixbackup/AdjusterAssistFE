@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -48,26 +49,30 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
+    // 1. Instant Validation
     if (!email.trim() || !password.trim()) {
-      setErrorMessage("Please enter both email and password.");
+      toast.error("Missing Credentials", {
+        description: "Please enter both email and password.",
+      });
       return;
     }
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      await login(email.trim(), password);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Invalid credentials";
-      setErrorMessage(message);
-      setLoading(false);
-    }
+
+    toast.promise(login(email.trim(), password), {
+      loading: 'Verifying your credentials...',
+      success: () => {
+        return 'Welcome back!';
+      },
+      error: (err) => {
+        return err instanceof Error ? err.message : "Invalid email or password";
+      },
+    });
   }
 
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
       <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={StyleSheet.absoluteFill} />
-      
+
       <View style={[styles.orb, styles.orbTop]} />
       <View style={[styles.orb, styles.orbBottom]} />
 
@@ -79,7 +84,7 @@ export default function LoginScreen() {
         // FIX: Offset ensures the input isn't glued to the keyboard
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           // FIX: Helps with input focus jitter
@@ -90,7 +95,7 @@ export default function LoginScreen() {
           scrollEnabled={height < 700 || focusedInput !== null}
         >
           <SafeAreaView style={styles.safeArea}>
-            
+
             <View style={styles.headerSection}>
               <View style={styles.logoBadge}>
                 <Image source={logoImg} style={styles.logo} />

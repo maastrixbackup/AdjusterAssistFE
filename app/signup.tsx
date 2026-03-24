@@ -6,7 +6,6 @@ import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -16,9 +15,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
 
 const { width } = Dimensions.get("window");
 type RoleType = "pa" | "ca";
@@ -40,48 +40,44 @@ export default function SignupScreen() {
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
   async function handleSignup() {
+    // 1. Validation (Immediate feedback)
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all fields.");
+      toast.error("Missing Fields", {
+        description: "Please fill in all fields to create your account.",
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.");
+      toast.error("Password Mismatch", {
+        description: "The passwords you entered do not match.",
+      });
       return;
     }
 
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      await signup(name.trim(), email.trim(), role, password);
-      
-      const successTitle = "Account Created";
-      const successMsg = "Your adjuster profile is ready. Please log in.";
-
-      if (Platform.OS === "web") {
-        window.alert(`${successTitle}\n\n${successMsg}`);
-        router.replace("/login");
-      } else {
-        Alert.alert(successTitle, successMsg, [
-          { text: "Log In Now", onPress: () => router.replace("/login") },
-        ]);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Signup failed";
-      setErrorMessage(message);
-    } finally {
-      setLoading(false);
-    }
+    // 2. The "Awesome" Promise Flow
+    // We wrap the signup call in a promise toast
+    toast.promise(signup(name.trim(), email.trim(), role, password), {
+      loading: 'Creating your profile...',
+      success: () => {
+        // This runs when the signup promise resolves
+        setTimeout(() => router.replace("/login"), 1500); // Small delay so they see the success toast
+        return 'Account Created! Redirecting to login...';
+      },
+      error: (err) => {
+        // This runs if the signup promise rejects
+        return err instanceof Error ? err.message : "Signup failed";
+      },
+    });
   }
 
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
-      
+
       {/* Background Layer */}
       <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={StyleSheet.absoluteFill} />
-      
+
       {/* Decorative Background Effects (Glass Orbs) */}
       <View style={[styles.orb, styles.orbTop]} />
       <View style={[styles.orb, styles.orbBottom]} />
@@ -90,13 +86,13 @@ export default function SignupScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent} 
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           <SafeAreaView style={styles.safeArea}>
-            
+
             <View style={styles.headerSection}>
               <View style={styles.logoBadge}>
                 <Image source={logoImg} style={styles.logo} />
@@ -221,7 +217,7 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#0B3C7A" },
-  
+
   // Background Orbs
   orb: {
     position: 'absolute',
@@ -249,7 +245,7 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: "#FFFFFF", borderRadius: 30, padding: 24, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
   label: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  
+
   roleRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   roleButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 45, borderRadius: 12, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
   roleButtonActive: { backgroundColor: "#276bbd", borderColor: "#276bbd" },
