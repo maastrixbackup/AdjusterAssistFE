@@ -86,7 +86,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
@@ -134,7 +134,7 @@ async function apiRequest<T>(
     return json as T;
   } catch (error) {
     /// Screen error
-    console.error(`%c [API ERROR] ${path}:`, error);
+    // console.error(`%c [API ERROR] ${path}:`, error);
     throw error;
   }
 }
