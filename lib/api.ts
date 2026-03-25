@@ -134,7 +134,7 @@ async function apiRequest<T>(
     return json as T;
   } catch (error) {
     /// Screen error
-    console.error(`%c [API ERROR] ${path}:`, error);
+    // console.error(`%c [API ERROR] ${path}:`, error);
     throw error;
   }
 }
