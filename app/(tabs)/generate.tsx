@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,7 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -32,6 +33,15 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
+
+const TASK_TYPES = [
+  { id: "claim_note_drafting", label: "Claim Note Drafting", icon: "note-text-outline" },
+  { id: "coverage_analysis_drafting", label: "Coverage Analysis", icon: "shield-search" },
+  { id: "damage_evaluation_drafting", label: "Damage Evaluation", icon: "home-alert" },
+  { id: "claim_communication_drafting", label: "Claim Communication", icon: "message-text-outline" },
+  { id: "vendor_response_drafting", label: "Vendor Response", icon: "store-outline" },
+  { id: "professional_documentation", label: "Professional Formatting", icon: "file-check-outline" },
+];
 
 type OutputMode = "Email" | "File Note" | "Escalation";
 const outputModes: OutputMode[] = ["Email", "File Note", "Escalation"];
@@ -62,6 +72,9 @@ export default function GenerateScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [selectedTask, setSelectedTask] = useState(TASK_TYPES[0]);
+  const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -137,7 +150,7 @@ export default function GenerateScreen() {
         fileId: selectedWorkspace.id,
         type: outputTypeMap[selectedOutput],
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
-        shouldSave: false
+        task_type: selectedTask.id
       };
 
       const result = await generateResponse(token, payload);
@@ -177,9 +190,9 @@ export default function GenerateScreen() {
     });
   };
 
-  const onClickRefresh = async() =>{
+  const onClickRefresh = async () => {
     // console.log("Refresh Clicked")
-    if(!token)return;
+    if (!token) return;
     await getRecentDrafts(token)
   }
 
@@ -236,6 +249,20 @@ export default function GenerateScreen() {
             ))}
           </ScrollView>
 
+          <Text style={styles.sectionLabel}>Assistant Task</Text>
+          <Pressable
+            style={styles.dropdownTrigger}
+            onPress={() => setIsTaskModalVisible(true)}
+          >
+            <View style={styles.dropdownLeft}>
+              <View style={styles.taskIconCircle}>
+                <MaterialCommunityIcons name={selectedTask.icon as any} size={20} color="#0F4C9C" />
+              </View>
+              <Text style={styles.dropdownValueText}>{selectedTask.label}</Text>
+            </View>
+            <Ionicons name="chevron-down" size={20} color="#64748B" />
+          </Pressable>
+
           <Text style={styles.sectionLabel}>Output Format</Text>
           <View style={styles.tabContainer}>
             {outputModes.map((mode) => (
@@ -274,7 +301,7 @@ export default function GenerateScreen() {
 
             {/* NEW: Refresh Trigger */}
             <Pressable
-              onPress={onClickRefresh} 
+              onPress={onClickRefresh}
               style={({ pressed }) => [
                 styles.refreshBadge,
                 pressed && { opacity: 0.6 }
@@ -310,6 +337,44 @@ export default function GenerateScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={isTaskModalVisible} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { minHeight: 350 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Assistant Task</Text>
+              <Pressable onPress={() => setIsTaskModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#94A3B8" />
+              </Pressable>
+            </View>
+            <FlatList
+              data={TASK_TYPES}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable 
+                  style={[styles.taskOption, selectedTask.id === item.id && styles.taskOptionActive]}
+                  onPress={() => {
+                    setSelectedTask(item);
+                    setIsTaskModalVisible(false);
+                  }}
+                >
+                  <MaterialCommunityIcons 
+                    name={item.icon as any} 
+                    size={22} 
+                    color={selectedTask.id === item.id ? "#0F4C9C" : "#64748B"} 
+                  />
+                  <Text style={[styles.taskOptionText, selectedTask.id === item.id && styles.taskOptionTextActive]}>
+                    {item.label}
+                  </Text>
+                  {selectedTask.id === item.id && (
+                    <Ionicons name="checkmark-circle" size={20} color="#0F4C9C" />
+                  )}
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
@@ -395,7 +460,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-    marginTop:12
+    marginTop: 12
   },
   refreshBadge: {
     flexDirection: 'row',
@@ -412,4 +477,23 @@ const styles = StyleSheet.create({
     color: '#0F4C9C',
     textTransform: 'uppercase',
   },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20
+  },
+  dropdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  taskIconCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  dropdownValueText: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+  taskOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 8, gap: 12 },
+  taskOptionActive: { backgroundColor: '#F1F5F9' },
+  taskOptionText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#64748B' },
+  taskOptionTextActive: { color: '#0F4C9C', fontWeight: '800' },
 });

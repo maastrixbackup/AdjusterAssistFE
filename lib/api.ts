@@ -64,7 +64,7 @@ export type GenerateResponseRequest = {
   fileId: number;
   type: OutputType;
   userInput: string;
-  shouldSave: boolean;
+  task_type: string;
 };
 
 export type GenerateResponseResult = {
@@ -220,12 +220,13 @@ export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
+  console.log(payload);
   const res = await apiRequest<{
     success: boolean;
     message: string;
     data: { content: string; fileId: number };
   }>(
-    "/drafts/generate-test",
+    "/drafts/generate",
     {
       method: "POST",
       body: JSON.stringify(payload),
