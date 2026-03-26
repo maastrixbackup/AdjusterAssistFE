@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   FlatList,
   Image,
@@ -18,14 +19,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
+import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
   ClaimFile,
-  deleteFile,
   getMyFiles,
   getSubscriptionStatus,
   SubscriptionStatus,
+  updateFile
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { toast } from "sonner-native";
 
 export default function HomeScreen() {
   const { token } = useAuth();
@@ -34,8 +37,6 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<ClaimFile | null>(null);
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -152,103 +153,51 @@ export default function HomeScreen() {
     }
   };
 
-  const renderFileItem = ({ item }: { item: ClaimFile }) => {
-    const statusStyle = getStatusStyle(item.status);
+const handleDeleteFile = (id: number) => { 
+  Alert.alert(
+    "Delete File",
+    "Are you sure?",
+    [
+      { text: "Cancel", style: "cancel" },
+      { 
+        text: "Delete", 
+        style: "destructive", 
+        onPress: async () => {
+          // 2. Ensure your filter logic matches the type
+          setFiles(prev => prev.filter(f => f.id !== id)); 
+          toast.success("File deleted");
+        } 
+      },
+    ]
+  );
+};
 
-    return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.fileCard,
-          pressed && styles.fileCardPressed,
-        ]}
-        onPress={() =>
-          router.push({
-            pathname: "/file-draft-history",
-            params: {
-              fileId: item.id,
-              claimNumber: item.claim_number,
-            },
-          })
-        }
-      >
-        <View style={styles.fileIconWrap}>
-          <LinearGradient
-            colors={["#EEF4FF", "#E0EAFF"]}
-            style={styles.fileIconGradient}
-          >
-            <MaterialCommunityIcons
-              name="folder-text-outline"
-              size={24}
-              color="#276bbd"
-            />
-          </LinearGradient>
-        </View>
-
-        <View style={styles.fileInfo}>
-          <View style={styles.fileTopRow}>
-            <Text style={styles.fileName} numberOfLines={1}>
-              {item.claim_number || "New Claim"}
-            </Text>
-
-            <View style={[styles.statusBadgeBase, statusStyle.badge]}>
-              <Ionicons
-                name={statusStyle.icon as any}
-                size={11}
-                style={statusStyle.text}
-              />
-              <Text style={[styles.statusTextBase, statusStyle.text]}>
-                {item.status || "Unknown"}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.clientName} numberOfLines={1}>
-            {item.client_name || "No Client Assigned"}
-          </Text>
-
-          <View style={styles.fileMetaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="calendar-outline" size={13} color="#94A3B8" />
-              <Text style={styles.fileSubText}>
-                {new Date(item.created_at).toLocaleDateString()}
-              </Text>
-            </View>
-
-            {!!item.policy_number && (
-              <View style={styles.metaItem}>
-                <MaterialCommunityIcons
-                  name="shield-outline"
-                  size={13}
-                  color="#94A3B8"
-                />
-                <Text style={styles.fileSubText}>{item.policy_number}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.chevronWrap}>
-          <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-        </View>
-      </Pressable>
-    );
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!selectedFile || !token) return;
-    try {
-      const res = await deleteFile(token, selectedFile.id);
-      if (res.success) {
-        setFiles((prev) => prev.filter((f) => f.id !== selectedFile.id));
-        Toast.show({ type: "success", text1: "Workspace Deleted" });
-      }
-    } catch (err) {
-      Toast.show({ type: "error", text1: "Delete Failed" });
-    } finally {
-      setDeleteModalVisible(false);
-      setSelectedFile(null);
+const handleUpdateFile = async (id: number, updateData: any) => {
+    if (!token) {
+        toast.error("Session expired. Please login again.");
+        return;
     }
-  };
+    try {
+        // Now TypeScript knows 'token' is a string here
+        await updateFile(token, id, updateData); 
+        toast.success("Workspace updated");
+        loadData(false);
+    } catch (err) {
+        toast.error("Update failed");
+    }
+};
+
+  const renderFileItem = ({ item }: { item: ClaimFile }) => (
+    <FileWorkspaceItem
+      item={item}
+      onPress={() => router.push({ pathname: "/file-draft-history", params: { fileId: item.id } })}
+      onUpdate={handleUpdateFile}
+      onDelete={handleDeleteFile}
+      getStatusStyle={getStatusStyle}
+    />
+  );
+
+
 
   return (
     <View style={styles.mainContainer}>
@@ -390,6 +339,7 @@ export default function HomeScreen() {
           <Text style={styles.fabText}>New Claim</Text>
         </LinearGradient>
       </Pressable>
+      
     </View>
   );
 }
