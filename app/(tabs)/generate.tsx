@@ -140,9 +140,14 @@ export default function GenerateScreen() {
   const onGenerate = useCallback(async () => {
     if (!token) return router.replace("/login");
     if (!selectedWorkspace) {
-      Toast.show({ type: "error", text1: "No Workspace" });
-      return;
-    }
+    toast.warning("Please select an Active Workspace first.");
+    return;
+  }
+
+  if (!request || request.trim().length < 5) {
+    toast.warning("Please describe the scenario (minimum 5 characters).");
+    return;
+  }
 
     setIsGenerating(true);
     try {
