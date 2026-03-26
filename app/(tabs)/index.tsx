@@ -8,24 +8,30 @@ import {
   BackHandler,
   FlatList,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   ToastAndroid,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
+import { CustomConfirmModal } from "@/components/CustomConfirmModal";
+import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
   ClaimFile,
   deleteFile,
   getMyFiles,
   getSubscriptionStatus,
   SubscriptionStatus,
+  updateFile
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import * as Haptics from 'expo-haptics';
+import { toast } from "sonner-native";
 
 export default function HomeScreen() {
   const { token } = useAuth();
@@ -34,8 +40,10 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<ClaimFile | null>(null);
+  // Delete modal
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -152,103 +160,87 @@ export default function HomeScreen() {
     }
   };
 
-  const renderFileItem = ({ item }: { item: ClaimFile }) => {
-    const statusStyle = getStatusStyle(item.status);
+  // const handleDeleteFile = (id: number) => {
+  //   Alert.alert(
+  //     "Delete File",
+  //     "Are you sure?",
+  //     [
+  //       { text: "Cancel", style: "cancel" },
+  //       {
+  //         text: "Delete",
+  //         style: "destructive",
+  //         onPress: async () => {
+  //           // 2. Ensure your filter logic matches the type
+  //           setFiles(prev => prev.filter(f => f.id !== id));
+  //           toast.success("File deleted");
+  //         }
+  //       },
+  //     ]
+  //   );
+  // };
 
-    return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.fileCard,
-          pressed && styles.fileCardPressed,
-        ]}
-        onPress={() =>
-          router.push({
-            pathname: "/file-draft-history",
-            params: {
-              fileId: item.id,
-              claimNumber: item.claim_number,
-            },
-          })
-        }
-      >
-        <View style={styles.fileIconWrap}>
-          <LinearGradient
-            colors={["#EEF4FF", "#E0EAFF"]}
-            style={styles.fileIconGradient}
-          >
-            <MaterialCommunityIcons
-              name="folder-text-outline"
-              size={24}
-              color="#276bbd"
-            />
-          </LinearGradient>
-        </View>
-
-        <View style={styles.fileInfo}>
-          <View style={styles.fileTopRow}>
-            <Text style={styles.fileName} numberOfLines={1}>
-              {item.claim_number || "New Claim"}
-            </Text>
-
-            <View style={[styles.statusBadgeBase, statusStyle.badge]}>
-              <Ionicons
-                name={statusStyle.icon as any}
-                size={11}
-                style={statusStyle.text}
-              />
-              <Text style={[styles.statusTextBase, statusStyle.text]}>
-                {item.status || "Unknown"}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.clientName} numberOfLines={1}>
-            {item.client_name || "No Client Assigned"}
-          </Text>
-
-          <View style={styles.fileMetaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="calendar-outline" size={13} color="#94A3B8" />
-              <Text style={styles.fileSubText}>
-                {new Date(item.created_at).toLocaleDateString()}
-              </Text>
-            </View>
-
-            {!!item.policy_number && (
-              <View style={styles.metaItem}>
-                <MaterialCommunityIcons
-                  name="shield-outline"
-                  size={13}
-                  color="#94A3B8"
-                />
-                <Text style={styles.fileSubText}>{item.policy_number}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.chevronWrap}>
-          <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-        </View>
-      </Pressable>
-    );
+  const handleDeleteFile = (id: number) => {
+    setSelectedFileId(id);
+    setModalVisible(true);
   };
+  const confirmDelete = async () => {
+    // 1. Validation check
+    if (selectedFileId === null || !token) {
+      toast.error("Unable to identify workspace or session");
+      return;
+    }
 
-  const handleDeleteConfirm = async () => {
-    if (!selectedFile || !token) return;
     try {
-      const res = await deleteFile(token, selectedFile.id);
-      if (res.success) {
-        setFiles((prev) => prev.filter((f) => f.id !== selectedFile.id));
-        Toast.show({ type: "success", text1: "Workspace Deleted" });
-      }
+      // 2. Perform the actual API deletion
+      // Assuming your api.ts export is: export const deleteFile = (token, id) => ...
+      await deleteFile(token, selectedFileId);
+
+      // 3. Update local UI state only after successful API response
+      setFiles(prev => prev.filter(f => f.id !== selectedFileId));
+
+      // 4. Success feedback with Haptics for premium feel
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success("Workspace deleted successfully");
+
     } catch (err) {
-      Toast.show({ type: "error", text1: "Delete Failed" });
+      // 5. Handle errors (Network issues, 401 Unauthorized, etc.)
+      console.error("API Delete Error:", err);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      toast.error("Failed to delete workspace. Please try again.");
+
     } finally {
-      setDeleteModalVisible(false);
-      setSelectedFile(null);
+      // 6. Clean up: Close modal and reset the ID tracker
+      setModalVisible(false);
+      setSelectedFileId(null);
     }
   };
+
+  const handleUpdateFile = async (id: number, updateData: any) => {
+    if (!token) {
+      toast.error("Session expired. Please login again.");
+      return;
+    }
+    try {
+      // Now TypeScript knows 'token' is a string here
+      await updateFile(token, id, updateData);
+      toast.success("Workspace updated");
+      loadData(false);
+    } catch (err) {
+      toast.error("Update failed");
+    }
+  };
+
+  const renderFileItem = ({ item }: { item: ClaimFile }) => (
+    <FileWorkspaceItem
+      item={item}
+      onPress={() => router.push({ pathname: "/file-draft-history", params: { fileId: item.id } })}
+      onUpdate={handleUpdateFile}
+      onDelete={handleDeleteFile}
+      getStatusStyle={getStatusStyle}
+    />
+  );
+
+
 
   return (
     <View style={styles.mainContainer}>
@@ -375,6 +367,16 @@ export default function HomeScreen() {
           />
         )}
       </View>
+      <CustomConfirmModal
+        isVisible={isModalVisible}
+        title="Delete Workspace"
+        message="Are you sure you want to delete this workspace? This action cannot be undone."
+        onConfirm={confirmDelete} // Calls the logic we wrote in step 1
+        onCancel={() => {
+          setModalVisible(false);
+          setSelectedFileId(null);
+        }}
+      />
 
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
@@ -390,6 +392,7 @@ export default function HomeScreen() {
           <Text style={styles.fabText}>New Claim</Text>
         </LinearGradient>
       </Pressable>
+
     </View>
   );
 }
@@ -545,7 +548,7 @@ const styles = StyleSheet.create({
   sectionEyebrow: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#94A3B8",
+    color: "#494f57",
     letterSpacing: 1.1,
   },
 
