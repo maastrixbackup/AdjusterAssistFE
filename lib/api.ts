@@ -258,6 +258,25 @@ export async function saveDraft(
   return { success: res.success, draftId: res.data.draftId };
 }
 
+export async function deleteDraft(
+  token: string,
+  draftId: number,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await apiRequest<{ success: boolean; message: string }>(
+      `/drafts/delete/${draftId}`,
+      {
+        method: "DELETE",
+      },
+      token,
+    );
+    return response;
+  } catch (error) {
+    console.error(`Error deleting draft ${draftId}:`, error);
+    throw error;
+  }
+}
+
 export async function getSubscriptionStatus(
   token: string,
 ): Promise<SubscriptionStatus> {
