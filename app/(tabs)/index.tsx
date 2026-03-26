@@ -14,7 +14,7 @@ import {
   StyleSheet,
   Text,
   ToastAndroid,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -27,10 +27,10 @@ import {
   getMyFiles,
   getSubscriptionStatus,
   SubscriptionStatus,
-  updateFile
+  updateFile,
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
-import * as Haptics from 'expo-haptics';
+import * as Haptics from "expo-haptics";
 import { toast } from "sonner-native";
 
 export default function HomeScreen() {
@@ -43,7 +43,6 @@ export default function HomeScreen() {
   // Delete modal
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
-
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -101,7 +100,7 @@ export default function HomeScreen() {
         if (backPressCount.current === 0) {
           backPressCount.current += 1;
 
-          ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+          ToastAndroid.show("Press again to exit", ToastAndroid.SHORT);
 
           setTimeout(() => {
             backPressCount.current = 0;
@@ -196,18 +195,18 @@ export default function HomeScreen() {
       await deleteFile(token, selectedFileId);
 
       // 3. Update local UI state only after successful API response
-      setFiles(prev => prev.filter(f => f.id !== selectedFileId));
+      setFiles((prev) => prev.filter((f) => f.id !== selectedFileId));
 
       // 4. Success feedback with Haptics for premium feel
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== "web")
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.success("Workspace deleted successfully");
-
     } catch (err) {
       // 5. Handle errors (Network issues, 401 Unauthorized, etc.)
       console.error("API Delete Error:", err);
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (Platform.OS !== "web")
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       toast.error("Failed to delete workspace. Please try again.");
-
     } finally {
       // 6. Clean up: Close modal and reset the ID tracker
       setModalVisible(false);
@@ -233,14 +232,17 @@ export default function HomeScreen() {
   const renderFileItem = ({ item }: { item: ClaimFile }) => (
     <FileWorkspaceItem
       item={item}
-      onPress={() => router.push({ pathname: "/file-draft-history", params: { fileId: item.id } })}
+      onPress={() =>
+        router.push({
+          pathname: "/file-draft-history",
+          params: { fileId: item.id },
+        })
+      }
       onUpdate={handleUpdateFile}
       onDelete={handleDeleteFile}
       getStatusStyle={getStatusStyle}
     />
   );
-
-
 
   return (
     <View style={styles.mainContainer}>
@@ -392,7 +394,6 @@ export default function HomeScreen() {
           <Text style={styles.fabText}>New Claim</Text>
         </LinearGradient>
       </Pressable>
-
     </View>
   );
 }
