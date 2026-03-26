@@ -258,6 +258,25 @@ export async function saveDraft(
   return { success: res.success, draftId: res.data.draftId };
 }
 
+export async function deleteDraft(
+  token: string,
+  draftId: number,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await apiRequest<{ success: boolean; message: string }>(
+      `/drafts/delete/${draftId}`,
+      {
+        method: "DELETE",
+      },
+      token,
+    );
+    return response;
+  } catch (error) {
+    console.error(`Error deleting draft ${draftId}:`, error);
+    throw error;
+  }
+}
+
 export async function getSubscriptionStatus(
   token: string,
 ): Promise<SubscriptionStatus> {
@@ -311,6 +330,55 @@ export const getDraftsByFile = async (
   } catch (error) {
     console.error(`Error fetching drafts for file ${fileId}:`, error);
     return [];
+  }
+};
+
+export const updateFile = async (
+  token: string,
+  fileId: string | number,
+  updateData: {
+    client_name?: string;
+    claim_number?: string;
+    policy_number?: string;
+    status?: "active" | "archived";
+  },
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  try {
+    const response = await apiRequest<{
+      success: boolean;
+      message: string;
+      data?: any;
+    }>(
+      `/files/update/${fileId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      token,
+    );
+    return response;
+  } catch (error) {
+    console.error(`Error updating file ${fileId}:`, error);
+    throw error;
+  }
+};
+
+export const deleteFile = async (
+  token: string,
+  fileId: string | number,
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const response = await apiRequest<{ success: boolean; message: string }>(
+      `/files/delete/${fileId}`,
+      {
+        method: "DELETE",
+      },
+      token,
+    );
+    return response;
+  } catch (error) {
+    console.error(`Error deleting file ${fileId}:`, error);
+    throw error;
   }
 };
 
