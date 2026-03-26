@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   sectionEyebrow: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#94A3B8",
+    color: "#494f57",
     letterSpacing: 1.1,
   },
 
