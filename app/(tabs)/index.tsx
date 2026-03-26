@@ -20,6 +20,7 @@ import Toast from "react-native-toast-message";
 
 import {
   ClaimFile,
+  deleteFile,
   getMyFiles,
   getSubscriptionStatus,
   SubscriptionStatus,
@@ -32,6 +33,9 @@ export default function HomeScreen() {
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<ClaimFile | null>(null);
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -111,6 +115,12 @@ export default function HomeScreen() {
     }, []),
   );
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData(false);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token]),
+  );
   const getStatusStyle = (value?: string) => {
     const statusValue = value?.toLowerCase();
 
@@ -222,6 +232,22 @@ export default function HomeScreen() {
         </View>
       </Pressable>
     );
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedFile || !token) return;
+    try {
+      const res = await deleteFile(token, selectedFile.id);
+      if (res.success) {
+        setFiles((prev) => prev.filter((f) => f.id !== selectedFile.id));
+        Toast.show({ type: "success", text1: "Workspace Deleted" });
+      }
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Delete Failed" });
+    } finally {
+      setDeleteModalVisible(false);
+      setSelectedFile(null);
+    }
   };
 
   return (
