@@ -41,12 +41,13 @@ export default function TabLayout() {
         ),
         tabBarButton: HapticTab,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+          height: 60 + insets.bottom,
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 12),
           backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
           borderTopColor: "#E2E8F0",
+
           ...Platform.select({
             ios: {
               shadowColor: "#000",
@@ -62,7 +63,6 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
-
       <Tabs.Screen
         name="index"
         options={{
@@ -93,7 +93,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
 
       <Tabs.Screen
         name="guides"
@@ -147,7 +146,6 @@ export default function TabLayout() {
           href: null,
         }}
       />
-     
     </Tabs>
   );
 }
@@ -157,7 +155,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     letterSpacing: 0.5,
-    fontFamily: Platform.select({ ios: "System", android: "sans-serif-medium" }),
+    fontFamily: Platform.select({
+      ios: "System",
+      android: "sans-serif-medium",
+    }),
   },
   tabBarLabel: {
     fontSize: 11,

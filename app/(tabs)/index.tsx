@@ -1,16 +1,18 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
   Image,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -34,40 +36,80 @@ export default function HomeScreen() {
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
   const activeFilesCount = useMemo(
-    () => files.filter((file) => file.status?.toLowerCase() === "active").length,
-    [files]
+    () =>
+      files.filter((file) => file.status?.toLowerCase() === "active").length,
+    [files],
   );
 
-  const loadData = async (showLoading = true) => {
-    if (!token) return;
+  const loadData = React.useCallback(
+    async (showLoading = true) => {
+      if (!token) return;
 
-    if (showLoading) setIsLoading(true);
-    if (!showLoading) setRefreshing(true);
+      if (showLoading) setIsLoading(true);
+      if (!showLoading) setRefreshing(true);
 
-    try {
-      const [filesResponse, statusResponse] = await Promise.all([
-        getMyFiles(token),
-        getSubscriptionStatus(token),
-      ]);
+      try {
+        const [filesResponse, statusResponse] = await Promise.all([
+          getMyFiles(token),
+          getSubscriptionStatus(token),
+        ]);
 
-      setFiles(filesResponse? filesResponse : []);
-      setStatus(statusResponse);
-    } catch (err) {
-      console.error("Error loading data:", err);
-      Toast.show({
-        type: "error",
-        text1: "Sync Failed",
-        text2: "Could not load your workspace data.",
-      });
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
+        setFiles(filesResponse ? filesResponse : []);
+        setStatus(statusResponse);
+      } catch (err) {
+        console.error("Error loading data:", err);
+        Toast.show({
+          type: "error",
+          text1: "Sync Failed",
+          text2: "Could not load your workspace data.",
+        });
+      } finally {
+        setIsLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [token],
+  );
 
   useEffect(() => {
-    loadData();
-  }, [token]);
+    loadData(true);
+  }, [loadData]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData(false);
+    }, [loadData]),
+  );
+
+  const backPressCount = useRef(0);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (backPressCount.current === 0) {
+          backPressCount.current += 1;
+
+          ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+
+          setTimeout(() => {
+            backPressCount.current = 0;
+          }, 2000);
+
+          return true; // prevent default behavior
+        }
+
+        BackHandler.exitApp();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, []),
+  );
 
   const getStatusStyle = (value?: string) => {
     const statusValue = value?.toLowerCase();
@@ -145,7 +187,7 @@ export default function HomeScreen() {
                 style={statusStyle.text}
               />
               <Text style={[styles.statusTextBase, statusStyle.text]}>
-                {(item.status || "Unknown")}
+                {item.status || "Unknown"}
               </Text>
             </View>
           </View>
@@ -176,11 +218,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.chevronWrap}>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="#94A3B8"
-          />
+          <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </View>
       </Pressable>
     );
@@ -215,7 +253,8 @@ export default function HomeScreen() {
             <View style={styles.heroTextWrap}>
               <Text style={styles.heroTitle}>Welcome back</Text>
               <Text style={styles.heroSubtitle}>
-                Track active files, manage client claims, and continue your work with confidence.
+                Track active files, manage client claims, and continue your work
+                with confidence.
               </Text>
             </View>
 
@@ -302,7 +341,8 @@ export default function HomeScreen() {
                 </LinearGradient>
                 <Text style={styles.emptyTitle}>No workspaces yet</Text>
                 <Text style={styles.emptySubtitle}>
-                  Create your first claim file to start organizing work and tracking activity.
+                  Create your first claim file to start organizing work and
+                  tracking activity.
                 </Text>
               </View>
             }
