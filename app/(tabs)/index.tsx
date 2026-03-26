@@ -5,29 +5,32 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   FlatList,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   ToastAndroid,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
+import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
   ClaimFile,
+  deleteFile,
   getMyFiles,
   getSubscriptionStatus,
   SubscriptionStatus,
   updateFile
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import * as Haptics from 'expo-haptics';
 import { toast } from "sonner-native";
 
 export default function HomeScreen() {
@@ -36,6 +39,10 @@ export default function HomeScreen() {
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Delete modal
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
 
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
@@ -153,39 +160,75 @@ export default function HomeScreen() {
     }
   };
 
-const handleDeleteFile = (id: number) => { 
-  Alert.alert(
-    "Delete File",
-    "Are you sure?",
-    [
-      { text: "Cancel", style: "cancel" },
-      { 
-        text: "Delete", 
-        style: "destructive", 
-        onPress: async () => {
-          // 2. Ensure your filter logic matches the type
-          setFiles(prev => prev.filter(f => f.id !== id)); 
-          toast.success("File deleted");
-        } 
-      },
-    ]
-  );
-};
+  // const handleDeleteFile = (id: number) => {
+  //   Alert.alert(
+  //     "Delete File",
+  //     "Are you sure?",
+  //     [
+  //       { text: "Cancel", style: "cancel" },
+  //       {
+  //         text: "Delete",
+  //         style: "destructive",
+  //         onPress: async () => {
+  //           // 2. Ensure your filter logic matches the type
+  //           setFiles(prev => prev.filter(f => f.id !== id));
+  //           toast.success("File deleted");
+  //         }
+  //       },
+  //     ]
+  //   );
+  // };
 
-const handleUpdateFile = async (id: number, updateData: any) => {
+  const handleDeleteFile = (id: number) => {
+    setSelectedFileId(id);
+    setModalVisible(true);
+  };
+  const confirmDelete = async () => {
+    // 1. Validation check
+    if (selectedFileId === null || !token) {
+      toast.error("Unable to identify workspace or session");
+      return;
+    }
+
+    try {
+      // 2. Perform the actual API deletion
+      // Assuming your api.ts export is: export const deleteFile = (token, id) => ...
+      await deleteFile(token, selectedFileId);
+
+      // 3. Update local UI state only after successful API response
+      setFiles(prev => prev.filter(f => f.id !== selectedFileId));
+
+      // 4. Success feedback with Haptics for premium feel
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success("Workspace deleted successfully");
+
+    } catch (err) {
+      // 5. Handle errors (Network issues, 401 Unauthorized, etc.)
+      console.error("API Delete Error:", err);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      toast.error("Failed to delete workspace. Please try again.");
+
+    } finally {
+      // 6. Clean up: Close modal and reset the ID tracker
+      setModalVisible(false);
+      setSelectedFileId(null);
+    }
+  };
+
+  const handleUpdateFile = async (id: number, updateData: any) => {
     if (!token) {
-        toast.error("Session expired. Please login again.");
-        return;
+      toast.error("Session expired. Please login again.");
+      return;
     }
     try {
-        // Now TypeScript knows 'token' is a string here
-        await updateFile(token, id, updateData); 
-        toast.success("Workspace updated");
-        loadData(false);
+      // Now TypeScript knows 'token' is a string here
+      await updateFile(token, id, updateData);
+      toast.success("Workspace updated");
+      loadData(false);
     } catch (err) {
-        toast.error("Update failed");
+      toast.error("Update failed");
     }
-};
+  };
 
   const renderFileItem = ({ item }: { item: ClaimFile }) => (
     <FileWorkspaceItem
@@ -324,6 +367,16 @@ const handleUpdateFile = async (id: number, updateData: any) => {
           />
         )}
       </View>
+      <CustomConfirmModal
+        isVisible={isModalVisible}
+        title="Delete Workspace"
+        message="Are you sure you want to delete this workspace? This action cannot be undone."
+        onConfirm={confirmDelete} // Calls the logic we wrote in step 1
+        onCancel={() => {
+          setModalVisible(false);
+          setSelectedFileId(null);
+        }}
+      />
 
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
@@ -339,7 +392,7 @@ const handleUpdateFile = async (id: number, updateData: any) => {
           <Text style={styles.fabText}>New Claim</Text>
         </LinearGradient>
       </Pressable>
-      
+
     </View>
   );
 }
