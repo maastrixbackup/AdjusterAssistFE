@@ -333,6 +333,55 @@ export const getDraftsByFile = async (
   }
 };
 
+export const updateFile = async (
+  token: string,
+  fileId: string | number,
+  updateData: {
+    client_name?: string;
+    claim_number?: string;
+    policy_number?: string;
+    status?: "active" | "archived";
+  },
+): Promise<{ success: boolean; message: string; data?: any }> => {
+  try {
+    const response = await apiRequest<{
+      success: boolean;
+      message: string;
+      data?: any;
+    }>(
+      `/files/update/${fileId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      token,
+    );
+    return response;
+  } catch (error) {
+    console.error(`Error updating file ${fileId}:`, error);
+    throw error;
+  }
+};
+
+export const deleteFile = async (
+  token: string,
+  fileId: string | number,
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const response = await apiRequest<{ success: boolean; message: string }>(
+      `/files/delete/${fileId}`,
+      {
+        method: "DELETE",
+      },
+      token,
+    );
+    return response;
+  } catch (error) {
+    console.error(`Error deleting file ${fileId}:`, error);
+    throw error;
+  }
+};
+
 export const AllDraftsofUser = async (token: string): Promise<Draft[]> => {
   const response = await apiRequest<{
     success: boolean;

@@ -1,8 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import Toast from "react-native-toast-message";
 
 import {
   ClaimFile,
+  deleteFile,
   getMyFiles,
   getSubscriptionStatus,
   SubscriptionStatus,
@@ -30,6 +31,10 @@ export default function HomeScreen() {
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<ClaimFile | null>(null);
+
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -50,7 +55,7 @@ export default function HomeScreen() {
         getSubscriptionStatus(token),
       ]);
 
-      setFiles(filesResponse? filesResponse : []);
+      setFiles(filesResponse ? filesResponse : []);
       setStatus(statusResponse);
     } catch (err) {
       console.error("Error loading data:", err);
@@ -65,10 +70,13 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, [token]);
 
+  useFocusEffect(
+  useCallback(() => {
+    loadData(false); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
+);
   const getStatusStyle = (value?: string) => {
     const statusValue = value?.toLowerCase();
 
@@ -185,6 +193,22 @@ export default function HomeScreen() {
       </Pressable>
     );
   };
+
+  const handleDeleteConfirm = async () => {
+  if (!selectedFile || !token) return;
+  try {
+    const res = await deleteFile(token, selectedFile.id);
+    if (res.success) {
+      setFiles(prev => prev.filter(f => f.id !== selectedFile.id));
+      Toast.show({ type: "success", text1: "Workspace Deleted" });
+    }
+  } catch (err) {
+    Toast.show({ type: "error", text1: "Delete Failed" });
+  } finally {
+    setDeleteModalVisible(false);
+    setSelectedFile(null);
+  }
+};
 
   return (
     <View style={styles.mainContainer}>
