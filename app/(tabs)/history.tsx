@@ -3,11 +3,12 @@ import { useAuth } from "@/providers/auth-provider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router"; // Added useFocusEffect
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Platform,
   Pressable,
@@ -18,9 +19,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const { width } = Dimensions.get('window');
 const SAVED_DATA_KEY = "@session_saved_drafts_data";
 
-// Extended Draft type to include source tracking
 type EnhancedDraft = Draft & { source: 'db' | 'session' };
 
 export default function DraftsListScreen() {
@@ -29,10 +30,11 @@ export default function DraftsListScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchMergedHistory = useCallback(async () => {
+  // Core data fetching logic
+  const fetchMergedHistory = useCallback(async (showLoading = true) => {
     if (!token) return;
     try {
-      if (!refreshing) setLoading(true);
+      if (showLoading) setLoading(true);
 
       // 1. Fetch from DB
       const dbData = await AllDraftsofUser(token);
@@ -44,14 +46,12 @@ export default function DraftsListScreen() {
       const sessionList: Draft[] = sessionRaw ? JSON.parse(sessionRaw) : [];
       const sessionDrafts: EnhancedDraft[] = sessionList.map(d => ({ ...d, source: 'session' }));
 
-      // 3. Merge and De-duplicate (DB version wins if content is same)
+      // 3. Merge and De-duplicate
       const combined = [...dbDrafts, ...sessionDrafts];
-      
-      // Use a Map to filter by content to avoid showing the same draft twice
       const uniqueMap = new Map<string, EnhancedDraft>();
+      
       combined.forEach(item => {
         const existing = uniqueMap.get(item.content);
-        // If it doesn't exist OR if the existing one is from session and current is from DB, overwrite
         if (!existing || (existing.source === 'session' && item.source === 'db')) {
           uniqueMap.set(item.content, item);
         }
@@ -62,23 +62,24 @@ export default function DraftsListScreen() {
       );
 
       setDrafts(sorted);
-      console.log(`History Synced: ${dbDrafts.length} DB, ${sessionDrafts.length} Session`);
-
     } catch (err) {
       console.error("Error fetching merged history.", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, refreshing]);
+  }, [token]);
 
-  useEffect(() => {
-    fetchMergedHistory();
-  }, [fetchMergedHistory]);
+  // AUTO-REFRESH LOGIC: Fires whenever screen comes into view
+  useFocusEffect(
+    useCallback(() => {
+      fetchMergedHistory(drafts.length === 0); // Only show full-screen loader on first load
+    }, [fetchMergedHistory])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMergedHistory();
+    fetchMergedHistory(false);
   };
 
   const renderDraft = ({ item }: { item: EnhancedDraft }) => {
@@ -115,7 +116,6 @@ export default function DraftsListScreen() {
                 <View style={styles.typeBadge}>
                     <Text style={styles.typeBadgeText}>{item.draft_type?.toUpperCase() || "DRAFT"}</Text>
                 </View>
-                {/* SOURCE TAG */}
                 <View style={[styles.sourceTag, isSynced ? styles.syncedTag : styles.sessionTag]}>
                     <Ionicons 
                         name={isSynced ? "cloud-done" : "time-outline"} 
@@ -255,14 +255,20 @@ const styles = StyleSheet.create({
   },
   titleStack: { alignItems: 'center' },
   navSubtitle: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 },
-  navTitle: { fontSize: 19, fontWeight: '800', color: '#FFFFFF' },
+  navTitle: { fontSize: width < 380 ? 16 : 19, fontWeight: '800', color: '#FFFFFF' }, // Responsive Title
   claimBadge: { backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   claimText: { color: '#0F172A', fontSize: 11, fontWeight: '800' },
   
   loaderCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loaderSub: { marginTop: 12, color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   
-  listContainer: { padding: 20, paddingBottom: 40 },
+  listContainer: { 
+    padding: 20, 
+    paddingBottom: 40,
+    alignSelf: 'center', // Center list for larger screens
+    width: '100%',
+    maxWidth: 600 // Responsive Max Width for tablets
+  },
   listHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
   headerCount: { fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' },
   headerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
