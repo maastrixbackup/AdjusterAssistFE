@@ -158,14 +158,14 @@ export default function SignupScreen() {
                   onPress={() => setRole("ca")}
                 >
                   <Ionicons name="business" size={16} color={role === "ca" ? "#FFF" : "#64748B"} />
-                  <Text style={[styles.roleButtonText, role === "ca" && styles.roleButtonTextActive]}>Carrier (CA)</Text>
+                  <Text style={[styles.roleButtonText, role === "ca" && styles.roleButtonTextActive]}>Licenced Adjuster</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.roleButton, role === "pa" && styles.roleButtonActive]}
                   onPress={() => setRole("pa")}
                 >
                   <Ionicons name="shield-checkmark" size={16} color={role === "pa" ? "#FFF" : "#64748B"} />
-                  <Text style={[styles.roleButtonText, role === "pa" && styles.roleButtonTextActive]}>Public (PA)</Text>
+                  <Text style={[styles.roleButtonText, role === "pa" && styles.roleButtonTextActive]}>Public Adjuster</Text>
                 </Pressable>
               </View>
 
