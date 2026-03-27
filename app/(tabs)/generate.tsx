@@ -140,14 +140,14 @@ export default function GenerateScreen() {
   const onGenerate = useCallback(async () => {
     if (!token) return router.replace("/login");
     if (!selectedWorkspace) {
-    toast.warning("Please select an Active Workspace first.");
-    return;
-  }
+      toast.warning("Please select an Active Workspace first.");
+      return;
+    }
 
-  if (!request || request.trim().length < 5) {
-    toast.warning("Please describe the scenario (minimum 5 characters).");
-    return;
-  }
+    if (!request || request.trim().length < 5) {
+      toast.warning("Please describe the scenario (minimum 5 characters).");
+      return;
+    }
 
     setIsGenerating(true);
     try {
@@ -180,26 +180,6 @@ export default function GenerateScreen() {
     }
   }, [token, request, claimDetails, selectedOutput, selectedWorkspace, fetchData]);
 
-  // FIXED: Added check for undefined type
-  const handleHistoryPress = (draft: RecentDraft) => {
-    const typeStr = draft.draft_type || 'email';
-    router.push({
-      pathname: "/response",
-      params: {
-        outputType: typeStr as OutputType,
-        type: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
-        text: draft.content || "No content found.",
-        fileId: draft.file_id?.toString() || "null",
-        alreadySaved: "true",
-      },
-    });
-  };
-
-  const onClickRefresh = async () => {
-    // console.log("Refresh Clicked")
-    if (!token) return;
-    await getRecentDrafts(token)
-  }
 
   if (isLoading && !refreshing) {
     return (
@@ -285,61 +265,23 @@ export default function GenerateScreen() {
               </View>
               <TextInput value={request} onChangeText={setRequest} multiline placeholder="What do you want to achieve?" placeholderTextColor="#94A3B8" style={styles.mainTextInput} />
             </View>
-            <View style={styles.cardDivider} />
+            {/* <View style={styles.cardDivider} />
             <View style={styles.fieldGroup}>
               <View style={styles.fieldHeader}>
                 <View style={[styles.iconCircle, { backgroundColor: "#F1F5F9" }]}><MaterialCommunityIcons name="paperclip" size={16} color="#475569" /></View>
                 <Text style={styles.inputLabel}>Policy Context</Text>
               </View>
               <TextInput value={claimDetails} onChangeText={setClaimDetails} multiline placeholder="Optional details..." placeholderTextColor="#94A3B8" style={styles.subTextInput} />
-            </View>
+            </View> */}
           </View>
 
           <Pressable onPress={onGenerate} disabled={isGenerating} style={styles.generateBtn}>
             <LinearGradient colors={["#0F4C9C", "#1E3A8A"]} style={styles.gradientBtn}>
-              {isGenerating ? <ActivityIndicator color="#FFF" /> : <><Text style={styles.btnText}>Draft Intelligence</Text><MaterialCommunityIcons name="auto-fix" size={20} color="#FFF" /></>}
+              {isGenerating ? <ActivityIndicator color="#FFF" /> : <><Text style={styles.btnText}>Generate Draft</Text><MaterialCommunityIcons name="auto-fix" size={20} color="#FFF" /></>}
             </LinearGradient>
           </Pressable>
 
-          <View style={styles.historyHeader}>
-            <Text style={styles.historyTitle}>Recent Generations</Text>
 
-            {/* NEW: Refresh Trigger */}
-            <Pressable
-              onPress={onClickRefresh}
-              style={({ pressed }) => [
-                styles.refreshBadge,
-                pressed && { opacity: 0.6 }
-              ]}
-            >
-              <Ionicons
-                name={isLoading ? "sync" : "refresh-outline"}
-                size={12}
-                color="#0F4C9C"
-                style={isLoading && { transform: [{ rotate: '45deg' }] }} // Subtle visual cue when loading
-              />
-              <Text style={styles.refreshText}>{isLoading ? "Syncing..." : "Refresh"}</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.historyList}>
-            {recentDrafts.map((item) => (
-              <Pressable
-                key={item.id || item.content} // Fallback to content if ID is missing for session drafts
-                onPress={() => handleHistoryPress(item)}
-                style={({ pressed }) => [styles.historyItem, pressed && { opacity: 0.7 }]}
-              >
-                <View style={styles.historyIconBox}>
-                  <Ionicons name="document-text-outline" size={20} color="#0F4C9C" />
-                </View>
-                <View style={styles.historyContent}>
-                  <Text style={styles.historyTypeTag}>{item.claim_number || "Draft"}</Text>
-                  <Text style={styles.historyText} numberOfLines={1}>{item.content}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-              </Pressable>
-            ))}
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -356,17 +298,17 @@ export default function GenerateScreen() {
               data={TASK_TYPES}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <Pressable 
+                <Pressable
                   style={[styles.taskOption, selectedTask.id === item.id && styles.taskOptionActive]}
                   onPress={() => {
                     setSelectedTask(item);
                     setIsTaskModalVisible(false);
                   }}
                 >
-                  <MaterialCommunityIcons 
-                    name={item.icon as any} 
-                    size={22} 
-                    color={selectedTask.id === item.id ? "#0F4C9C" : "#64748B"} 
+                  <MaterialCommunityIcons
+                    name={item.icon as any}
+                    size={22}
+                    color={selectedTask.id === item.id ? "#0F4C9C" : "#64748B"}
                   />
                   <Text style={[styles.taskOptionText, selectedTask.id === item.id && styles.taskOptionTextActive]}>
                     {item.label}
