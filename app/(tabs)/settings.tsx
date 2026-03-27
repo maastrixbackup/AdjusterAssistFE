@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from 'react-native-toast-message';
 
+import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import {
   getSubscriptionStatus,
   SubscriptionStatus,
@@ -32,6 +33,9 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [busyCheckout, setBusyCheckout] = useState(false);
   const prevPlanRef = useRef<string | null>(null);
+
+  // Logout Modal State
+  const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const loadSubscription = useCallback(async (showLoading = true) => {
     if (!token) {
@@ -72,6 +76,11 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleLogoutConfirm = async () => {
+    setLogoutModalVisible(false); // Close modal first
+    await logout(); // Perform the Supabase/Auth logout
+  };
+
   const usagePercentage = status?.subscription 
     ? (status.subscription.current_usage / status.subscription.usage_limit) * 100 
     : 0;
@@ -100,7 +109,8 @@ export default function SettingsScreen() {
                   <Text style={styles.userEmail} numberOfLines={1}>{email}</Text>
                 </View>
               </View>
-              <Pressable onPress={logout} style={({ pressed }) => [styles.logoutIcon, pressed && { opacity: 0.7 }]}>
+              {/* UPDATED: Trigger modal instead of direct logout */}
+              <Pressable onPress={() => setLogoutModalVisible(true)} style={({ pressed }) => [styles.logoutIcon, pressed && { opacity: 0.7 }]}>
                 <MaterialCommunityIcons name="logout-variant" size={22} color="#F8FAFC" />
               </Pressable>
             </View>
@@ -186,21 +196,32 @@ export default function SettingsScreen() {
         <View style={styles.menuContainer}>
           <MenuLink icon="notifications-outline" label="Push Notifications" color="#64748B" />
           <MenuLink icon="lock-closed-outline" label="Security & Privacy" color="#64748B" />
+          {/* UPDATED: Trigger modal instead of direct logout */}
           <MenuLink 
             icon="log-out-outline" 
             label="Logout Account" 
             color="#EF4444" 
             isLast 
-            onPress={logout}
+            onPress={() => setLogoutModalVisible(true)}
           />
         </View>
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>BUILD 1.0.8 • PRODUCTION</Text>
+          <Text style={styles.versionText}>BUILD 1.4.0 • PRODUCTION</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence Engine</Text>
         </View>
       </ScrollView>
       <Toast />
+
+      {/* Logout Confirmation Modal */}
+      <CustomConfirmModal 
+        isVisible={isLogoutModalVisible}
+        title="Sign Out"
+        confirmText = 'Logout'
+        message="Are you sure you want to log out of AdjusterAssist? You will need to sign in again to access your workspaces."
+        onConfirm={handleLogoutConfirm}
+        onCancel={() => setLogoutModalVisible(false)}
+      />
     </View>
   );
 }

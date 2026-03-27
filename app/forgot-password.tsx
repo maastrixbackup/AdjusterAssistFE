@@ -39,6 +39,9 @@ export default function ForgotPasswordScreen() {
       setLoading(true);
       await sendPasswordReset(email)
       toast.success("Reset password link sent to email")
+    }catch(error){
+      console.log(error)
+      toast.error("Unable to send email")
     } finally {
       setLoading(false);
     }
