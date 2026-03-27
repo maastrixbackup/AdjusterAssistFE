@@ -197,7 +197,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footerSection}>
           <Text style={styles.versionText}>BUILD 1.0.8 • PRODUCTION</Text>
-          <Text style={styles.powerText}>ClaimScope Intelligence Engine</Text>
+          <Text style={styles.powerText}>AdjusterAssist Intelligence Engine</Text>
         </View>
       </ScrollView>
       <Toast />
