@@ -39,8 +39,17 @@ export default function SignupScreen() {
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
+  // --- Password Validation Helper ---
+  const validatePassword = (pass: string) => {
+    if (pass.length < 6) return "Password must be at least 6 characters.";
+    if (!/[a-zA-Z]/.test(pass)) return "Include at least one letter.";
+    if (!/\d/.test(pass)) return "Include at least one number.";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pass)) return "Include a special character (!@#$).";
+    return null;
+  };
+
   async function handleSignup() {
-    // 1. Validation (Immediate feedback)
+    // 1. Basic Field Validation
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
       toast.error("Missing Fields", {
         description: "Please fill in all fields to create your account.",
@@ -48,24 +57,33 @@ export default function SignupScreen() {
       return;
     }
 
+    // 2. Password Complexity Validation
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setErrorMessage(passwordError);
+      // toast.error("Weak Password", { description: passwordError });
+      return;
+    }
+
+    // 3. Match Validation
     if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
       toast.error("Password Mismatch", {
         description: "The passwords you entered do not match.",
       });
       return;
     }
 
-    // 2. The "Awesome" Promise Flow
-    // We wrap the signup call in a promise toast
+    setErrorMessage(null); // Clear errors if all checks pass
+
+    // 4. The "Awesome" Promise Flow
     toast.promise(signup(name.trim(), email.trim(), role, password), {
       loading: 'Creating your profile...',
       success: () => {
-        // This runs when the signup promise resolves
-        setTimeout(() => router.replace("/login"), 1500); // Small delay so they see the success toast
+        setTimeout(() => router.replace("/login"), 1500);
         return 'Account Created! Redirecting to login...';
       },
       error: (err) => {
-        // This runs if the signup promise rejects
         return err instanceof Error ? err.message : "Signup failed";
       },
     });
@@ -217,8 +235,6 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#0B3C7A" },
-
-  // Background Orbs
   orb: {
     position: 'absolute',
     width: width * 0.8,
@@ -234,7 +250,6 @@ const styles = StyleSheet.create({
     bottom: -width * 0.1,
     left: -width * 0.3,
   },
-
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
   safeArea: { flex: 1, paddingHorizontal: 24 },
   headerSection: { alignItems: "center", marginBottom: 30, marginTop: 20 },
@@ -242,27 +257,21 @@ const styles = StyleSheet.create({
   logo: { width: 180, height: 40, resizeMode: "contain" },
   welcomeText: { fontSize: 26, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
   brandSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: "500" },
-
   card: { backgroundColor: "#FFFFFF", borderRadius: 30, padding: 24, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
   label: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-
   roleRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   roleButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 45, borderRadius: 12, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
   roleButtonActive: { backgroundColor: "#276bbd", borderColor: "#276bbd" },
   roleButtonText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
   roleButtonTextActive: { color: "#FFFFFF" },
-
   inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 14, paddingHorizontal: 15, height: 54, marginBottom: 14 },
   inputActive: { borderColor: "#276bbd", backgroundColor: "#FFF" },
   input: { flex: 1, marginLeft: 10, fontSize: 15, color: "#1E293B", fontWeight: "500" },
-
   errorBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 12, borderRadius: 12, marginBottom: 15, gap: 8 },
   errorText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
-
   submitBtn: { borderRadius: 14, overflow: "hidden", marginTop: 10, elevation: 3 },
   btnGradient: { height: 56, justifyContent: "center", alignItems: "center" },
   btnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-
   footer: { flexDirection: "row", justifyContent: "center", marginTop: 20, gap: 5 },
   footerText: { color: "#64748B", fontSize: 14, fontWeight: "500" },
   loginLink: { color: "#276bbd", fontSize: 14, fontWeight: "700" },
