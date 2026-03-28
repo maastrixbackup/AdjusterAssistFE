@@ -1,16 +1,13 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   BackHandler,
-  FlatList,
   Image,
   Platform,
   Pressable,
-  RefreshControl,
   StyleSheet,
   Text,
   ToastAndroid,
@@ -31,6 +28,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import * as Haptics from "expo-haptics";
+import { RefreshControl, ScrollView } from "react-native-gesture-handler";
 import { toast } from "sonner-native";
 
 export default function HomeScreen() {
@@ -306,69 +304,58 @@ export default function HomeScreen() {
           </View>
         </SafeAreaView>
       </LinearGradient>
-
-      <View style={styles.contentContainer}>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionEyebrow}>WORKSPACES</Text>
-            <Text style={styles.sectionTitle}>Recent Claims</Text>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadData(false)}
+            tintColor="#276bbd"
+          />
+        }
+      >
+        <View style={styles.centerCard}>
+          {/* Icon */}
+          <View style={styles.iconWrap}>
+            <LinearGradient
+              colors={["#EFF6FF", "#DBEAFE"]}
+              style={styles.iconGradient}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={28}
+                color="#1D4ED8"
+              />
+            </LinearGradient>
           </View>
 
+          {/* Title */}
+          <Text style={styles.centerTitle}>Start a New Claim</Text>
+
+          {/* Subtitle */}
+          <Text style={styles.centerSubtitle}>
+            Create and manage claims with speed and accuracy.
+          </Text>
+
+          {/* CTA */}
           <Pressable
-            style={styles.sectionAction}
-            onPress={() => loadData(false)}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.fabPressed,
+            ]}
+            onPress={() => router.push("/generate")}
           >
-            <Ionicons name="refresh" size={16} color="#276bbd" />
-            <Text style={styles.sectionActionText}>Refresh</Text>
+            <LinearGradient
+              colors={["#276bbd", "#1D4ED8"]}
+              style={styles.primaryGradient}
+            >
+              <Ionicons name="add" size={20} color="#FFF" />
+              <Text style={styles.primaryText}>New Claim</Text>
+            </LinearGradient>
           </Pressable>
         </View>
-
-        {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <View style={styles.loaderCard}>
-              <ActivityIndicator size="large" color="#276bbd" />
-              <Text style={styles.loaderTitle}>Loading workspace</Text>
-              <Text style={styles.loaderSubtitle}>
-                Syncing your latest files and subscription details.
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <FlatList
-            data={files}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderFileItem}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => loadData(false)}
-                tintColor="#276bbd"
-              />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <LinearGradient
-                  colors={["#F8FAFC", "#EEF4FF"]}
-                  style={styles.emptyIconWrap}
-                >
-                  <MaterialCommunityIcons
-                    name="folder-open-outline"
-                    size={64}
-                    color="#94A3B8"
-                  />
-                </LinearGradient>
-                <Text style={styles.emptyTitle}>No workspaces yet</Text>
-                <Text style={styles.emptySubtitle}>
-                  Create your first claim file to start organizing work and
-                  tracking activity.
-                </Text>
-              </View>
-            }
-          />
-        )}
-      </View>
+      </ScrollView>
       <CustomConfirmModal
         isVisible={isModalVisible}
         title="Delete Workspace"
@@ -379,21 +366,6 @@ export default function HomeScreen() {
           setSelectedFileId(null);
         }}
       />
-
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => router.push("/generate")}
-      >
-        <LinearGradient
-          colors={["#276bbd", "#1D4ED8", "#1E40AF"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <Ionicons name="add" size={22} color="#FFF" />
-          <Text style={styles.fabText}>New Claim</Text>
-        </LinearGradient>
-      </Pressable>
     </View>
   );
 }
@@ -403,7 +375,87 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8FAFC",
   },
+  iconWrap: {
+    marginBottom: 14,
+  },
 
+  iconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryButton: {
+    marginTop: 20,
+    width: "100%",
+    borderRadius: 999,
+    overflow: "hidden",
+
+    // shadow (iOS)
+    shadowColor: "#1D4ED8",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+
+    // shadow (Android)
+    elevation: 6,
+  },
+
+  primaryGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 999,
+  },
+
+  primaryText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+
+  fabPressed: {
+    transform: [{ scale: 0.96 }],
+    opacity: 0.95,
+  },
+  centerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  centerSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  centerCard: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: "center",
+
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  bottomFill: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    marginTop: -20, // keeps overlap effect with header
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+  },
   headerGradient: {
     paddingBottom: 28,
     borderBottomLeftRadius: 30,

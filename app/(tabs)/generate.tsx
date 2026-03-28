@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,7 +15,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -35,12 +36,36 @@ import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
 const TASK_TYPES = [
-  { id: "claim_note_drafting", label: "Claim Note Drafting", icon: "note-text-outline" },
-  { id: "coverage_analysis_drafting", label: "Coverage Analysis", icon: "shield-search" },
-  { id: "damage_evaluation_drafting", label: "Damage Evaluation", icon: "home-alert" },
-  { id: "claim_communication_drafting", label: "Claim Communication", icon: "message-text-outline" },
-  { id: "vendor_response_drafting", label: "Vendor Response", icon: "store-outline" },
-  { id: "professional_documentation", label: "Professional Formatting", icon: "file-check-outline" },
+  {
+    id: "claim_note_drafting",
+    label: "Claim Note Drafting",
+    icon: "note-text-outline",
+  },
+  {
+    id: "coverage_analysis_drafting",
+    label: "Coverage Analysis",
+    icon: "shield-search",
+  },
+  {
+    id: "damage_evaluation_drafting",
+    label: "Damage Evaluation",
+    icon: "home-alert",
+  },
+  {
+    id: "claim_communication_drafting",
+    label: "Claim Communication",
+    icon: "message-text-outline",
+  },
+  {
+    id: "vendor_response_drafting",
+    label: "Vendor Response",
+    icon: "store-outline",
+  },
+  {
+    id: "professional_documentation",
+    label: "Professional Formatting",
+    icon: "file-check-outline",
+  },
 ];
 
 type OutputMode = "Email" | "File Note" | "Escalation";
@@ -54,9 +79,11 @@ const outputTypeMap: Record<OutputMode, OutputType> = {
 
 export default function GenerateScreen() {
   const { token } = useAuth();
-
+  const scrollRef = React.useRef<ScrollView>(null);
   const [workspaces, setWorkspaces] = useState<ClaimFile[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(
+    null,
+  );
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
@@ -103,10 +130,22 @@ export default function GenerateScreen() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+
+    return () => {
+      showSub.remove();
+    };
+  }, []);
+
   const handleCreateWorkspace = async () => {
     if (!token) return;
     if (!newClaim || !newClient) {
-      toast.warning("Missing information")
+      toast.warning("Missing information");
       return;
     }
 
@@ -127,11 +166,11 @@ export default function GenerateScreen() {
         setNewClaim("");
         setNewPolicy("");
         setNewClient("");
-        toast.success("Workspace created successfully")
+        toast.success("Workspace created successfully");
       }
     } catch (error: any) {
-      console.log(error)
-      toast.error("unable to create workspace")
+      console.log(error);
+      toast.error("unable to create workspace");
     } finally {
       setIsCreatingFile(false);
     }
@@ -155,7 +194,7 @@ export default function GenerateScreen() {
         fileId: selectedWorkspace.id,
         type: outputTypeMap[selectedOutput],
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
-        task_type: selectedTask.id
+        task_type: selectedTask.id,
       };
 
       const result = await generateResponse(token, payload);
@@ -173,18 +212,49 @@ export default function GenerateScreen() {
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
-      toast.error("Unable too generate response")
+      toast.error("Unable too generate response");
       // console.log(error)
     } finally {
       setIsGenerating(false);
     }
-  }, [token, request, claimDetails, selectedOutput, selectedWorkspace, fetchData]);
-
+  }, [
+    token,
+    request,
+    claimDetails,
+    selectedOutput,
+    selectedWorkspace,
+    fetchData,
+  ]);
 
   if (isLoading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0F4C9C" />
+      <View style={styles.loaderScreen}>
+        <LinearGradient
+          colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
+          style={styles.loaderGradient}
+        >
+          <View style={styles.loaderContent}>
+            {/* Icon */}
+            <View style={styles.loaderIconWrap}>
+              <Ionicons name="sparkles" size={34} color="#FFFFFF" />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.loaderTitle}>Preparing AI Workspace</Text>
+
+            {/* Subtitle */}
+            <Text style={styles.loaderSubtitle}>
+              Setting up your claim assistant...
+            </Text>
+
+            {/* Loader */}
+            <ActivityIndicator
+              size="small"
+              color="#FFFFFF"
+              style={{ marginTop: 18 }}
+            />
+          </View>
+        </LinearGradient>
       </View>
     );
   }
@@ -193,7 +263,10 @@ export default function GenerateScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
 
-      <LinearGradient colors={["#0F4C9C", "#123C78"]} style={styles.headerGradient}>
+      <LinearGradient
+        colors={["#0F4C9C", "#123C78"]}
+        style={styles.headerGradient}
+      >
         <SafeAreaView edges={["top"]} style={styles.safeHeader}>
           <View style={styles.navBar}>
             <Pressable onPress={() => router.back()} style={styles.iconBtn}>
@@ -202,18 +275,35 @@ export default function GenerateScreen() {
             <Text style={styles.navTitle}>AI Studio</Text>
             <View style={styles.creditBadge}>
               <View style={styles.statusDot} />
-              <Text style={styles.creditValue}>{status?.subscription?.remaining ?? 0} Credits</Text>
+              <Text style={styles.creditValue}>
+                {status?.subscription?.remaining ?? 0} Credits
+              </Text>
             </View>
           </View>
         </SafeAreaView>
       </LinearGradient>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"} // ✅ FIXED
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.sectionLabel}>Active Workspace</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workspaceScroll}>
-            <Pressable style={styles.addWorkspaceBtn} onPress={() => setIsModalVisible(true)}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.workspaceScroll}
+          >
+            <Pressable
+              style={styles.addWorkspaceBtn}
+              onPress={() => setIsModalVisible(true)}
+            >
               <Ionicons name="add" size={20} color="#0F4C9C" />
               <Text style={styles.addWorkspaceText}>New Workspace</Text>
             </Pressable>
@@ -221,13 +311,25 @@ export default function GenerateScreen() {
               <Pressable
                 key={ws.id}
                 onPress={() => setSelectedWorkspace(ws)}
-                style={[styles.workspaceItem, selectedWorkspace?.id === ws.id && styles.workspaceItemActive]}
+                style={[
+                  styles.workspaceItem,
+                  selectedWorkspace?.id === ws.id && styles.workspaceItemActive,
+                ]}
               >
                 <MaterialCommunityIcons
-                  name={selectedWorkspace?.id === ws.id ? "folder-open" : "folder"}
-                  size={18} color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
+                  name={
+                    selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
+                  }
+                  size={18}
+                  color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
                 />
-                <Text style={[styles.workspaceText, selectedWorkspace?.id === ws.id && styles.workspaceTextActive]}>
+                <Text
+                  style={[
+                    styles.workspaceText,
+                    selectedWorkspace?.id === ws.id &&
+                      styles.workspaceTextActive,
+                  ]}
+                >
                   {ws.client_name || ws.claim_number}
                 </Text>
               </Pressable>
@@ -241,7 +343,11 @@ export default function GenerateScreen() {
           >
             <View style={styles.dropdownLeft}>
               <View style={styles.taskIconCircle}>
-                <MaterialCommunityIcons name={selectedTask.icon as any} size={20} color="#0F4C9C" />
+                <MaterialCommunityIcons
+                  name={selectedTask.icon as any}
+                  size={20}
+                  color="#0F4C9C"
+                />
               </View>
               <Text style={styles.dropdownValueText}>{selectedTask.label}</Text>
             </View>
@@ -251,8 +357,22 @@ export default function GenerateScreen() {
           <Text style={styles.sectionLabel}>Output Format</Text>
           <View style={styles.tabContainer}>
             {outputModes.map((mode) => (
-              <Pressable key={mode} onPress={() => setSelectedOutput(mode)} style={[styles.tabItem, mode === selectedOutput && styles.tabItemActive]}>
-                <Text style={[styles.tabText, mode === selectedOutput && styles.tabTextActive]}>{mode}</Text>
+              <Pressable
+                key={mode}
+                onPress={() => setSelectedOutput(mode)}
+                style={[
+                  styles.tabItem,
+                  mode === selectedOutput && styles.tabItemActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    mode === selectedOutput && styles.tabTextActive,
+                  ]}
+                >
+                  {mode}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -260,10 +380,28 @@ export default function GenerateScreen() {
           <View style={styles.glassCard}>
             <View style={styles.fieldGroup}>
               <View style={styles.fieldHeader}>
-                <View style={styles.iconCircle}><MaterialCommunityIcons name="text-box-search-outline" size={16} color="#0F4C9C" /></View>
+                <View style={styles.iconCircle}>
+                  <MaterialCommunityIcons
+                    name="text-box-search-outline"
+                    size={16}
+                    color="#0F4C9C"
+                  />
+                </View>
                 <Text style={styles.inputLabel}>Scenario Description</Text>
               </View>
-              <TextInput value={request} onChangeText={setRequest} multiline placeholder="What do you want to achieve?" placeholderTextColor="#94A3B8" style={styles.mainTextInput} />
+              <TextInput
+                value={request}
+                onChangeText={setRequest}
+                multiline
+                onFocus={() => {
+                  scrollRef.current?.scrollToEnd({ animated: true });
+                }}
+                placeholder="What do you want to achieve?"
+                placeholderTextColor="#94A3B8"
+                style={styles.mainTextInput}
+                returnKeyType="done"
+                blurOnSubmit={true}
+              />
             </View>
             {/* <View style={styles.cardDivider} />
             <View style={styles.fieldGroup}>
@@ -275,17 +413,37 @@ export default function GenerateScreen() {
             </View> */}
           </View>
 
-          <Pressable onPress={onGenerate} disabled={isGenerating} style={styles.generateBtn}>
-            <LinearGradient colors={["#0F4C9C", "#1E3A8A"]} style={styles.gradientBtn}>
-              {isGenerating ? <ActivityIndicator color="#FFF" /> : <><Text style={styles.btnText}>Generate Draft</Text><MaterialCommunityIcons name="auto-fix" size={20} color="#FFF" /></>}
+          <Pressable
+            onPress={onGenerate}
+            disabled={isGenerating}
+            style={styles.generateBtn}
+          >
+            <LinearGradient
+              colors={["#0F4C9C", "#1E3A8A"]}
+              style={styles.gradientBtn}
+            >
+              {isGenerating ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Text style={styles.btnText}>Generate Draft</Text>
+                  <MaterialCommunityIcons
+                    name="auto-fix"
+                    size={20}
+                    color="#FFF"
+                  />
+                </>
+              )}
             </LinearGradient>
           </Pressable>
-
-
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal visible={isTaskModalVisible} animationType="fade" transparent={true}>
+      <Modal
+        visible={isTaskModalVisible}
+        animationType="fade"
+        transparent={true}
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { minHeight: 350 }]}>
             <View style={styles.modalHeader}>
@@ -299,7 +457,10 @@ export default function GenerateScreen() {
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <Pressable
-                  style={[styles.taskOption, selectedTask.id === item.id && styles.taskOptionActive]}
+                  style={[
+                    styles.taskOption,
+                    selectedTask.id === item.id && styles.taskOptionActive,
+                  ]}
                   onPress={() => {
                     setSelectedTask(item);
                     setIsTaskModalVisible(false);
@@ -310,11 +471,21 @@ export default function GenerateScreen() {
                     size={22}
                     color={selectedTask.id === item.id ? "#0F4C9C" : "#64748B"}
                   />
-                  <Text style={[styles.taskOptionText, selectedTask.id === item.id && styles.taskOptionTextActive]}>
+                  <Text
+                    style={[
+                      styles.taskOptionText,
+                      selectedTask.id === item.id &&
+                        styles.taskOptionTextActive,
+                    ]}
+                  >
                     {item.label}
                   </Text>
                   {selectedTask.id === item.id && (
-                    <Ionicons name="checkmark-circle" size={20} color="#0F4C9C" />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color="#0F4C9C"
+                    />
                   )}
                 </Pressable>
               )}
@@ -328,17 +499,41 @@ export default function GenerateScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Workspace File</Text>
-              <Pressable onPress={() => setIsModalVisible(false)}><Ionicons name="close" size={24} color="#94A3B8" /></Pressable>
+              <Pressable onPress={() => setIsModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#94A3B8" />
+              </Pressable>
             </View>
             <View style={styles.modalBody}>
               <Text style={styles.modalLabel}>Claim Number</Text>
-              <TextInput style={styles.modalInput} value={newClaim} onChangeText={setNewClaim} />
+              <TextInput
+                style={styles.modalInput}
+                value={newClaim}
+                onChangeText={setNewClaim}
+              />
               <Text style={styles.modalLabel}>Policy Number</Text>
-              <TextInput style={styles.modalInput} value={newPolicy} onChangeText={setNewPolicy} />
+              <TextInput
+                style={styles.modalInput}
+                value={newPolicy}
+                onChangeText={setNewPolicy}
+              />
               <Text style={styles.modalLabel}>Client Name</Text>
-              <TextInput style={styles.modalInput} value={newClient} onChangeText={setNewClient} />
-              <Pressable style={styles.modalActionBtn} onPress={handleCreateWorkspace} disabled={isCreatingFile}>
-                {isCreatingFile ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalActionText}>Initialize Workspace</Text>}
+              <TextInput
+                style={styles.modalInput}
+                value={newClient}
+                onChangeText={setNewClient}
+              />
+              <Pressable
+                style={styles.modalActionBtn}
+                onPress={handleCreateWorkspace}
+                disabled={isCreatingFile}
+              >
+                {isCreatingFile ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.modalActionText}>
+                    Initialize Workspace
+                  </Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -352,67 +547,265 @@ export default function GenerateScreen() {
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  headerGradient: { borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: "hidden" },
+  headerGradient: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
+  },
   safeHeader: { paddingHorizontal: 18, paddingBottom: 18 },
-  navBar: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  iconBtn: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
+  navBar: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  loaderScreen: {
+    flex: 1,
+  },
+
+  loaderGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  loaderContent: {
+    alignItems: "center",
+    paddingHorizontal: 30,
+  },
+
+  loaderIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+
+  loaderTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
+
+  loaderSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.75)",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
   navTitle: { fontSize: 19, fontWeight: "800", color: "#FFFFFF" },
-  creditBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.14)", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
-  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" },
+  creditBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
+  },
   creditValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
   scrollView: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  sectionLabel: { fontSize: 11, fontWeight: "800", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14, marginTop: 10 },
+  scrollContent: { padding: 20, paddingBottom: 80 },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    marginBottom: 14,
+    marginTop: 10,
+  },
   workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
-  workspaceItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 8 },
-  workspaceItemActive: { backgroundColor: '#0F4C9C', borderColor: '#0f4c9c' },
-  workspaceText: { fontSize: 14, fontWeight: '700', color: '#64748B' },
-  workspaceTextActive: { color: '#FFF' },
-  addWorkspaceBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#0F4C9C', gap: 4 },
-  addWorkspaceText: { fontSize: 14, fontWeight: '800', color: '#0F4C9C' },
-  tabContainer: { flexDirection: "row", backgroundColor: "#E2E8F0", borderRadius: 18, padding: 6, marginBottom: 28 },
-  tabItem: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 14 },
+  workspaceItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    gap: 8,
+  },
+  workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c" },
+  workspaceText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
+  workspaceTextActive: { color: "#FFF" },
+  addWorkspaceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    borderColor: "#0F4C9C",
+    gap: 4,
+  },
+  addWorkspaceText: { fontSize: 14, fontWeight: "800", color: "#0F4C9C" },
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#E2E8F0",
+    borderRadius: 18,
+    padding: 6,
+    marginBottom: 28,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderRadius: 14,
+  },
   tabItemActive: { backgroundColor: "#FFF" },
   tabText: { fontSize: 14, color: "#64748B", fontWeight: "600" },
   tabTextActive: { color: "#0F4C9C", fontWeight: "800" },
-  glassCard: { backgroundColor: "#FFF", borderRadius: 28, padding: 20, borderWidth: 1, borderColor: "#FFF" },
+  glassCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 28,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#FFF",
+  },
   fieldGroup: { marginVertical: 4 },
-  fieldHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
-  iconCircle: { width: 28, height: 28, borderRadius: 10, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
+  fieldHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   inputLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
-  mainTextInput: { fontSize: 16, color: "#334155", minHeight: 60, textAlignVertical: "top" },
+  mainTextInput: {
+    fontSize: 16,
+    color: "#334155",
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
   cardDivider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 20 },
-  subTextInput: { fontSize: 15, color: "#475569", minHeight: 20, textAlignVertical: "top" },
+  subTextInput: {
+    fontSize: 15,
+    color: "#475569",
+    minHeight: 20,
+    textAlignVertical: "top",
+  },
   generateBtn: { marginTop: 30, borderRadius: 20, overflow: "hidden" },
-  gradientBtn: { height: 64, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  gradientBtn: {
+    height: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
   btnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
   historyTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
   historyList: { gap: 14 },
-  historyItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF", padding: 14, borderRadius: 20, borderWidth: 1, borderColor: "#F1F5F9" },
-  historyIconBox: { width: 48, height: 48, borderRadius: 14, backgroundColor: "#EAF2FF", alignItems: "center", justifyContent: "center" },
+  historyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  historyIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#EAF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   historyContent: { flex: 1, marginLeft: 16 },
-  historyTypeTag: { fontSize: 10, fontWeight: "900", color: "#94A3B8", textTransform: "uppercase" },
+  historyTypeTag: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+  },
   historyText: { fontSize: 14, color: "#1E293B", fontWeight: "600" },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, minHeight: 450 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    minHeight: 450,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 25,
+  },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
   modalBody: { gap: 16 },
-  modalLabel: { fontSize: 12, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase' },
-  modalInput: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', fontSize: 15, color: '#0F172A' },
-  modalActionBtn: { backgroundColor: '#0F4C9C', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginTop: 10 },
-  modalActionText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+  },
+  modalInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  modalActionBtn: {
+    backgroundColor: "#0F4C9C",
+    borderRadius: 18,
+    paddingVertical: 18,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  modalActionText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
   historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
-    marginTop: 12
+    marginTop: 12,
   },
   refreshBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E0F2FE', // Light blue background
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E0F2FE", // Light blue background
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -420,27 +813,46 @@ const styles = StyleSheet.create({
   },
   refreshText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#0F4C9C',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    color: "#0F4C9C",
+    textTransform: "uppercase",
   },
   dropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFF',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF",
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 20
+    borderColor: "#E2E8F0",
+    marginBottom: 20,
   },
-  dropdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  taskIconCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  dropdownValueText: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
-  taskOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 8, gap: 12 },
-  taskOptionActive: { backgroundColor: '#F1F5F9' },
-  taskOptionText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#64748B' },
-  taskOptionTextActive: { color: '#0F4C9C', fontWeight: '800' },
+  dropdownLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  taskIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropdownValueText: { fontSize: 15, fontWeight: "700", color: "#1E293B" },
+  taskOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 8,
+    gap: 12,
+  },
+  taskOptionActive: { backgroundColor: "#F1F5F9" },
+  taskOptionText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  taskOptionTextActive: { color: "#0F4C9C", fontWeight: "800" },
 });
