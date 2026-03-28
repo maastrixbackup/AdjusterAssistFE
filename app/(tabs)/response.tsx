@@ -1,9 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Back for local logging
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -12,11 +12,12 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  View
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { saveDraft } from "@/lib/api";
+import { saveDraft, updateDraft } from "@/lib/api"; // Added updateDraft
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
@@ -28,9 +29,9 @@ type Params = {
   outputType?: OutputType;
   fileId?: string;
   alreadySaved?: string;
+  draftId?: string; // Added draftId to params
 };
 
-// Local storage key for "Generation Log"
 const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
 
 const defaultLabels: Record<string, string> = {
@@ -46,65 +47,61 @@ export default function ResponseScreen() {
 
   const [copying, setCopying] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Local UI state for the Green "Saved" button
   const [isSaved, setIsSaved] = useState(params.alreadySaved === "true");
 
-  const responseText = useMemo(() => params.text || "No response available.", [params.text]);
+  // --- NEW EDITING STATES ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState(params.text || "");
+
   const responseTypeLabel = params.type || defaultLabels[params.outputType || "email"] || "Generated Output";
 
   /**
    * 1. AUTOMATIC LOCAL SESSION SAVE
-   * Runs once when screen opens to log the generation locally.
    */
   useEffect(() => {
     const logToSession = async () => {
-      // If we came from history, don't re-log it
       if (params.alreadySaved === "true") return;
 
       try {
         const rawData = await AsyncStorage.getItem(SESSION_HISTORY_KEY);
         let currentData = rawData ? JSON.parse(rawData) : [];
-
-        // Avoid duplicate logs for the exact same text
-        const exists = currentData.some((item: any) => item.content === responseText);
+        const exists = currentData.some((item: any) => item.content === editedText);
 
         if (!exists) {
           const newEntry = {
             id: Date.now(),
-            content: responseText,
+            content: editedText,
             draft_type: params.outputType || 'email',
             file_id: params.fileId,
             created_at: new Date().toISOString(),
           };
           currentData.unshift(newEntry);
-          await AsyncStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(currentData.slice(0, 50))); // Keep last 50
+          await AsyncStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(currentData.slice(0, 50)));
         }
       } catch (e) {
         console.error("Local Session Log Error:", e);
       }
     };
-
     logToSession();
-  }, [responseText]);
-
-
+  }, [params.text]);
 
   useEffect(() => {
-    // Whenever params.text changes (a new generation), 
-    // reset the saved state based on the new params.
     setIsSaved(params.alreadySaved === "true");
-
-    // Also reset the internal saving spinner just in case
+    setEditedText(params.text || "");
     setSaving(false);
   }, [params.text, params.alreadySaved]);
 
-
   /**
-   * 2. MANUAL DB SAVE
-   * Only fires if the user specifically clicks the button.
+   * 2. MANUAL DB SAVE / UPDATE
    */
   async function onSave() {
+    // If user is editing, "Confirming" just exits edit mode locally
+    if (isEditing) {
+      setIsEditing(false);
+      toast.success("Draft updated.");
+      return;
+    }
+
     if (isSaved || saving) return;
 
     const fId = params.fileId;
@@ -123,12 +120,21 @@ export default function ResponseScreen() {
       setSaving(true);
       const sanitizedToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
 
-      const result = await saveDraft(
-        sanitizedToken,
-        Number(fId),
-        params.outputType || 'email',
-        responseText
-      );
+      let result;
+      // Use updateDraft if we already have a record, otherwise saveDraft
+      if (params.alreadySaved === "true" && params.draftId) {
+        result = await updateDraft(sanitizedToken, params.draftId, {
+          content: editedText,
+          draft_type: params.outputType || 'email'
+        });
+      } else {
+        result = await saveDraft(
+          sanitizedToken,
+          Number(fId),
+          params.outputType || 'email',
+          editedText
+        );
+      }
 
       if (result) {
         setIsSaved(true);
@@ -137,19 +143,16 @@ export default function ResponseScreen() {
         });
       }
     } catch (error: any) {
-      toast.error("Error", {
-        description:"Save failed"
-      })
-      console.log(error)
+      toast.error("Error", { description: "Save failed" });
+      console.log(error);
     } finally {
       setSaving(false);
     }
   }
 
-  // ... (Keep onShare and onCopy functions as they were)
   const onShare = async () => {
     try {
-      await Share.share({ message: responseText, title: responseTypeLabel });
+      await Share.share({ message: editedText, title: responseTypeLabel });
     } catch (error) {
       console.log("Share error:", error);
     }
@@ -158,7 +161,7 @@ export default function ResponseScreen() {
   async function onCopy() {
     try {
       setCopying(true);
-      await Clipboard.setStringAsync(responseText);
+      await Clipboard.setStringAsync(editedText);
       setTimeout(() => setCopying(false), 2000);
       toast.success("Copied to Clipboard")
     } catch {
@@ -176,9 +179,19 @@ export default function ResponseScreen() {
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </Pressable>
           <Text style={styles.headerTitle}>Review Draft</Text>
-          <Pressable onPress={onShare} style={styles.iconButton}>
-            <Ionicons name="share-outline" size={24} color="#FFFFFF" />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* NEW EDIT ICON */}
+            <Pressable onPress={() => setIsEditing(!isEditing)} style={styles.iconButton}>
+              <MaterialCommunityIcons 
+                name={isEditing ? "close-circle" : "pencil-outline"} 
+                size={24} 
+                color={isEditing ? "#ff0909" : "#FFFFFF"} 
+              />
+            </Pressable>
+            <Pressable onPress={onShare} style={styles.iconButton}>
+              <Ionicons name="share-outline" size={24} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
       </LinearGradient>
 
@@ -192,15 +205,33 @@ export default function ResponseScreen() {
             <MaterialCommunityIcons name="robot" size={16} color="#1469C9" />
             <Text style={styles.typeText}>{responseTypeLabel}</Text>
           </View>
-          <Text style={styles.timestamp}>{new Date().toLocaleDateString()}</Text>
+          <Text style={styles.timestamp}>
+            {isEditing ? "EDIT MODE" : new Date().toLocaleDateString()}
+          </Text>
         </View>
 
-        <View style={styles.documentCard}>
+        <View style={[styles.documentCard, isEditing && styles.editingCard]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardHeaderLabel}>AI GENERATED CONTENT</Text>
+            <Text style={styles.cardHeaderLabel}>
+               {isEditing ? "EDIT DRAFT" : "AI GENERATED CONTENT"}
+            </Text>
             <View style={styles.cardHeaderLine} />
           </View>
-          <Text style={styles.bodyText}>{responseText}</Text>
+          
+          {/* TOGGLE BETWEEN TEXT AND TEXTINPUT */}
+          {isEditing ? (
+            <TextInput
+              style={styles.textInput}
+              multiline
+              value={editedText}
+              onChangeText={setEditedText}
+              autoFocus
+              textAlignVertical="top"
+            />
+          ) : (
+            <Text style={styles.bodyText}>{editedText}</Text>
+          )}
+
           <View style={styles.cardFooter}>
             <Text style={styles.footerNote}>Check for accuracy before sending.</Text>
           </View>
@@ -216,20 +247,20 @@ export default function ResponseScreen() {
 
           <Pressable
             onPress={onSave}
-            disabled={saving || isSaved}
-            style={[styles.primaryButton, (saving || isSaved) && { opacity: 0.8 }]}
+            disabled={saving || (isSaved && !isEditing)}
+            style={[styles.primaryButton, (saving || (isSaved && !isEditing)) && { opacity: 0.8 }]}
           >
             <LinearGradient
-              colors={isSaved ? ["#10B981", "#059669"] : ["#276bbd", "#0B3C7A"]}
+              colors={isEditing ? ["#10B981", "#059669"] : (isSaved ? ["#10B981", "#059669"] : ["#276bbd", "#0B3C7A"])}
               style={styles.buttonGradient}
             >
               {saving ? (
                 <ActivityIndicator color="#FFF" size="small" />
               ) : (
                 <>
-                  <Ionicons name={isSaved ? "cloud-done" : "cloud-upload-outline"} size={20} color="#FFF" />
+                  <Ionicons name={isEditing ? "checkmark-done" : (isSaved ? "cloud-done" : "cloud-upload-outline")} size={20} color="#FFF" />
                   <Text style={styles.buttonText}>
-                    {isSaved ? "Saved" : "Save to Workspace"}
+                    {isEditing ? "Confirm Changes" : (isSaved ? "Saved" : "Save to Workspace")}
                   </Text>
                 </>
               )}
@@ -254,10 +285,12 @@ const styles = StyleSheet.create({
   typeText: { color: "#1E40AF", fontSize: 13, fontWeight: "700" },
   timestamp: { color: "#64748B", fontSize: 12 },
   documentCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 24, borderWidth: 1, borderColor: "#E2E8F0" },
+  editingCard: { borderColor: "#276bbd", borderWidth: 2, backgroundColor: "#F0F7FF" }, // Highlight card when editing
   cardHeader: { marginBottom: 20, flexDirection: "row", alignItems: "center", gap: 10 },
   cardHeaderLabel: { fontSize: 10, color: "#94A3B8", fontWeight: "800" },
   cardHeaderLine: { flex: 1, height: 1, backgroundColor: "#F1F5F9" },
   bodyText: { color: "#334155", fontSize: 16, lineHeight: 28 },
+  textInput: { color: "#334155", fontSize: 16, lineHeight: 28, minHeight: 200, padding: 0 }, // Style for editable text
   cardFooter: { marginTop: 30, paddingTop: 20, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
   footerNote: { fontSize: 12, color: "#94A3B8", textAlign: "center" },
   floatingFooter: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#FFF", paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#E2E8F0" },
