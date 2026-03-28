@@ -259,6 +259,41 @@ export async function saveDraft(
   return { success: res.success, draftId: res.data.draftId };
 }
 
+export async function updateDraft(
+  token: string,
+  draftId: number | string,
+  updateData: { content?: string; draft_type?: string },
+): Promise<any> {
+  const sanitizedToken = token.startsWith("Bearer ")
+    ? token
+    : `Bearer ${token}`;
+
+  try {
+    const response = await fetch(
+      `${process.env.EXPO_PUBLIC_API_URL}/drafts/update/${draftId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: sanitizedToken,
+        },
+        body: JSON.stringify(updateData),
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to update draft");
+    }
+
+    return result.data; // Returns the updated draft object from Supabase
+  } catch (error) {
+    console.error("updateDraft Error:", error);
+    throw error;
+  }
+}
+
 export async function deleteDraft(
   token: string,
   draftId: number,
