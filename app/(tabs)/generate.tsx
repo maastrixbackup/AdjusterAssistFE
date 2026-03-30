@@ -30,7 +30,7 @@ import {
   getSubscriptionStatus,
   OutputType,
   RecentDraft,
-  SubscriptionStatus,
+  SubscriptionStatus
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
@@ -68,13 +68,16 @@ const TASK_TYPES = [
   },
 ];
 
-type OutputMode = "Email" | "File Note" | "Escalation";
-const outputModes: OutputMode[] = ["Email", "File Note", "Escalation"];
+type OutputMode = "Email" | "File Note" | "Escalation" | "Xact Analysis" | "Contractor Response" | "Insured Response" ;
+const outputModes: OutputMode[] = ["Email", "File Note", "Escalation", "Xact Analysis", "Contractor Response", "Insured Response"];
 
 const outputTypeMap: Record<OutputMode, OutputType> = {
   Email: "email",
   "File Note": "file",
   Escalation: "escalation",
+  "Xact Analysis":"xactanalysis",
+  "Contractor Response":"contractor",
+  "Insured Response":"insured"
 };
 
 export default function GenerateScreen() {

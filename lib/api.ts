@@ -1,6 +1,12 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
 
-export type OutputType = "email" | "file" | "escalation";
+export type OutputType =
+  | "email"
+  | "file"
+  | "escalation"
+  | "xactanalysis"
+  | "contractor"
+  | "insured";
 
 export type AuthSession = {
   token: string;
@@ -92,6 +98,9 @@ const responseTypeLabels: Record<OutputType, string> = {
   email: "Email Response",
   file: "File",
   escalation: "Escalation Response",
+  xactanalysis: "Xact Analysis",
+  contractor: "Contractor Response",
+  insured: "Insured Response",
 };
 
 /**
