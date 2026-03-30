@@ -1,14 +1,19 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Voice, {
+  SpeechErrorEvent,
+  SpeechResultsEvent,
+} from "@react-native-voice/voice";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PermissionsAndroid,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +22,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
@@ -68,21 +74,39 @@ const TASK_TYPES = [
   },
 ];
 
-type OutputMode = "Email" | "File Note" | "Escalation";
-const outputModes: OutputMode[] = ["Email", "File Note", "Escalation"];
+type OutputMode =
+  | "Email"
+  | "File Note"
+  | "Escalation"
+  | "Xact Analysis"
+  | "Contractor Response"
+  | "Insured Response";
+
+const outputModes: OutputMode[] = [
+  "Email",
+  "File Note",
+  "Escalation",
+  "Xact Analysis",
+  "Contractor Response",
+  "Insured Response",
+];
 
 const outputTypeMap: Record<OutputMode, OutputType> = {
   Email: "email",
   "File Note": "file",
   Escalation: "escalation",
+  "Xact Analysis": "xactanalysis",
+  "Contractor Response": "contractor",
+  "Insured Response": "insured",
 };
 
 export default function GenerateScreen() {
   const { token } = useAuth();
-  const scrollRef = React.useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
   const [workspaces, setWorkspaces] = useState<ClaimFile[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(
-    null,
+    null
   );
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -103,14 +127,159 @@ export default function GenerateScreen() {
   const [selectedTask, setSelectedTask] = useState(TASK_TYPES[0]);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
 
+  const [isListening, setIsListening] = useState(false);
+  const [voiceAvailable, setVoiceAvailable] = useState(true);
+
+  const requestMicPermission = async () => {
+    if (Platform.OS !== "android") return true;
+
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: "Microphone Permission",
+          message: "This app needs microphone access for voice input.",
+          buttonPositive: "Allow",
+          buttonNegative: "Cancel",
+        }
+      );
+
+      const isGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
+
+      if (!isGranted) {
+        toast.error("Microphone permission is required for voice input.");
+      }
+
+      return isGranted;
+    } catch (error) {
+      console.error("Permission error:", error);
+      toast.error("Unable to request microphone permission.");
+      return false;
+    }
+  };
+
+  const onSpeechResults = useCallback((e: SpeechResultsEvent) => {
+    if (e.value && e.value.length > 0) {
+      const transcript = e.value[0]?.trim();
+      if (!transcript) return;
+
+      setRequest((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    }
+  }, []);
+
+  const onSpeechError = useCallback((e: SpeechErrorEvent) => {
+    console.log("Speech Error:", JSON.stringify(e, null, 2));
+    setIsListening(false);
+
+    const message = e?.error?.message?.toLowerCase?.() || "";
+
+    if (
+      message.includes("no match") ||
+      message.includes("didn't catch that") ||
+      message.includes("no speech input")
+    ) {
+      toast.warning("Didn't catch that. Try speaking again.");
+      return;
+    }
+
+    if (message.includes("permission")) {
+      toast.error("Microphone permission denied.");
+      return;
+    }
+
+    toast.error("Voice recognition stopped.");
+  }, []);
+
+  const onSpeechStart = useCallback(() => {
+    setIsListening(true);
+  }, []);
+
+  const onSpeechEnd = useCallback(() => {
+    setIsListening(false);
+  }, []);
+
+  useEffect(() => {
+    const initVoice = async () => {
+      await requestMicPermission();
+
+      try {
+        const available = await Voice.isAvailable();
+        setVoiceAvailable(!!available);
+
+        if (!available) {
+          console.log("Voice recognition not available on this device");
+        }
+      } catch (err) {
+        console.log("Voice availability error:", err);
+        setVoiceAvailable(false);
+      }
+    };
+
+    initVoice();
+
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = onSpeechEnd;
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechError = onSpeechError;
+
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners).catch(() => {});
+    };
+  }, [onSpeechEnd, onSpeechError, onSpeechResults, onSpeechStart]);
+
+  const toggleListening = async () => {
+    try {
+      const permissionGranted = await requestMicPermission();
+      if (!permissionGranted) return;
+
+      const available = await Voice.isAvailable();
+
+      if (!available) {
+        toast.error(
+          "Voice recognition is not available. Use Expo Dev Build (not Expo Go)."
+        );
+        return;
+      }
+
+      if (isListening) {
+        await Voice.stop();
+        setIsListening(false);
+      } else {
+        Keyboard.dismiss();
+
+        // Optional cleanup before restart
+        try {
+          await Voice.cancel();
+        } catch {}
+
+        await Voice.start("en-US");
+        setIsListening(true);
+
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, 250);
+      }
+    } catch (e: any) {
+      console.error("Voice Error:", e);
+      setIsListening(false);
+
+      const errText =
+        e?.message || "Unable to start voice recognition. Rebuild app.";
+
+      toast.error(errText);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     if (!token) return;
+
     try {
       const [statusData, draftsData, filesData] = await Promise.all([
         getSubscriptionStatus(token),
         getRecentDrafts(token),
         getMyFiles(token),
       ]);
+
       setStatus(statusData);
       setRecentDrafts(draftsData ?? []);
       setWorkspaces(filesData ?? []);
@@ -128,7 +297,7 @@ export default function GenerateScreen() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => {
@@ -144,6 +313,7 @@ export default function GenerateScreen() {
 
   const handleCreateWorkspace = async () => {
     if (!token) return;
+
     if (!newClaim || !newClient) {
       toast.warning("Missing information");
       return;
@@ -170,7 +340,7 @@ export default function GenerateScreen() {
       }
     } catch (error: any) {
       console.log(error);
-      toast.error("unable to create workspace");
+      toast.error("Unable to create workspace");
     } finally {
       setIsCreatingFile(false);
     }
@@ -178,6 +348,7 @@ export default function GenerateScreen() {
 
   const onGenerate = useCallback(async () => {
     if (!token) return router.replace("/login");
+
     if (!selectedWorkspace) {
       toast.warning("Please select an Active Workspace first.");
       return;
@@ -189,15 +360,19 @@ export default function GenerateScreen() {
     }
 
     setIsGenerating(true);
+
     try {
       const payload: GenerateResponseRequest = {
         fileId: selectedWorkspace.id,
         type: outputTypeMap[selectedOutput],
-        userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
+        userInput: `${request.trim()}${
+          claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""
+        }`,
         task_type: selectedTask.id,
       };
 
       const result = await generateResponse(token, payload);
+
       router.push({
         pathname: "/response",
         params: {
@@ -208,12 +383,13 @@ export default function GenerateScreen() {
           alreadySaved: "false",
         },
       });
+
       setRequest("");
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
-      toast.error("Unable too generate response");
-      // console.log(error)
+      toast.error("Unable to generate response");
+      console.log(error);
     } finally {
       setIsGenerating(false);
     }
@@ -223,6 +399,7 @@ export default function GenerateScreen() {
     claimDetails,
     selectedOutput,
     selectedWorkspace,
+    selectedTask,
     fetchData,
   ]);
 
@@ -234,20 +411,16 @@ export default function GenerateScreen() {
           style={styles.loaderGradient}
         >
           <View style={styles.loaderContent}>
-            {/* Icon */}
             <View style={styles.loaderIconWrap}>
               <Ionicons name="sparkles" size={34} color="#FFFFFF" />
             </View>
 
-            {/* Title */}
             <Text style={styles.loaderTitle}>Preparing AI Workspace</Text>
 
-            {/* Subtitle */}
             <Text style={styles.loaderSubtitle}>
               Setting up your claim assistant...
             </Text>
 
-            {/* Loader */}
             <ActivityIndicator
               size="small"
               color="#FFFFFF"
@@ -284,7 +457,7 @@ export default function GenerateScreen() {
       </LinearGradient>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"} // ✅ FIXED
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -295,6 +468,7 @@ export default function GenerateScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.sectionLabel}>Active Workspace</Text>
+
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -307,6 +481,7 @@ export default function GenerateScreen() {
               <Ionicons name="add" size={20} color="#0F4C9C" />
               <Text style={styles.addWorkspaceText}>New Workspace</Text>
             </Pressable>
+
             {workspaces.map((ws) => (
               <Pressable
                 key={ws.id}
@@ -389,28 +564,48 @@ export default function GenerateScreen() {
                 </View>
                 <Text style={styles.inputLabel}>Scenario Description</Text>
               </View>
-              <TextInput
-                value={request}
-                onChangeText={setRequest}
-                multiline
-                onFocus={() => {
-                  scrollRef.current?.scrollToEnd({ animated: true });
-                }}
-                placeholder="What do you want to achieve?"
-                placeholderTextColor="#94A3B8"
-                style={styles.mainTextInput}
-                returnKeyType="done"
-                blurOnSubmit={true}
-              />
-            </View>
-            {/* <View style={styles.cardDivider} />
-            <View style={styles.fieldGroup}>
-              <View style={styles.fieldHeader}>
-                <View style={[styles.iconCircle, { backgroundColor: "#F1F5F9" }]}><MaterialCommunityIcons name="paperclip" size={16} color="#475569" /></View>
-                <Text style={styles.inputLabel}>Policy Context</Text>
+
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  value={request}
+                  onChangeText={setRequest}
+                  multiline
+                  onFocus={() => {
+                    scrollRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  placeholder="What do you want to achieve?"
+                  placeholderTextColor="#94A3B8"
+                  style={styles.mainTextInput}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                />
+
+                <Pressable
+                  onPress={toggleListening}
+                  style={[
+                    styles.micBtn,
+                    isListening && styles.micBtnActive,
+                    !voiceAvailable && styles.micBtnDisabled,
+                  ]}
+                >
+                  <Ionicons
+                    name={isListening ? "stop-circle" : "mic"}
+                    size={24}
+                    color={
+                      !voiceAvailable
+                        ? "#94A3B8"
+                        : isListening
+                        ? "red"
+                        : "#0F4C9C"
+                    }
+                  />
+                </Pressable>
               </View>
-              <TextInput value={claimDetails} onChangeText={setClaimDetails} multiline placeholder="Optional details..." placeholderTextColor="#94A3B8" style={styles.subTextInput} />
-            </View> */}
+
+              {isListening && (
+                <Text style={styles.listeningText}>Listening...</Text>
+              )}
+            </View>
           </View>
 
           <Pressable
@@ -452,6 +647,7 @@ export default function GenerateScreen() {
                 <Ionicons name="close" size={24} color="#94A3B8" />
               </Pressable>
             </View>
+
             <FlatList
               data={TASK_TYPES}
               keyExtractor={(item) => item.id}
@@ -503,6 +699,7 @@ export default function GenerateScreen() {
                 <Ionicons name="close" size={24} color="#94A3B8" />
               </Pressable>
             </View>
+
             <View style={styles.modalBody}>
               <Text style={styles.modalLabel}>Claim Number</Text>
               <TextInput
@@ -510,18 +707,21 @@ export default function GenerateScreen() {
                 value={newClaim}
                 onChangeText={setNewClaim}
               />
+
               <Text style={styles.modalLabel}>Policy Number</Text>
               <TextInput
                 style={styles.modalInput}
                 value={newPolicy}
                 onChangeText={setNewPolicy}
               />
+
               <Text style={styles.modalLabel}>Client Name</Text>
               <TextInput
                 style={styles.modalInput}
                 value={newClient}
                 onChangeText={setNewClient}
               />
+
               <Pressable
                 style={styles.modalActionBtn}
                 onPress={handleCreateWorkspace}
@@ -539,6 +739,7 @@ export default function GenerateScreen() {
           </View>
         </View>
       </Modal>
+
       <Toast />
     </View>
   );
@@ -546,7 +747,11 @@ export default function GenerateScreen() {
 
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   headerGradient: {
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
@@ -562,18 +767,15 @@ const styles = StyleSheet.create({
   loaderScreen: {
     flex: 1,
   },
-
   loaderGradient: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-
   loaderContent: {
     alignItems: "center",
     paddingHorizontal: 30,
   },
-
   loaderIconWrap: {
     width: 72,
     height: 72,
@@ -583,14 +785,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 20,
   },
-
   loaderTitle: {
     fontSize: 18,
     fontWeight: "800",
     color: "#FFFFFF",
     textAlign: "center",
   },
-
   loaderSubtitle: {
     marginTop: 8,
     fontSize: 13,
@@ -648,7 +848,10 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     gap: 8,
   },
-  workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c" },
+  workspaceItemActive: {
+    backgroundColor: "#0F4C9C",
+    borderColor: "#0f4c9c",
+  },
   workspaceText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
   workspaceTextActive: { color: "#FFF" },
   addWorkspaceBtn: {
@@ -670,9 +873,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 6,
     marginBottom: 28,
+    flexWrap: "wrap",
   },
   tabItem: {
     flex: 1,
+    minWidth: "30%",
     paddingVertical: 12,
     alignItems: "center",
     borderRadius: 14,
@@ -703,11 +908,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   inputLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  inputWrapper: {
+    minHeight: 90,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    position: "relative",
+    paddingRight: 50,
+  },
   mainTextInput: {
     fontSize: 16,
     color: "#334155",
-    minHeight: 60,
+    minHeight: 80,
     textAlignVertical: "top",
+    paddingVertical: 8,
+  },
+  listeningText: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F4C9C",
   },
   cardDivider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 20 },
   subTextInput: {
@@ -805,7 +1024,7 @@ const styles = StyleSheet.create({
   refreshBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E0F2FE", // Light blue background
+    backgroundColor: "#E0F2FE",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -855,4 +1074,17 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
   taskOptionTextActive: { color: "#0F4C9C", fontWeight: "800" },
+  micBtn: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    padding: 10,
+    borderRadius: 12,
+  },
+  micBtnActive: {
+    transform: [{ scale: 1.08 }],
+  },
+  micBtnDisabled: {
+    opacity: 0.5,
+  },
 });
