@@ -841,9 +841,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
-  fabPressed: {
-    transform: [{ scale: 0.98 }],
-  },
+  // fabPressed: {
+  //   transform: [{ scale: 0.98 }],
+  // },
 
   fabGradient: {
     height: 58,
