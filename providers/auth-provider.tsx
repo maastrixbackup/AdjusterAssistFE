@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         void AsyncStorage.removeItem("@session_saved_drafts_data");
         void AsyncStorage.removeItem("@session_saved_drafts");
-
+      
         // 3. Call the API logout if necessary
         void logoutUser();
       },

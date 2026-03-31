@@ -26,6 +26,7 @@ import {
   SubscriptionStatus,
   updateFile,
 } from "@/lib/api";
+import { logoutUser } from "@/lib/services/authService";
 import { useAuth } from "@/providers/auth-provider";
 import * as Haptics from "expo-haptics";
 import { RefreshControl, ScrollView } from "react-native-gesture-handler";
@@ -65,13 +66,17 @@ export default function HomeScreen() {
 
         setFiles(filesResponse ? filesResponse : []);
         setStatus(statusResponse);
-      } catch (err) {
+      } catch (err:any) {
         console.error("Error loading data:", err);
+        if (err.message.includes("401") || err.message.includes("Unauthorized")) {
+          logoutUser(); 
+        }
         Toast.show({
           type: "error",
           text1: "Sync Failed",
           text2: "Could not load your workspace data.",
         });
+     
       } finally {
         setIsLoading(false);
         setRefreshing(false);
@@ -215,6 +220,7 @@ export default function HomeScreen() {
   const handleUpdateFile = async (id: number, updateData: any) => {
     if (!token) {
       toast.error("Session expired. Please login again.");
+      router.push("/login")
       return;
     }
     try {
