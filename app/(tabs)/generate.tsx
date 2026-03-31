@@ -106,7 +106,7 @@ export default function GenerateScreen() {
 
   const [workspaces, setWorkspaces] = useState<ClaimFile[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(
-    null
+    null,
   );
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -141,7 +141,7 @@ export default function GenerateScreen() {
           message: "This app needs microphone access for voice input.",
           buttonPositive: "Allow",
           buttonNegative: "Cancel",
-        }
+        },
       );
 
       const isGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
@@ -204,6 +204,7 @@ export default function GenerateScreen() {
 
       try {
         const available = await Voice.isAvailable();
+        console.log("Voice available:", available);
         setVoiceAvailable(!!available);
 
         if (!available) {
@@ -223,7 +224,9 @@ export default function GenerateScreen() {
     Voice.onSpeechError = onSpeechError;
 
     return () => {
-      Voice.destroy().then(Voice.removeAllListeners).catch(() => {});
+      Voice.destroy()
+        .then(Voice.removeAllListeners)
+        .catch(() => {});
     };
   }, [onSpeechEnd, onSpeechError, onSpeechResults, onSpeechStart]);
 
@@ -236,7 +239,7 @@ export default function GenerateScreen() {
 
       if (!available) {
         toast.error(
-          "Voice recognition is not available. Use Expo Dev Build (not Expo Go)."
+          "Voice recognition is not available. Use Expo Dev Build (not Expo Go).",
         );
         return;
       }
@@ -530,27 +533,30 @@ export default function GenerateScreen() {
           </Pressable>
 
           <Text style={styles.sectionLabel}>Output Format</Text>
-          <View style={styles.tabContainer}>
-            {outputModes.map((mode) => (
-              <Pressable
-                key={mode}
-                onPress={() => setSelectedOutput(mode)}
-                style={[
-                  styles.tabItem,
-                  mode === selectedOutput && styles.tabItemActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    mode === selectedOutput && styles.tabTextActive,
-                  ]}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabContainer}
+          >
+            {outputModes.map((mode) => {
+              const isActive = mode === selectedOutput;
+
+              return (
+                <Pressable
+                  key={mode}
+                  onPress={() => setSelectedOutput(mode)}
+                  style={[styles.tabItem, isActive && styles.tabItemActive]}
                 >
-                  {mode}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                  <Text
+                    style={[styles.tabText, isActive && styles.tabTextActive]}
+                  >
+                    {mode}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
           <View style={styles.glassCard}>
             <View style={styles.fieldGroup}>
@@ -595,8 +601,8 @@ export default function GenerateScreen() {
                       !voiceAvailable
                         ? "#94A3B8"
                         : isListening
-                        ? "red"
-                        : "#0F4C9C"
+                          ? "red"
+                          : "#0F4C9C"
                     }
                   />
                 </Pressable>
@@ -868,23 +874,36 @@ const styles = StyleSheet.create({
   },
   addWorkspaceText: { fontSize: 14, fontWeight: "800", color: "#0F4C9C" },
   tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#E2E8F0",
-    borderRadius: 18,
-    padding: 6,
-    marginBottom: 28,
-    flexWrap: "wrap",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    gap: 10,
   },
+
   tabItem: {
-    flex: 1,
-    minWidth: "30%",
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999, // pill shape
+    backgroundColor: "#F3F4F6", // soft gray
   },
-  tabItemActive: { backgroundColor: "#FFF" },
-  tabText: { fontSize: 14, color: "#64748B", fontWeight: "600" },
-  tabTextActive: { color: "#0F4C9C", fontWeight: "800" },
+
+  tabItemActive: {
+    backgroundColor: "#1F2937", // dark premium
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+
+  tabText: {
+    fontSize: 14,
+    color: "#374151",
+    fontWeight: "500",
+  },
+
+  tabTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
   glassCard: {
     backgroundColor: "#FFF",
     borderRadius: 28,

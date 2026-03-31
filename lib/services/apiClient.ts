@@ -1,5 +1,9 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
+import { logoutUser } from "@/lib/services/authService";
 import { getToken } from "@/lib/utils/storage";
+import { router } from "expo-router";
+
+let isLoggingOut = false;
 
 export async function apiRequest<T = unknown>(
   endpoint: string,
@@ -31,6 +35,21 @@ export async function apiRequest<T = unknown>(
     ok: response.ok,
     data,
   });
+
+  if (response.status === 401) {
+    if (!isLoggingOut) {
+      isLoggingOut = true;
+
+      await logoutUser();
+
+      setTimeout(() => {
+        router.replace("/login");
+        isLoggingOut = false;
+      }, 100);
+    }
+
+    throw new Error("Session expired. Please login again.");
+  }
 
   if (!response.ok) {
     throw new Error(data?.message ?? "Request failed");
