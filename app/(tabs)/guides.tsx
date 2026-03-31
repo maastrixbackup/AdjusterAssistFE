@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import WorkInProgress from "../workinprogress";
 
 export default function GuidesScreen() {

@@ -95,10 +95,9 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="guides"
+        name="workspaces"
         options={{
-          title: "Guides",
-          tabBarLabel: "Guides",
+          headerShown:false,
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               size={26}
@@ -144,6 +143,13 @@ export default function TabLayout() {
         options={{
           headerShown: false,
           href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="guides"
+        options={{
+          headerShown:false, 
+          href:null
         }}
       />
     </Tabs>

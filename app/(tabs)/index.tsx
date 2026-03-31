@@ -215,6 +215,7 @@ export default function HomeScreen() {
   const handleUpdateFile = async (id: number, updateData: any) => {
     if (!token) {
       toast.error("Session expired. Please login again.");
+      router.push("/login")
       return;
     }
     try {

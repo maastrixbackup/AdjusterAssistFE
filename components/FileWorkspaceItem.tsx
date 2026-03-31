@@ -48,6 +48,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
     const [editData, setEditData] = useState({
         client_name: item.client_name || "",
         claim_number: item.claim_number || "",
+        policy_number: item.policy_number|| "",
         status: (item.status?.toLowerCase() === "closed" ? "closed" : "active")
     });
 
@@ -56,6 +57,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
             setEditData({
                 client_name: item.client_name || "",
                 claim_number: item.claim_number || "",
+                policy_number: item.policy_number || "",
                 status: (item.status?.toLowerCase() === "closed" ? "closed" : "active")
             });
         }
@@ -217,6 +219,17 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                     value={editData.claim_number} 
                                     onChangeText={(t) => setEditData({...editData, claim_number: t})}
                                     placeholder="e.g. CLM-8829"
+                                    placeholderTextColor="#CBD5E1"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Policy Number</Text>
+                                <TextInput 
+                                    style={styles.modernInput} 
+                                    value={editData.policy_number} 
+                                    onChangeText={(t) => setEditData({...editData, policy_number: t})}
+                                    placeholder="e.g. POL-D12"
                                     placeholderTextColor="#CBD5E1"
                                 />
                             </View>
