@@ -47,13 +47,6 @@
           "microphonePermission": "Allow AdjusterAssist to use the microphone for drafting.",
           "speechRecognitionPermission": "Allow AdjusterAssist to recognize speech"
         }
-      ],
-      [
-        "expo-notifications",
-        {
-          
-          "color": "#0F4C9C"
-        }
       ]
     ],
     "experiments": {

@@ -12,7 +12,7 @@ import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Toaster } from "sonner-native";
 
-import PushNotificationManager from "@/components/PushNotification";
+// import PushNotificationManager from "@/components/PushNotification";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -92,14 +92,14 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <ThemeProvider value={AppTheme}>
-            {/* Move the Notification Manager inside the AuthProvider */}
-            <PushNotificationManager> 
-              <View style={{ flex: 1, backgroundColor: "#0B3C7A" }}>
-                <NavigationGuard />
-                <Toaster />
-              </View>
-              <StatusBar style="light" />
-            </PushNotificationManager>
+            {/* Expo notifications temporarily disabled. Re-enable by restoring PushNotificationManager wrapper. */}
+            {/* <PushNotificationManager> */}
+            <View style={{ flex: 1, backgroundColor: "#0B3C7A" }}>
+              <NavigationGuard />
+              <Toaster />
+            </View>
+            <StatusBar style="light" />
+            {/* </PushNotificationManager> */}
           </ThemeProvider>
         </AuthProvider>
       </SafeAreaProvider>
