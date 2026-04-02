@@ -130,6 +130,18 @@ export default function GenerateScreen() {
   const [isListening, setIsListening] = useState(false);
   const [voiceAvailable, setVoiceAvailable] = useState(true);
 
+  const isVoiceRecognitionAvailable = useCallback(async () => {
+    if (!Voice || typeof Voice.isAvailable !== "function") {
+      return false;
+    }
+
+    try {
+      return !!(await Voice.isAvailable());
+    } catch {
+      return false;
+    }
+  }, []);
+
   const requestMicPermission = async () => {
     if (Platform.OS !== "android") return true;
 
@@ -202,40 +214,46 @@ export default function GenerateScreen() {
     const initVoice = async () => {
       await requestMicPermission();
 
-      try {
-        const available = await Voice.isAvailable();
-        console.log("Voice available:", available);
-        setVoiceAvailable(!!available);
+      const available = await isVoiceRecognitionAvailable();
+      setVoiceAvailable(available);
 
-        if (!available) {
-          console.log("Voice recognition not available on this device");
-        }
-      } catch (err) {
-        console.log("Voice availability error:", err);
-        setVoiceAvailable(false);
+      if (!available) {
+        console.log(
+          "Voice recognition unavailable in current runtime (use a dev build if needed).",
+        );
       }
     };
 
     initVoice();
 
-    Voice.onSpeechStart = onSpeechStart;
-    Voice.onSpeechEnd = onSpeechEnd;
-    Voice.onSpeechResults = onSpeechResults;
-    Voice.onSpeechError = onSpeechError;
+    try {
+      Voice.onSpeechStart = onSpeechStart;
+      Voice.onSpeechEnd = onSpeechEnd;
+      Voice.onSpeechResults = onSpeechResults;
+      Voice.onSpeechError = onSpeechError;
+    } catch {
+      setVoiceAvailable(false);
+    }
 
     return () => {
       Voice.destroy()
         .then(Voice.removeAllListeners)
         .catch(() => {});
     };
-  }, [onSpeechEnd, onSpeechError, onSpeechResults, onSpeechStart]);
+  }, [
+    isVoiceRecognitionAvailable,
+    onSpeechEnd,
+    onSpeechError,
+    onSpeechResults,
+    onSpeechStart,
+  ]);
 
   const toggleListening = async () => {
     try {
       const permissionGranted = await requestMicPermission();
       if (!permissionGranted) return;
 
-      const available = await Voice.isAvailable();
+      const available = await isVoiceRecognitionAvailable();
 
       if (!available) {
         toast.error(
