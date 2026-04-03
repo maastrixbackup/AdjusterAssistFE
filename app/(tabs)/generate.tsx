@@ -36,7 +36,7 @@ import {
   getSubscriptionStatus,
   OutputType,
   RecentDraft,
-  SubscriptionStatus,
+  SubscriptionStatus
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
@@ -50,10 +50,42 @@ const TASK_TYPES = [
   { id: "professional_documentation", label: "Professional Formatting", icon: "file-check-outline" },
 ];
 
-type OutputMode = "Email" | "File Note" | "Escalation" | "Xact Analysis" | "Contractor Response" | "Insured Response";
-const outputModes: OutputMode[] = ["Email", "File Note", "Escalation", "Xact Analysis", "Contractor Response", "Insured Response"];
+type OutputMode = 
+  | "File Note" 
+  | "Insured Email" 
+  | "Contractor Email" 
+  | "Escalation" 
+  | "Supplement" 
+  | "Coverage Analysis" 
+  | "Denial Support" 
+  | "Claim Summary" 
+  | "Xact Analysis" 
+  | "Damage Evaluation";
+
+const outputModes: OutputMode[] = [
+  "File Note",
+  "Insured Email",
+  "Contractor Email",
+  "Escalation",
+  "Supplement",
+  "Coverage Analysis",
+  "Denial Support",
+  "Claim Summary",
+  "Xact Analysis",
+  "Damage Evaluation"
+];
+
 const outputTypeMap: Record<OutputMode, OutputType> = {
-  Email: "email", "File Note": "file", Escalation: "escalation", "Xact Analysis": "xactanalysis", "Contractor Response": "contractor", "Insured Response": "insured",
+  "File Note": "file_note",
+  "Insured Email": "email_insured",
+  "Contractor Email": "email_contractor",
+  "Escalation": "escalation_response",
+  "Supplement": "supplement_response",
+  "Coverage Analysis": "coverage_analysis",
+  "Denial Support": "denial_support",
+  "Claim Summary": "claim_summary",
+  "Xact Analysis": "xactanalysis_response",
+  "Damage Evaluation": "damage_evaluation",
 };
 
 export default function GenerateScreen() {
@@ -81,7 +113,7 @@ export default function GenerateScreen() {
     status: "active" as const
   });
 
-  const [selectedOutput, setSelectedOutput] = useState<OutputMode>("Email");
+  const [selectedOutput, setSelectedOutput] = useState<OutputMode>("File Note");
   const [request, setRequest] = useState("");
   const [claimDetails, setClaimDetails] = useState("");
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);

@@ -1,12 +1,16 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
 
 export type OutputType =
-  | "email"
-  | "file"
-  | "escalation"
-  | "xactanalysis"
-  | "contractor"
-  | "insured";
+  | "file_note"
+  | "email_insured"
+  | "email_contractor"
+  | "escalation_response"
+  | "supplement_response"
+  | "coverage_analysis"
+  | "denial_support"
+  | "claim_summary"
+  | "xactanalysis_response"
+  | "damage_evaluation";
 
 export type AuthSession = {
   token: string;
@@ -127,12 +131,16 @@ const API_BASE_URL = BASE_URL;
 const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<OutputType, string> = {
-  email: "Email Response",
-  file: "File",
-  escalation: "Escalation Response",
-  xactanalysis: "Xact Analysis",
-  contractor: "Contractor Response",
-  insured: "Insured Response",
+  file_note: "File",
+  email_insured: "Email Response",
+  email_contractor: "Contractor Response",
+  escalation_response: "Escalation Response",
+  supplement_response: "Suplement Response",
+  coverage_analysis: "Coverage Analysis",
+  denial_support: "Denial Support",
+  claim_summary: "Claim Summary",
+  xactanalysis_response: "Xact Analysis",
+  damage_evaluation: "Damage Evaluation",
 };
 
 /**
