@@ -17,11 +17,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { saveDraft, updateDraft } from "@/lib/api"; // Added updateDraft
+import { OutputType, saveDraft, updateDraft } from "@/lib/api"; // Added updateDraft
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
-type OutputType = "email" | "file" | "escalation";
 
 type Params = {
   text?: string;
@@ -33,11 +32,17 @@ type Params = {
 };
 
 const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
-
-const defaultLabels: Record<string, string> = {
-  email: "Email Response",
-  file: "File",
-  escalation: "Escalation Response",
+const defaultLabels: Record<OutputType, string> = {
+  file_note: "File Note",
+  email_insured: "Insured Correspondence",
+  email_contractor: "Contractor Correspondence",
+  escalation_response: "Escalation Response",
+  supplement_response: "Supplement Response",
+  coverage_analysis: "Coverage Analysis",
+  denial_support: "Denial Support",
+  claim_summary: "Claim Summary",
+  xactanalysis_response: "Xact Analysis",
+  damage_evaluation: "Damage Evaluation",
 };
 
 export default function ResponseScreen() {
@@ -53,7 +58,7 @@ export default function ResponseScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(params.text || "");
 
-  const responseTypeLabel = params.type || defaultLabels[params.outputType || "email"] || "Generated Output";
+  const responseTypeLabel = params.type || defaultLabels[params.outputType || "file_note"] || "Generated Output";
 
   /**
    * 1. AUTOMATIC LOCAL SESSION SAVE
@@ -131,7 +136,7 @@ export default function ResponseScreen() {
         result = await saveDraft(
           sanitizedToken,
           Number(fId),
-          params.outputType || 'email',
+          params.outputType || 'file_note',
           editedText
         );
       }
