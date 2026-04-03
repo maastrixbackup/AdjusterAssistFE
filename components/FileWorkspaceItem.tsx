@@ -10,6 +10,7 @@ import {
     Modal,
     Platform,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -21,58 +22,66 @@ import {
     GestureDetector
 } from 'react-native-gesture-handler';
 import Animated, {
+    interpolate,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
-    withSpring
+    withSpring,
+    withTiming
 } from 'react-native-reanimated';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = -70;
-const DELETE_WIDTH = -100;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SWIPE_THRESHOLD = -75;
+const DELETE_WIDTH = -110;
 
 interface Props {
     item: ClaimFile;
     onPress: () => void;
-    onUpdate: (id: number, data: { client_name?: string; claim_number?: string; status?: string }) => Promise<void>;
-    onDelete: (id: number) => void;
+    onUpdate: (data: Partial<ClaimFile>) => Promise<void>;
+    onDelete: () => void;
     getStatusStyle: (status?: string) => any;
 }
 
 export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, getStatusStyle }: Props) {
     const translateX = useSharedValue(0);
+    const scale = useSharedValue(1);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
-
-    // Sync local state with props when modal opens
-    const [editData, setEditData] = useState({
-        client_name: item.client_name || "",
-        claim_number: item.claim_number || "",
-        policy_number: item.policy_number|| "",
-        status: (item.status?.toLowerCase() === "closed" ? "closed" : "active")
-    });
+    const [editData, setEditData] = useState<Partial<ClaimFile>>({});
 
     useEffect(() => {
         if (editModalVisible) {
             setEditData({
-                client_name: item.client_name || "",
                 claim_number: item.claim_number || "",
-                policy_number: item.policy_number || "",
-                status: (item.status?.toLowerCase() === "closed" ? "closed" : "active")
+                client_name: item.client_name || "",
+                address: item.address || "",
+                policy_form: item.policy_form || "",
+                date_of_loss: item.date_of_loss || "",
+                reported_date: item.reported_date || "",
+                loss_type: item.loss_type || "",
+                jurisdiction: item.jurisdiction || "",
+                line_of_business: item.line_of_business || "",
+                claim_stage: item.claim_stage || "",
+                status: (item.status?.toLowerCase() === "closed" ? "closed" : "active") as "active" | "closed"
             });
         }
     }, [editModalVisible, item]);
 
     const statusStyle = getStatusStyle(item.status);
 
-    const closeSwipe = () => {
-        translateX.value = withSpring(0);
-    };
+    const handlePressIn = () => { scale.value = withTiming(0.97, { duration: 100 }); };
+    const handlePressOut = () => { scale.value = withSpring(1); };
+
+    const closeSwipe = () => { translateX.value = withSpring(0); };
 
     const handleSave = async () => {
+        if (!editData.claim_number?.trim()) {
+            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            return;
+        }
         setIsUpdating(true);
         try {
-            await onUpdate(item.id, editData);
+            await onUpdate(editData);
             setEditModalVisible(false);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (error) {
@@ -82,15 +91,10 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
         }
     };
 
-    // --- Gesture Logic ---
     const pan = Gesture.Pan()
         .activeOffsetX([-10, 10])
         .onUpdate((event) => {
-            // Only allow swiping to the left (negative X)
-            const newX = event.translationX;
-            if (newX < 0) {
-                translateX.value = newX;
-            }
+            if (event.translationX < 0) translateX.value = event.translationX;
         })
         .onEnd((event) => {
             if (event.translationX < SWIPE_THRESHOLD) {
@@ -102,337 +106,189 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
         });
 
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: translateX.value }],
+        transform: [
+            { translateX: translateX.value },
+            { scale: scale.value }
+        ],
     }));
 
-    const toggleStatus = () => {
-        setEditData(prev => ({
-            ...prev,
-            status: prev.status === "active" ? "closed" : "active"
-        }));
-        if (Platform.OS !== 'web') Haptics.selectionAsync();
-    };
+    const deleteOpacityStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(translateX.value, [DELETE_WIDTH, 0], [1, 0]),
+        transform: [{ scale: interpolate(translateX.value, [DELETE_WIDTH, 0], [1, 0.5]) }]
+    }));
+
+    const RenderInput = ({ label, value, keyName, placeholder }: { label: string, value?: string, keyName: keyof ClaimFile, placeholder: string }) => (
+        <View style={styles.inputGroup}>
+            <Text style={styles.label}>{label}</Text>
+            <TextInput 
+                style={styles.modernInput} 
+                value={value} 
+                onChangeText={(t) => setEditData({ ...editData, [keyName]: t })}
+                placeholder={placeholder}
+                placeholderTextColor="#94A3B8"
+            />
+        </View>
+    );
 
     return (
-        <View style={styles.outerContainer}>
-            {/* DELETE ACTION LAYER (Visible under the card) */}
+        <View style={styles.wrapper}>
             <TouchableOpacity 
-                activeOpacity={0.8}
-                style={styles.deleteBackground} 
-                onPress={() => {
-                    closeSwipe();
-                    onDelete(item.id);
-                }}
+                activeOpacity={0.9}
+                style={styles.deleteAction} 
+                onPress={() => { closeSwipe(); onDelete(); }}
             >
-                <View style={styles.deleteContent}>
-                    <Feather name="trash-2" size={22} color="#FFF" />
+                <Animated.View style={[styles.deleteContent, deleteOpacityStyle]}>
+                    <Feather name="trash-2" size={24} color="#FFF" />
                     <Text style={styles.deleteText}>Delete</Text>
-                </View>
+                </Animated.View>
             </TouchableOpacity>
 
             <GestureDetector gesture={pan}>
                 <Animated.View style={[styles.fileCard, animatedStyle]}>
                     <Pressable
-                        onPress={() => {
-                            if (translateX.value !== 0) {
-                                closeSwipe();
-                            } else {
-                                onPress();
-                            }
-                        }}
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                        onPress={() => { translateX.value !== 0 ? closeSwipe() : onPress(); }}
                         onLongPress={() => {
-                            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                             setEditModalVisible(true);
                         }}
-                        delayLongPress={500}
-                        style={({ pressed }) => [pressed && styles.pressed]}
+                        delayLongPress={400}
+                        style={styles.pressArea}
                     >
-                        <View style={styles.contentRow}>
-                            <LinearGradient colors={["#F8FAFC", "#F1F5F9"]} style={styles.iconBox}>
+                        <View style={styles.mainRow}>
+                            <LinearGradient colors={["#6366F1", "#4F46E5"]} style={styles.statusLine} />
+                            
+                            <View style={styles.iconContainer}>
                                 <MaterialCommunityIcons 
-                                    name={item.status?.toLowerCase() === 'closed' ? "folder-lock-outline" : "folder-open-outline"} 
-                                    size={24} 
-                                    color={item.status?.toLowerCase() === 'closed' ? "#94A3B8" : "#2563EB"} 
+                                    name={item.status?.toLowerCase() === 'closed' ? "folder-lock" : "folder-text"} 
+                                    size={28} 
+                                    color={item.status?.toLowerCase() === 'closed' ? "#94A3B8" : "#4F46E5"} 
                                 />
-                            </LinearGradient>
-
-                            <View style={styles.fileInfo}>
-                                <View style={styles.fileTopRow}>
-                                    <Text style={styles.fileName} numberOfLines={1}>
-                                        {item.claim_number || "Untitled"}
-                                    </Text>
-                                    <View style={[styles.statusBadge, statusStyle.badge]}>
-                                        <View style={[styles.statusDot, { backgroundColor: statusStyle.text.color }]} />
-                                        <Text style={[styles.statusText, statusStyle.text]}>{item.status}</Text>
-                                    </View>
-                                </View>
-                                <Text style={styles.clientName} numberOfLines={1}>
-                                    {item.client_name || "Unassigned Client"}
-                                </Text>
                             </View>
-                            <Feather name="chevron-right" size={18} color="#CBD5E1" />
+
+                            <View style={styles.infoColumn}>
+                                <View style={styles.headerRow}>
+                                    <Text style={styles.claimNoLabel}>Claim #</Text>
+                                    <Text style={styles.claimNoText}>{item.claim_number || "---"}</Text>
+                                </View>
+                                <Text style={styles.clientText} numberOfLines={1}>
+                                    {item.client_name || "New Property Claim"}
+                                </Text>
+                                <View style={styles.badgeRow}>
+                                    <View style={[styles.miniBadge, { backgroundColor: statusStyle.badge.backgroundColor }]}>
+                                        <Text style={[styles.miniBadgeText, { color: statusStyle.text.color }]}>
+                                            {item.status?.toUpperCase()}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.stageText}>• {item.claim_stage || "Initial Intake"}</Text>
+                                </View>
+                            </View>
+
+                            <Feather name="chevron-right" size={20} color="#E2E8F0" />
                         </View>
                     </Pressable>
                 </Animated.View>
             </GestureDetector>
 
-            {/* EDIT MODAL */}
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={editModalVisible}
-                onRequestClose={() => setEditModalVisible(false)}
-            >
-                <TouchableOpacity 
-                    style={styles.modalOverlay} 
-                    activeOpacity={1} 
-                    onPress={() => setEditModalVisible(false)}
-                >
-                    <KeyboardAvoidingView 
-                        behavior={Platform.OS === "ios" ? "padding" : "height"}
-                        style={{ width: '100%' }}
-                    >
-                        <Pressable style={styles.modalCard} onPress={e => e.stopPropagation()}>
-                            <View style={styles.modalHandle} />
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Workspace Settings</Text>
-                                <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.closeBtn}>
+            <Modal animationType="slide" transparent visible={editModalVisible} onRequestClose={() => setEditModalVisible(false)}>
+                <View style={styles.overlay}>
+                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboardView}>
+                        <View style={styles.sheet}>
+                            <View style={styles.handle} />
+                            <View style={styles.sheetHeader}>
+                                <Text style={styles.sheetTitle}>File Parameters</Text>
+                                <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.circleClose}>
                                     <Feather name="x" size={20} color="#64748B" />
                                 </TouchableOpacity>
                             </View>
-                            
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Client Name</Text>
-                                <TextInput 
-                                    style={styles.modernInput} 
-                                    value={editData.client_name} 
-                                    onChangeText={(t) => setEditData({...editData, client_name: t})}
-                                    placeholder="e.g. Terrence Walker"
-                                    placeholderTextColor="#CBD5E1"
-                                />
-                            </View>
 
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Claim Number</Text>
-                                <TextInput 
-                                    style={styles.modernInput} 
-                                    value={editData.claim_number} 
-                                    onChangeText={(t) => setEditData({...editData, claim_number: t})}
-                                    placeholder="e.g. CLM-8829"
-                                    placeholderTextColor="#CBD5E1"
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Policy Number</Text>
-                                <TextInput 
-                                    style={styles.modernInput} 
-                                    value={editData.policy_number} 
-                                    onChangeText={(t) => setEditData({...editData, policy_number: t})}
-                                    placeholder="e.g. POL-D12"
-                                    placeholderTextColor="#CBD5E1"
-                                />
-                            </View>
-
-                            <View style={styles.statusToggleRow}>
-                                <View>
-                                    <Text style={styles.label}>Workspace Status</Text>
-                                    <Text style={styles.statusSubLabel}>Toggle to mark as complete</Text>
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                                <RenderInput label="Claim ID" value={editData.claim_number} keyName="claim_number" placeholder="Assign Claim ID..." />
+                                <RenderInput label="Policyholder" value={editData.client_name} keyName="client_name" placeholder="John Doe..." />
+                                <RenderInput label="Loss Location" value={editData.address} keyName="address" placeholder="123 Maple St..." />
+                                
+                                <View style={styles.grid}>
+                                    <View style={styles.gridHalf}><RenderInput label="Form" value={editData.policy_form} keyName="policy_form" placeholder="HO3" /></View>
+                                    <View style={styles.gridHalf}><RenderInput label="Cause" value={editData.loss_type} keyName="loss_type" placeholder="Wind" /></View>
                                 </View>
-                                <TouchableOpacity 
-                                    style={[styles.statusToggle, editData.status === 'closed' && styles.statusToggleclosed]} 
-                                    onPress={toggleStatus}
-                                >
-                                    <Text style={[styles.statusToggleText, editData.status === 'closed' && styles.statusToggleTextclosed]}>
-                                        {editData.status}
-                                    </Text>
-                                    <MaterialCommunityIcons 
-                                        name={editData.status === 'active' ? "check-circle" : "lock"} 
-                                        size={16} 
-                                        color={editData.status === 'active' ? "#059669" : "#64748B"} 
-                                    />
-                                </TouchableOpacity>
-                            </View>
 
-                            <TouchableOpacity 
-                                style={[styles.primaryBtn, isUpdating && styles.disabledBtn]} 
-                                onPress={handleSave} 
-                                disabled={isUpdating}
-                            >
-                                {isUpdating ? (
-                                    <ActivityIndicator color="#FFF" />
-                                ) : (
-                                    <Text style={styles.primaryBtnText}>Save Changes</Text>
-                                )}
-                            </TouchableOpacity>
-                        </Pressable>
+                                <View style={styles.grid}>
+                                    <View style={styles.gridHalf}><RenderInput label="DOL" value={editData.date_of_loss} keyName="date_of_loss" placeholder="YYYY-MM-DD" /></View>
+                                    <View style={styles.gridHalf}><RenderInput label="Reported" value={editData.reported_date} keyName="reported_date" placeholder="YYYY-MM-DD" /></View>
+                                </View>
+
+                                <RenderInput label="LOB" value={editData.line_of_business} keyName="line_of_business" placeholder="Residential" />
+                                <RenderInput label="Workflow Stage" value={editData.claim_stage} keyName="claim_stage" placeholder="Inspection" />
+
+                                <TouchableOpacity 
+                                    activeOpacity={0.8}
+                                    style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]} 
+                                    onPress={handleSave} 
+                                    disabled={isUpdating}
+                                >
+                                    {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Update File Metadata</Text>}
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </View>
                     </KeyboardAvoidingView>
-                </TouchableOpacity>
+                </View>
             </Modal>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    outerContainer: { 
-        marginBottom: 12, 
-        backgroundColor: '#EF4444', 
-        borderRadius: 24,
-        marginHorizontal: 16,
+    wrapper: { marginBottom: 16 },
+    deleteAction: { 
+        position: 'absolute', right: 0, top: 0, bottom: 0, width: 110, 
+        backgroundColor: '#EF4444', borderRadius: 24, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 25 
     },
-    deleteBackground: {
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 100,
-        justifyContent: 'center',
-        alignItems: 'center',
+    deleteContent: { alignItems: 'center', gap: 4 },
+    deleteText: { color: '#FFF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+    fileCard: { 
+        backgroundColor: "#FFFFFF", borderRadius: 24, 
+        ...Platform.select({
+            ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
+            android: { elevation: 4 }
+        }),
+        borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden'
     },
-    deleteContent: { 
-        alignItems: 'center', 
-        gap: 4, 
-        paddingLeft: 10 
+    pressArea: { padding: 20 },
+    mainRow: { flexDirection: 'row', alignItems: 'center' },
+    statusLine: { position: 'absolute', left: -20, top: -20, bottom: -20, width: 6 },
+    iconContainer: { 
+        width: 56, height: 56, borderRadius: 18, backgroundColor: '#F8FAFC', 
+        alignItems: 'center', justifyContent: 'center', marginRight: 16,
+        borderWidth: 1, borderColor: '#F1F5F9'
     },
-    deleteText: { 
-        color: '#FFF', 
-        fontSize: 10, 
-        fontWeight: '900', 
-        textTransform: 'uppercase' 
-    },
-    fileCard: {
-        backgroundColor: "#FFFFFF",
-        borderRadius: 24,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: "#F1F5F9",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    contentRow: { flexDirection: 'row', alignItems: 'center' },
-    pressed: { opacity: 0.7, backgroundColor: '#F8FAFC' },
-    iconBox: { 
-        width: 48, 
-        height: 48, 
-        borderRadius: 14, 
-        alignItems: "center", 
-        justifyContent: "center", 
-        marginRight: 14 
-    },
-    fileInfo: { flex: 1 },
-    fileTopRow: { 
-        flexDirection: "row", 
-        justifyContent: "space-between", 
-        alignItems: 'center', 
-        marginBottom: 2 
-    },
-    fileName: { fontSize: 15, fontWeight: "800", color: "#0F172A", flex: 1 },
-    clientName: { fontSize: 13, color: "#64748B", fontWeight: '500' },
-    statusBadge: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        paddingHorizontal: 8, 
-        paddingVertical: 3, 
-        borderRadius: 8, 
-        gap: 5,
-        marginLeft: 8
-    },
-    statusDot: { width: 5, height: 5, borderRadius: 2.5 },
-    statusText: { fontSize: 10, fontWeight: "800", textTransform: 'uppercase' },
+    infoColumn: { flex: 1 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+    claimNoLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginRight: 6 },
+    claimNoText: { fontSize: 16, fontWeight: '900', color: '#1E293B' },
+    clientText: { fontSize: 14, color: '#64748B', fontWeight: '600', marginBottom: 8 },
+    badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    miniBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+    miniBadgeText: { fontSize: 10, fontWeight: '900' },
+    stageText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
     
-    // Modal Styles
-    modalOverlay: { 
-        flex: 1, 
-        backgroundColor: 'rgba(15, 23, 42, 0.4)', 
-        justifyContent: 'flex-end' 
-    },
-    modalCard: { 
-        backgroundColor: '#FFF', 
-        borderTopLeftRadius: 32, 
-        borderTopRightRadius: 32, 
-        padding: 24, 
-        paddingTop: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 20
-    },
-    modalHandle: { 
-        width: 36, 
-        height: 4, 
-        backgroundColor: '#E2E8F0', 
-        borderRadius: 2, 
-        alignSelf: 'center', 
-        marginBottom: 20 
-    },
-    modalHeader: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 24 
-    },
-    modalTitle: { fontSize: 19, fontWeight: '900', color: '#0F172A' },
-    closeBtn: { 
-        width: 32, 
-        height: 32, 
-        borderRadius: 16, 
-        backgroundColor: '#F1F5F9', 
-        alignItems: 'center', 
-        justifyContent: 'center' 
-    },
-    inputGroup: { marginBottom: 18 },
-    label: { 
-        fontSize: 11, 
-        fontWeight: '800', 
-        color: '#94A3B8', 
-        marginBottom: 8, 
-        textTransform: 'uppercase', 
-        letterSpacing: 0.5 
-    },
-    statusSubLabel: { fontSize: 12, color: '#94A3B8', marginTop: -4 },
+    overlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.6)', justifyContent: 'flex-end' },
+    keyboardView: { width: '100%' },
+    sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 24, maxHeight: SCREEN_HEIGHT * 0.88 },
+    handle: { width: 40, height: 5, backgroundColor: '#E2E8F0', borderRadius: 10, alignSelf: 'center', marginTop: 14, marginBottom: 20 },
+    sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+    sheetTitle: { fontSize: 22, fontWeight: '900', color: '#0F172A', letterSpacing: -0.5 },
+    circleClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+    scrollContent: { paddingBottom: 50 },
+    grid: { flexDirection: 'row', justifyContent: 'space-between' },
+    gridHalf: { width: '48%' },
+    inputGroup: { marginBottom: 20 },
+    label: { fontSize: 12, fontWeight: '800', color: '#475569', marginBottom: 8, textTransform: 'uppercase', marginLeft: 4 },
     modernInput: { 
-        backgroundColor: '#F8FAFC', 
-        borderWidth: 1, 
-        borderColor: '#E2E8F0', 
-        borderRadius: 14, 
-        padding: 14, 
-        fontSize: 15, 
-        color: '#0F172A' 
+        backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#F1F5F9', 
+        borderRadius: 16, padding: 16, fontSize: 16, color: '#0F172A', fontWeight: '500'
     },
-    statusToggleRow: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 32,
-        backgroundColor: '#F8FAFC',
-        padding: 16,
-        borderRadius: 16
-    },
-    statusToggle: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 6, 
-        backgroundColor: '#DCFCE7', 
-        paddingHorizontal: 12, 
-        paddingVertical: 6, 
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#10B981'
-    },
-    statusToggleclosed: { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
-    statusToggleText: { fontSize: 12, fontWeight: '800', color: '#059669' },
-    statusToggleTextclosed: { color: '#64748B' },
-    primaryBtn: { 
-        backgroundColor: '#0F172A', 
-        padding: 18, 
-        borderRadius: 16, 
-        alignItems: 'center',
-        marginBottom: Platform.OS === 'ios' ? 20 : 0
-    },
-    primaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
-    disabledBtn: { backgroundColor: '#94A3B8' }
+    saveBtn: { backgroundColor: '#4F46E5', padding: 20, borderRadius: 20, alignItems: 'center', marginTop: 10 },
+    saveBtnText: { color: '#FFF', fontWeight: '900', fontSize: 16, letterSpacing: 0.5 },
+    saveBtnDisabled: { backgroundColor: '#CBD5E1' }
 });

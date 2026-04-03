@@ -1,12 +1,16 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
 
 export type OutputType =
-  | "email"
-  | "file"
-  | "escalation"
-  | "xactanalysis"
-  | "contractor"
-  | "insured";
+  | "file_note"
+  | "email_insured"
+  | "email_contractor"
+  | "escalation_response"
+  | "supplement_response"
+  | "coverage_analysis"
+  | "denial_support"
+  | "claim_summary"
+  | "xactanalysis_response"
+  | "damage_evaluation";
 
 export type AuthSession = {
   token: string;
@@ -26,23 +30,55 @@ type AuthApiResponse = {
 };
 
 export interface ClaimFile {
+  // Primary Identifiers
   id: number;
   user_id: number;
   claim_number: string;
-  policy_number: string | null;
+
+  // Insurance Metadata (Updated)
   client_name: string;
-  status: string;
+  policy_form: string;
+  address: string;
+
+  // Dates
+  date_of_loss: string; // ISO format date
+  reported_date: string; // ISO format date
+
+  // Claim Specifics
+  loss_type: string; // e.g., 'water', 'fire', 'wind'
+  jurisdiction: string; // e.g., 'CT', 'FL', 'NY'
+  line_of_business: string; // e.g., 'homeowners', 'commercial'
+  claim_stage: string; // e.g., 'mitigation_review', 'adjustment'
+
+  // Status & Metadata
+  status: "active" | "closed";
   created_at: string;
   updated_at?: string;
+
+  // Derived / UI Fields
   draft_count?: number;
 }
 
 // Data structure for creating a new file from the frontend
 export interface CreateFileRequest {
-  client_name: string;
-  policy_number: string | null;
-  claim_number: string;
-  status: string;
+  // Required Claim Identifiers
+  claim_number: string; // Unique ID for the claim
+  client_name: string; // Insured party's name
+
+  // Mandatory Insurance Metadata
+  address: string; // Property location
+  policy_form: string; // e.g., 'HO-3', 'HO-5'
+  loss_type: string; // e.g., 'water', 'fire', 'wind'
+  jurisdiction: string; // State abbreviation (e.g., 'CT', 'FL')
+  line_of_business: string; // e.g., 'homeowners', 'commercial'
+  claim_stage: string; // e.g., 'mitigation_review', 'inspection'
+
+  // Dates (Stored as strings from the DatePicker)
+  date_of_loss: string;
+  reported_date: string;
+
+  // Operational Status
+  status: "active" | "archived";
 }
 
 export interface RecentDraft {
@@ -95,12 +131,16 @@ const API_BASE_URL = BASE_URL;
 const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<OutputType, string> = {
-  email: "Email Response",
-  file: "File",
-  escalation: "Escalation Response",
-  xactanalysis: "Xact Analysis",
-  contractor: "Contractor Response",
-  insured: "Insured Response",
+  file_note: "File",
+  email_insured: "Email Response",
+  email_contractor: "Contractor Response",
+  escalation_response: "Escalation Response",
+  supplement_response: "Suplement Response",
+  coverage_analysis: "Coverage Analysis",
+  denial_support: "Denial Support",
+  claim_summary: "Claim Summary",
+  xactanalysis_response: "Xact Analysis",
+  damage_evaluation: "Damage Evaluation",
 };
 
 /**
@@ -382,10 +422,17 @@ export const updateFile = async (
   token: string,
   fileId: string | number,
   updateData: {
-    client_name?: string;
     claim_number?: string;
-    policy_number?: string;
-    status?: "active" | "archived";
+    client_name?: string;
+    address?: string;
+    policy_form?: string;
+    date_of_loss?: string;
+    reported_date?: string;
+    loss_type?: string;
+    jurisdiction?: string;
+    line_of_business?: string;
+    claim_stage?: string;
+    status?: "active" | "closed";
   },
 ): Promise<{ success: boolean; message: string; data?: any }> => {
   try {
@@ -397,6 +444,9 @@ export const updateFile = async (
       `/files/update/${fileId}`,
       {
         method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(updateData),
       },
       token,
