@@ -145,7 +145,7 @@ export default function WorkspacesScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
+        colors={["#156bdb", "#123C78", "#0B2F5B"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}

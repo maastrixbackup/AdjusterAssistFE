@@ -239,7 +239,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
 }
 
 const styles = StyleSheet.create({
-    wrapper: { marginBottom: 16, marginHorizontal: 16 },
+    wrapper: { marginBottom: 16 },
     deleteAction: { 
         position: 'absolute', right: 0, top: 0, bottom: 0, width: 110, 
         backgroundColor: '#EF4444', borderRadius: 24, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 25 
