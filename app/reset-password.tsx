@@ -44,7 +44,9 @@ export default function ResetPasswordScreen() {
   }, [params.verified]);
 
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
@@ -64,9 +66,16 @@ export default function ResetPasswordScreen() {
       return;
     }
 
-    if (!newPassword.trim()) {
+    if (!newPassword.trim() || !confirmPassword.trim()) {
       toast.error("Required Fields", {
-        description: "Please enter a new password.",
+        description: "Please enter and confirm your new password.",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Password Mismatch", {
+        description: "New Password and Re-enter Password must match.",
       });
       return;
     }
@@ -123,7 +132,7 @@ export default function ResetPasswordScreen() {
 
             <Text style={styles.title}>Set New Password</Text>
             <Text style={styles.subtitle}>
-              OTP is verified. Enter your new password to complete reset.
+              OTP is verified internally. Set your new password to complete reset.
             </Text>
 
             <View style={styles.inputContainer}>
@@ -145,6 +154,32 @@ export default function ResetPasswordScreen() {
                 >
                   <Ionicons
                     name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Re-enter Password</Text>
+              <View style={styles.inputWrapper}>
+                <Feather name="lock" size={20} color="#94A3B8" />
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholder="Re-enter new password"
+                  placeholderTextColor="#CBD5E1"
+                  style={styles.input}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? "eye-off" : "eye"}
                     size={20}
                     color="#94A3B8"
                   />
