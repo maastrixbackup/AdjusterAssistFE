@@ -73,12 +73,21 @@ export async function requestPasswordReset(email: string): Promise<void> {
   await apiRequest("/auth/forgot-password", "POST", { email });
 }
 
+export async function verifyPasswordResetOtp(
+  email: string,
+  otp: string,
+): Promise<void> {
+  await apiRequest("/auth/verify", "POST", { email, otp });
+}
+
 export async function resetPassword(
-  token: string,
+  email: string,
+  otp: string,
   newPassword: string,
 ): Promise<void> {
   await apiRequest("/auth/reset-password", "POST", {
-    token,
+    email,
+    otp,
     newPassword,
   });
 }

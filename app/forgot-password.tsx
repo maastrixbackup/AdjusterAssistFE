@@ -28,7 +28,9 @@ export default function ForgotPasswordScreen() {
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
   async function handleReset() {
-    if (!email.trim()) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
       toast.error("Email Required", {
         description: "Please enter your email address to continue.",
       });
@@ -37,11 +39,17 @@ export default function ForgotPasswordScreen() {
 
     try {
       setLoading(true);
-      await sendPasswordReset(email)
-      toast.success("Reset password link sent to email")
-    }catch(error){
-      console.log(error)
-      toast.error("Unable to send email")
+      await sendPasswordReset(normalizedEmail);
+      toast.success("OTP sent to your email", {
+        description: "Use the OTP to verify and set a new password.",
+      });
+      router.push({
+        pathname: "/verify-otp",
+        params: { email: normalizedEmail },
+      });
+    } catch (error) {
+      console.log(error);
+      toast.error("Unable to send OTP");
     } finally {
       setLoading(false);
     }
@@ -84,7 +92,7 @@ export default function ForgotPasswordScreen() {
 
             <Text style={styles.title}>Recovery</Text>
             <Text style={styles.subtitle}>
-              Enter your email and we&apos;ll send you a secure token to reset your password.
+              Enter your email and we&apos;ll send a one-time password (OTP) for secure reset.
             </Text>
 
             <View style={styles.inputContainer}>
@@ -119,7 +127,7 @@ export default function ForgotPasswordScreen() {
                 ) : (
                   <>
                     <Text style={styles.buttonText}>
-                      Send Instructions
+                      Send OTP
                     </Text>
                     <Ionicons
                       name="send"
@@ -146,11 +154,11 @@ export default function ForgotPasswordScreen() {
               </View>
 
               <TouchableOpacity
-                onPress={() => router.push("/reset-password")}
+                onPress={() => router.push("/verify-otp")}
                 style={styles.tokenButton}
               >
                 <Text style={styles.tokenText}>
-                  I already have a token
+                  I already have an OTP
                 </Text>
                 <Ionicons
                   name="chevron-forward"

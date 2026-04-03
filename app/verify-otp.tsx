@@ -1,4 +1,4 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -20,71 +20,41 @@ import { toast } from "sonner-native";
 
 import { useAuth } from "@/providers/auth-provider";
 
-export default function ResetPasswordScreen() {
-  const { resetPassword } = useAuth();
-  const params = useLocalSearchParams<{
-    email?: string;
-    otp?: string;
-    verified?: string;
-  }>();
-
-  const email = useMemo(() => {
-    if (Array.isArray(params.email)) return (params.email[0] ?? "").toLowerCase();
-    return (params.email ?? "").toLowerCase();
+export default function VerifyOtpScreen() {
+  const { verifyPasswordResetOtp } = useAuth();
+  const params = useLocalSearchParams<{ email?: string }>();
+  const emailFromParams = useMemo(() => {
+    if (Array.isArray(params.email)) return params.email[0] ?? "";
+    return params.email ?? "";
   }, [params.email]);
 
-  const otp = useMemo(() => {
-    if (Array.isArray(params.otp)) return params.otp[0] ?? "";
-    return params.otp ?? "";
-  }, [params.otp]);
-
-  const verified = useMemo(() => {
-    if (Array.isArray(params.verified)) return params.verified[0] === "1";
-    return params.verified === "1";
-  }, [params.verified]);
-
-  const [newPassword, setNewPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState(emailFromParams.toLowerCase());
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
-  async function handleResetPassword() {
+  async function handleVerifyOtp() {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOtp = otp.trim();
 
-    if (!verified || !normalizedEmail || !normalizedOtp) {
-      toast.error("Session Expired", {
-        description: "Please verify OTP again before resetting your password.",
-      });
-      router.replace({
-        pathname: "/verify-otp",
-        params: normalizedEmail ? { email: normalizedEmail } : undefined,
-      });
-      return;
-    }
-
-    if (!newPassword.trim()) {
+    if (!normalizedEmail || !normalizedOtp) {
       toast.error("Required Fields", {
-        description: "Please enter a new password.",
+        description: "Please enter both your email and OTP.",
       });
       return;
     }
 
     try {
       setLoading(true);
-      await toast.promise(
-        resetPassword(normalizedEmail, normalizedOtp, newPassword),
-        {
-          loading: "Updating your password...",
-          success: () => {
-            setTimeout(() => router.replace("/login"), 1500);
-            return "Password updated! Redirecting...";
-          },
-          error: (err) =>
-            err instanceof Error ? err.message : "Unable to reset password",
-        },
-      );
+      await verifyPasswordResetOtp(normalizedEmail, normalizedOtp);
+      toast.success("OTP verified", {
+        description: "Now set your new password.",
+      });
+      router.push({
+        pathname: "/reset-password",
+        params: { email: normalizedEmail, otp: normalizedOtp, verified: "1" },
+      });
     } finally {
       setLoading(false);
     }
@@ -93,7 +63,6 @@ export default function ResetPasswordScreen() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="#052146" />
-
       <LinearGradient
         colors={["#1E63B6", "#052146"]}
         style={StyleSheet.absoluteFill}
@@ -115,46 +84,53 @@ export default function ResetPasswordScreen() {
           <View style={styles.formCard}>
             <View style={styles.iconCircle}>
               <MaterialCommunityIcons
-                name="shield-lock-outline"
+                name="shield-key-outline"
                 size={32}
                 color="#1E63B6"
               />
             </View>
 
-            <Text style={styles.title}>Set New Password</Text>
+            <Text style={styles.title}>Verify OTP</Text>
             <Text style={styles.subtitle}>
-              OTP is verified. Enter your new password to complete reset.
+              Enter the OTP received on your registered email address.
             </Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>New Password</Text>
+              <Text style={styles.inputLabel}>Registered Email</Text>
               <View style={styles.inputWrapper}>
-                <Feather name="lock" size={20} color="#94A3B8" />
+                <Ionicons name="mail-outline" size={20} color="#94A3B8" />
                 <TextInput
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={!showPassword}
-                  placeholder="Min. 8 characters"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="name@company.com"
                   placeholderTextColor="#CBD5E1"
                   style={styles.input}
                   editable={!loading}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={20}
-                    color="#94A3B8"
-                  />
-                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>OTP</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="key-outline" size={20} color="#94A3B8" />
+                <TextInput
+                  value={otp}
+                  onChangeText={setOtp}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="#CBD5E1"
+                  style={styles.input}
+                  keyboardType="number-pad"
+                  editable={!loading}
+                />
               </View>
             </View>
 
             <TouchableOpacity
               style={styles.button}
-              onPress={handleResetPassword}
+              onPress={handleVerifyOtp}
               disabled={loading}
             >
               <LinearGradient
@@ -165,7 +141,7 @@ export default function ResetPasswordScreen() {
                   <ActivityIndicator color="#FFF" />
                 ) : (
                   <>
-                    <Text style={styles.buttonText}>Update Password</Text>
+                    <Text style={styles.buttonText}>Verify OTP</Text>
                     <Ionicons
                       name="arrow-forward"
                       size={18}
@@ -178,15 +154,10 @@ export default function ResetPasswordScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() =>
-                router.replace({
-                  pathname: "/verify-otp",
-                  params: email ? { email } : undefined,
-                })
-              }
+              onPress={() => router.replace("/forgot-password")}
               style={styles.backButton}
             >
-              <Text style={styles.backText}>Back to OTP Verification</Text>
+              <Text style={styles.backText}>Back to Forgot Password</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

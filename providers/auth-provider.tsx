@@ -12,6 +12,7 @@ import {
   loginWithEmail,
   logoutUser,
   requestPasswordReset,
+  verifyPasswordResetOtp as verifyOtpForPasswordReset,
   resetPassword as resetUserPassword,
   signupWithEmail,
 } from "@/lib/services/authService";
@@ -30,7 +31,12 @@ type AuthContextValue = {
   ) => Promise<void>;
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;
-  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  verifyPasswordResetOtp: (email: string, otp: string) => Promise<void>;
+  resetPassword: (
+    email: string,
+    otp: string,
+    newPassword: string,
+  ) => Promise<void>;
 };
 
 const SESSION_KEY = "adjusterassist_session_v1";
@@ -121,8 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async sendPasswordReset(inputEmail: string) {
         await requestPasswordReset(inputEmail);
       },
-      async resetPassword(inputToken: string, newPassword: string) {
-        await resetUserPassword(inputToken, newPassword);
+      async verifyPasswordResetOtp(inputEmail: string, otp: string) {
+        await verifyOtpForPasswordReset(inputEmail, otp);
+      },
+      async resetPassword(inputEmail: string, otp: string, newPassword: string) {
+        await resetUserPassword(inputEmail, otp, newPassword);
       },
     }),
     [email, isHydrated, token],
