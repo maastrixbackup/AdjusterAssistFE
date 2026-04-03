@@ -17,7 +17,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
-import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
   ClaimFile,
   deleteFile,
@@ -233,20 +232,7 @@ export default function HomeScreen() {
     }
   };
 
-  const renderFileItem = ({ item }: { item: ClaimFile }) => (
-    <FileWorkspaceItem
-      item={item}
-      onPress={() =>
-        router.push({
-          pathname: "/file-draft-history",
-          params: { fileId: item.id },
-        })
-      }
-      onUpdate={handleUpdateFile}
-      onDelete={handleDeleteFile}
-      getStatusStyle={getStatusStyle}
-    />
-  );
+
 
   return (
     <View style={styles.mainContainer}>
