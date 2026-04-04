@@ -67,7 +67,7 @@ export const useVoiceToText = (setRequest: (text: string) => void) => {
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer OPENAI_API_KEY`,
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
           },
         },
       );
