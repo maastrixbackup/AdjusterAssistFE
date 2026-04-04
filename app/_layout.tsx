@@ -71,6 +71,9 @@ function NavigationGuard() {
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="notification" options={{ title: "Notifications" }} />
+      <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="verify-otp" options={{ headerShown: false }} />
     </Stack>
   );
 }

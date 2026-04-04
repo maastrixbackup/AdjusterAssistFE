@@ -48,7 +48,7 @@ export async function apiRequest<T = unknown>(
       }, 100);
     }
 
-    throw new Error("Session expired. Please login again.");
+    // throw new Error("Session expired. Please login again.");
   }
 
   if (!response.ok) {

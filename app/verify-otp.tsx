@@ -31,14 +31,20 @@ export default function VerifyOtpScreen() {
   const [email, setEmail] = useState(emailFromParams.toLowerCase());
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [statusType, setStatusType] = useState<"error" | "success" | null>(null);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
   async function handleVerifyOtp() {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOtp = otp.trim();
+    setStatusMessage("");
+    setStatusType(null);
 
     if (!normalizedEmail || !normalizedOtp) {
+      setStatusType("error");
+      setStatusMessage("Please enter both your email and OTP.");
       toast.error("Required Fields", {
         description: "Please enter both your email and OTP.",
       });
@@ -48,12 +54,24 @@ export default function VerifyOtpScreen() {
     try {
       setLoading(true);
       await verifyPasswordResetOtp(normalizedEmail, normalizedOtp);
+      setStatusType("success");
+      setStatusMessage("OTP verified successfully.");
       toast.success("OTP verified", {
         description: "Now set your new password.",
       });
       router.push({
         pathname: "/reset-password",
         params: { email: normalizedEmail, otp: normalizedOtp, verified: "1" },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Invalid OTP. Please try again.";
+      setStatusType("error");
+      setStatusMessage(message);
+      toast.error("Verification failed", {
+        description: message,
       });
     } finally {
       setLoading(false);
@@ -118,7 +136,13 @@ export default function VerifyOtpScreen() {
                 <Ionicons name="key-outline" size={20} color="#94A3B8" />
                 <TextInput
                   value={otp}
-                  onChangeText={setOtp}
+                  onChangeText={(value) => {
+                    setOtp(value);
+                    if (statusType) {
+                      setStatusType(null);
+                      setStatusMessage("");
+                    }
+                  }}
                   placeholder="Enter 6-digit OTP"
                   placeholderTextColor="#CBD5E1"
                   style={styles.input}
@@ -126,6 +150,18 @@ export default function VerifyOtpScreen() {
                   editable={!loading}
                 />
               </View>
+              {!!statusMessage && (
+                <Text
+                  style={[
+                    styles.statusText,
+                    statusType === "error"
+                      ? styles.statusError
+                      : styles.statusSuccess,
+                  ]}
+                >
+                  {statusMessage}
+                </Text>
+              )}
             </View>
 
             <TouchableOpacity
@@ -275,5 +311,16 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 14,
     fontWeight: "600",
+  },
+  statusText: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  statusError: {
+    color: "#DC2626",
+  },
+  statusSuccess: {
+    color: "#16A34A",
   },
 });
