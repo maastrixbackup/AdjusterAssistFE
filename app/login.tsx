@@ -3,11 +3,12 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,7 +30,25 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [focusedInput, setFocusedInput] = useState<"email" | "pass" | null>(null);
+  const [focusedInput, setFocusedInput] = useState<"email" | "pass" | null>(
+    null,
+  );
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardOpen(true);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardOpen(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
@@ -41,8 +60,16 @@ export default function LoginScreen() {
 
   if (!isHydrated || isAuthenticated) {
     return (
-      <View style={[styles.mainContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-        <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={StyleSheet.absoluteFill} />
+      <View
+        style={[
+          styles.mainContainer,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <LinearGradient
+          colors={["#276bbd", "#0B3C7A"]}
+          style={StyleSheet.absoluteFill}
+        />
         <ActivityIndicator size="large" color="#FFFFFF" />
       </View>
     );
@@ -58,9 +85,9 @@ export default function LoginScreen() {
     }
 
     toast.promise(login(email.trim(), password), {
-      loading: 'Verifying your credentials...',
+      loading: "Verifying your credentials...",
       success: () => {
-        return 'Welcome back!';
+        return "Welcome back!";
       },
       error: (err) => {
         return err instanceof Error ? err.message : "Invalid email or password";
@@ -71,7 +98,10 @@ export default function LoginScreen() {
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
-      <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={["#276bbd", "#0B3C7A"]}
+        style={StyleSheet.absoluteFill}
+      />
 
       <View style={[styles.orb, styles.orbTop]} />
       <View style={[styles.orb, styles.orbBottom]} />
@@ -85,7 +115,11 @@ export default function LoginScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.scrollContent,
+            keyboardOpen && { paddingBottom: 300 }, // 👈 KEY FIX
+          ]}
           showsVerticalScrollIndicator={false}
           // FIX: Helps with input focus jitter
           keyboardShouldPersistTaps="handled"
@@ -95,20 +129,30 @@ export default function LoginScreen() {
           scrollEnabled={height < 700 || focusedInput !== null}
         >
           <SafeAreaView style={styles.safeArea}>
-
             <View style={styles.headerSection}>
               <View style={styles.logoBadge}>
                 <Image source={logoImg} style={styles.logo} />
               </View>
               <Text style={styles.welcomeText}>Welcome Back</Text>
-              <Text style={styles.brandSubtitle}>Secure Access for Adjusters</Text>
+              <Text style={styles.brandSubtitle}>
+                Secure Access for Adjusters
+              </Text>
             </View>
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Sign In</Text>
 
-              <View style={[styles.inputContainer, focusedInput === "email" && styles.inputContainerActive]}>
-                <Feather name="mail" size={18} color={focusedInput === "email" ? "#276bbd" : "#94A3B8"} />
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedInput === "email" && styles.inputContainerActive,
+                ]}
+              >
+                <Feather
+                  name="mail"
+                  size={18}
+                  color={focusedInput === "email" ? "#276bbd" : "#94A3B8"}
+                />
                 <TextInput
                   placeholder="Email Address"
                   placeholderTextColor="#94A3B8"
@@ -116,26 +160,55 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={email}
-                  onChangeText={(v) => { setEmail(v); setErrorMessage(null); }}
-                  onFocus={() => setFocusedInput("email")}
+                  onChangeText={(v) => {
+                    setEmail(v);
+                    setErrorMessage(null);
+                  }}
+                  onFocus={() => {
+                    setFocusedInput("email");
+                  }}
                   onBlur={() => setFocusedInput(null)}
                 />
               </View>
 
-              <View style={[styles.inputContainer, focusedInput === "pass" && styles.inputContainerActive]}>
-                <Feather name="lock" size={18} color={focusedInput === "pass" ? "#276bbd" : "#94A3B8"} />
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedInput === "pass" && styles.inputContainerActive,
+                ]}
+              >
+                <Feather
+                  name="lock"
+                  size={18}
+                  color={focusedInput === "pass" ? "#276bbd" : "#94A3B8"}
+                />
                 <TextInput
                   placeholder="Password"
                   placeholderTextColor="#94A3B8"
                   secureTextEntry={!showPassword}
                   style={styles.input}
                   value={password}
-                  onChangeText={(v) => { setPassword(v); setErrorMessage(null); }}
-                  onFocus={() => setFocusedInput("pass")}
+                  onChangeText={(v) => {
+                    setPassword(v);
+                    setErrorMessage(null);
+                  }}
+                  onFocus={() => {
+                    setFocusedInput("email");
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 0);
+                  }}
                   onBlur={() => setFocusedInput(null)}
                 />
-                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
-                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#94A3B8" />
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={10}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color="#94A3B8"
+                  />
                 </Pressable>
               </View>
 
@@ -153,17 +226,22 @@ export default function LoginScreen() {
               <Pressable
                 style={({ pressed }) => [
                   styles.loginButton,
-                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
                 ]}
                 onPress={handleLogin}
                 disabled={loading}
               >
                 <LinearGradient
                   colors={["#276bbd", "#1E63B6"]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={styles.buttonGradient}
                 >
-                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.loginButtonText}>Continue</Text>}
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>Continue</Text>
+                  )}
                 </LinearGradient>
               </Pressable>
 
@@ -185,15 +263,15 @@ const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#0B3C7A" },
   flex1: { flex: 1 },
   orb: {
-    position: 'absolute',
+    position: "absolute",
     width: width * 0.8,
     height: width * 0.8,
     borderRadius: (width * 0.8) / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
   orbTop: { top: -width * 0.2, right: -width * 0.2 },
   orbBottom: { bottom: -width * 0.1, left: -width * 0.3 },
-  scrollContent: { flexGrow: 1, justifyContent: 'center' }, // FIX: Keeps card centered
+  scrollContent: { flexGrow: 1, justifyContent: "flex-start" }, // FIX: Keeps card centered
   safeArea: { paddingHorizontal: 24, paddingBottom: 20 },
   headerSection: { alignItems: "center", marginBottom: 30 },
   logoBadge: {
@@ -205,8 +283,18 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.2)",
   },
   logo: { width: 180, height: 45, resizeMode: "contain" },
-  welcomeText: { fontSize: 28, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
-  brandSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: "500" },
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+  },
+  brandSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 4,
+    fontWeight: "500",
+  },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 32,
@@ -217,7 +305,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 20,
   },
-  cardTitle: { fontSize: 20, fontWeight: "700", color: "#1E293B", marginBottom: 24 },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 24,
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -230,14 +323,49 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputContainerActive: { borderColor: "#276bbd", backgroundColor: "#FFFFFF" },
-  input: { flex: 1, marginLeft: 12, fontSize: 16, color: "#0F172A", fontWeight: "500" },
-  forgotLabel: { textAlign: "right", color: "#64748B", fontSize: 14, fontWeight: "600", marginBottom: 20 },
+  input: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: "#0F172A",
+    fontWeight: "500",
+  },
+  forgotLabel: {
+    textAlign: "right",
+    color: "#64748B",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 20,
+  },
   loginButton: { borderRadius: 16, overflow: "hidden", marginTop: 10 },
-  buttonGradient: { height: 58, justifyContent: "center", alignItems: "center" },
-  loginButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700", letterSpacing: 0.5 },
-  errorBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 12, borderRadius: 12, marginBottom: 20, gap: 8 },
+  buttonGradient: {
+    height: 58,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loginButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 8,
+  },
   errorText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
-  footerRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 24, gap: 6 },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 24,
+    gap: 6,
+  },
   footerText: { color: "#64748B", fontSize: 14, fontWeight: "500" },
   signupText: { color: "#276bbd", fontSize: 14, fontWeight: "700" },
 });

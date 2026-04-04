@@ -42,12 +42,17 @@
         }
       ],
       [
-        "@react-native-voice/voice",
+        "expo-build-properties",
         {
-          "microphonePermission": "Allow AdjusterAssist to use the microphone for drafting.",
-          "speechRecognitionPermission": "Allow AdjusterAssist to recognize speech"
+          "android": {
+            "useAndroidX": true,
+            "enableJetifier": true,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
+          }
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,
