@@ -6,6 +6,7 @@ export const useVoiceToText = (setRequest: (text: string) => void) => {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_KEY;
 
   const startRecording = async () => {
     try {
@@ -66,7 +67,7 @@ export const useVoiceToText = (setRequest: (text: string) => void) => {
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer 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`,
+            Authorization: `Bearer OPENAI_API_KEY`,
           },
         },
       );
