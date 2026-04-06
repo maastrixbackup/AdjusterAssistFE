@@ -269,8 +269,8 @@ export default function GenerateScreen() {
       setRequest("");
       setClaimDetails("");
       fetchData();
-    } catch (error) {
-      toast.error("Generation failed");
+    } catch (error:any) {
+      toast.error(error.message || "Generation failed");
     } finally {
       setIsGenerating(false);
     }
