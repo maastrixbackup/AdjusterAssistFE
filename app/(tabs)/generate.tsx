@@ -23,7 +23,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
-import { useVoiceToText } from "@/hooks/useVoiceToText";
 import {
   ClaimFile,
   createFile,
@@ -148,8 +147,8 @@ export default function GenerateScreen() {
 
   const [selectedTask, setSelectedTask] = useState(TASK_TYPES[0]);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
-  const { isRecording, isProcessing, startRecording, stopRecording } =
-    useVoiceToText(setRequest);
+  // const { isRecording, startRecording, stopRecording } =
+  //   useVoiceToText(setRequest);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -270,7 +269,10 @@ export default function GenerateScreen() {
       setClaimDetails("");
       fetchData();
     } catch (error) {
-      toast.error("Generation failed");
+      toast.error("You’ve used all your credits", {
+        description:
+          "Please upgrade your plan or wait for your credits to refresh.",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -466,7 +468,7 @@ export default function GenerateScreen() {
                   }}
                 />
 
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   onPress={isRecording ? stopRecording : startRecording}
                   style={[
                     styles.micButton,
@@ -478,15 +480,15 @@ export default function GenerateScreen() {
                     size={20}
                     color="#fff"
                   />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
-              {isRecording && (
+              {/* {isRecording && (
                 <Text style={styles.listeningText}>Listening...</Text>
-              )}
-
+              )} */}
+              {/* 
               {isProcessing && (
                 <Text style={styles.listeningText}>Converting speech...</Text>
-              )}
+              )} */}
             </View>
           </View>
 

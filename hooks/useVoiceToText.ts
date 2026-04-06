@@ -1,91 +1,35 @@
-import axios from "axios";
-import { Audio } from "expo-av";
-import { useState } from "react";
+// import Voice from "@react-native-voice/voice";
+// import { useEffect, useState } from "react";
 
-export const useVoiceToText = (setRequest: (text: string) => void) => {
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_KEY;
+// export const useVoiceToText = (setRequest: (text: string) => void) => {
+//   const [isRecording, setIsRecording] = useState(false);
 
-  const startRecording = async () => {
-    try {
-      console.log("🎤 Start recording");
-      await Audio.requestPermissionsAsync();
+//   useEffect(() => {
+//     Voice.onSpeechResults = (event) => {
+//       const text = event.value?.[0];
+//       if (text) {
+//         setRequest(text); // 🔥 LIVE TEXT UPDATE
+//       }
+//     };
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+//     return () => {
+//       Voice.destroy().then(Voice.removeAllListeners);
+//     };
+//   }, []);
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
+//   const startRecording = async () => {
+//     setIsRecording(true);
+//     await Voice.start("en-US"); // or "en-IN"
+//   };
 
-      setRecording(recording);
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Start recording error:", err);
-    }
-  };
+//   const stopRecording = async () => {
+//     setIsRecording(false);
+//     await Voice.stop();
+//   };
 
-  const stopRecording = async () => {
-    console.log("⏹ Stop recording");
-
-    if (!recording) return;
-
-    setIsRecording(false);
-    setIsProcessing(true);
-
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-
-    if (uri) {
-      await convertSpeechToText(uri);
-    }
-
-    setRecording(null);
-    setIsProcessing(false);
-  };
-
-  const convertSpeechToText = async (uri: string) => {
-    try {
-      console.log("🚀 Sending to API...");
-      const formData = new FormData();
-
-      formData.append("file", {
-        uri,
-        name: "audio.m4a",
-        type: "audio/m4a",
-      } as any);
-
-      formData.append("model", "whisper-1");
-
-      const response = await axios.post(
-        "https://api.openai.com/v1/audio/transcriptions",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-          },
-        },
-      );
-
-      const text = response.data.text;
-
-      if (text) {
-        setRequest(text); // 🔥 AUTO FILL INPUT
-      }
-    } catch (error) {
-      console.error("Speech to text error:", error);
-    }
-  };
-
-  return {
-    isRecording,
-    isProcessing,
-    startRecording,
-    stopRecording,
-  };
-};
+//   return {
+//     isRecording,
+//     startRecording,
+//     stopRecording,
+//   };
+// };
