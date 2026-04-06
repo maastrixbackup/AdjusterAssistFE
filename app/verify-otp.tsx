@@ -1,10 +1,13 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAuth } from "@/providers/auth-provider";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,314 +16,303 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-import { useAuth } from "@/providers/auth-provider";
+const { width } = Dimensions.get("window");
 
 export default function VerifyOtpScreen() {
   const { verifyPasswordResetOtp } = useAuth();
   const params = useLocalSearchParams<{ email?: string }>();
+
   const emailFromParams = useMemo(() => {
     if (Array.isArray(params.email)) return params.email[0] ?? "";
     return params.email ?? "";
   }, [params.email]);
 
-  const [email, setEmail] = useState(emailFromParams.toLowerCase());
-  const [otp, setOtp] = useState("");
+  const [email] = useState(emailFromParams.toLowerCase());
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusType, setStatusType] = useState<"error" | "success" | null>(null);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
-  async function handleVerifyOtp() {
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedOtp = otp.trim();
-    setStatusMessage("");
-    setStatusType(null);
+  // Fix: Prevent initial screen flicker by handling StatusBar and initial focus
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      StatusBar.setTranslucent(true);
+      StatusBar.setBackgroundColor("transparent");
+    }
+    
+    // Smooth transition: Focus first input after screen entry animation finishes
+    const timer = setTimeout(() => {
+      inputRefs.current[0]?.focus();
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
-    if (!normalizedEmail || !normalizedOtp) {
-      setStatusType("error");
-      setStatusMessage("Please enter both your email and OTP.");
-      toast.error("Required Fields", {
-        description: "Please enter both your email and OTP.",
-      });
+  const handleOtpChange = (value: string, index: number) => {
+    const newOtp = [...otp];
+    const char = value.slice(-1);
+    newOtp[index] = char;
+    setOtp(newOtp);
+
+    if (char && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+    if (char && index === 5) {
+      Keyboard.dismiss();
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === "Backspace") {
+      if (!otp[index] && index > 0) {
+        const newOtp = [...otp];
+        newOtp[index - 1] = "";
+        setOtp(newOtp);
+        inputRefs.current[index - 1]?.focus();
+      }
+    }
+  };
+
+  async function handleVerifyOtp() {
+    const combinedOtp = otp.join("");
+    if (combinedOtp.length < 6) {
+      toast.error("Incomplete Code", { description: "Please enter all 6 digits." });
       return;
     }
 
     try {
       setLoading(true);
-      await verifyPasswordResetOtp(normalizedEmail, normalizedOtp);
-      setStatusType("success");
-      setStatusMessage("OTP verified successfully.");
-      toast.success("OTP verified", {
-        description: "Now set your new password.",
-      });
+      await verifyPasswordResetOtp(email, combinedOtp);
+      toast.success("Identity Verified");
       router.push({
         pathname: "/reset-password",
-        params: { email: normalizedEmail, otp: normalizedOtp, verified: "1" },
+        params: { email, otp: combinedOtp, verified: "1" },
       });
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Invalid OTP. Please try again.";
-      setStatusType("error");
-      setStatusMessage(message);
-      toast.error("Verification failed", {
-        description: message,
-      });
+    } catch (error: any) {
+      toast.error("Verification Failed", { description: error.message || "Invalid OTP." });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#052146" />
-      <LinearGradient
-        colors={["#1E63B6", "#052146"]}
-        style={StyleSheet.absoluteFill}
-      />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.root}>
+        {/* Set to translucent to prevent "jump" on Android keyboard open */}
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <SafeAreaView edges={["top"]} style={styles.headerSafe}>
-        <Image source={logoImg} style={styles.logo} />
-      </SafeAreaView>
+        <LinearGradient colors={["#040D1A", "#0A192F", "#020617"]} style={StyleSheet.absoluteFill} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          // Use 'padding' for iOS and nothing/static height for Android to avoid flickering
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
         >
-          <View style={styles.formCard}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons
-                name="shield-key-outline"
-                size={32}
-                color="#1E63B6"
-              />
-            </View>
-
-            <Text style={styles.title}>Verify OTP</Text>
-            <Text style={styles.subtitle}>
-              Enter the OTP received on your registered email address.
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Registered Email</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color="#94A3B8" />
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  placeholder="name@company.com"
-                  placeholderTextColor="#CBD5E1"
-                  style={styles.input}
-                  editable={!loading}
-                />
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <SafeAreaView style={styles.container}>
+              
+              <View style={styles.logoWrapper}>
+                <View style={styles.logoGlassBackground}>
+                  <Image source={logoImg} style={styles.logo} />
+                </View>
+                <View style={styles.logoGlow} />
               </View>
-            </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>OTP</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="key-outline" size={20} color="#94A3B8" />
-                <TextInput
-                  value={otp}
-                  onChangeText={(value) => {
-                    setOtp(value);
-                    if (statusType) {
-                      setStatusType(null);
-                      setStatusMessage("");
-                    }
-                  }}
-                  placeholder="Enter 6-digit OTP"
-                  placeholderTextColor="#CBD5E1"
-                  style={styles.input}
-                  keyboardType="number-pad"
-                  editable={!loading}
-                />
-              </View>
-              {!!statusMessage && (
-                <Text
-                  style={[
-                    styles.statusText,
-                    statusType === "error"
-                      ? styles.statusError
-                      : styles.statusSuccess,
-                  ]}
-                >
-                  {statusMessage}
+              <View style={styles.glassCard}>
+                <View style={styles.iconBadge}>
+                  <MaterialCommunityIcons name="shield-check" size={34} color="#38BDF8" />
+                </View>
+
+                <Text style={styles.title}>Verify Account</Text>
+                <Text style={styles.subtitle}>
+                  Enter the verification code sent to{"\n"}
+                  <Text style={styles.emailHighlight}>{email || "your inbox"}</Text>
                 </Text>
-              )}
-            </View>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleVerifyOtp}
-              disabled={loading}
-            >
-              <LinearGradient
-                colors={["#276bbd", "#0B3C7A"]}
-                style={styles.buttonGradient}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>Verify OTP</Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={18}
-                      color="#FFF"
-                      style={{ marginLeft: 8 }}
+                <View style={styles.otpRow}>
+                  {otp.map((digit, index) => (
+                    <TextInput
+                      key={index}
+                      ref={(ref) => { inputRefs.current[index] = ref; }}
+                      style={[
+                        styles.otpBox,
+                        digit ? styles.otpBoxActive : styles.otpBoxInactive
+                      ]}
+                      maxLength={1}
+                      keyboardType="number-pad"
+                      value={digit}
+                      onChangeText={(val) => handleOtpChange(val, index)}
+                      onKeyPress={(e) => handleKeyPress(e, index)}
+                      selectionColor="#38BDF8"
+                      placeholder="-"
+                      placeholderTextColor="rgba(255,255,255,0.1)"
+                      // Fix: Remove standard underlining on some Android versions
+                      underlineColorAndroid="transparent"
                     />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                  ))}
+                </View>
 
-            <TouchableOpacity
-              onPress={() => router.replace("/forgot-password")}
-              style={styles.backButton}
-            >
-              <Text style={styles.backText}>Back to Forgot Password</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+                <TouchableOpacity
+                  style={styles.submitBtn}
+                  onPress={handleVerifyOtp}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={["#38BDF8", "#1D4ED8"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.btnGradient}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#FFF" size="small" />
+                    ) : (
+                      <Text style={styles.btnText}>VERIFY OTP</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.resendTouch} onPress={() => router.back()}>
+                  <Text style={styles.resendBase}>
+                    Didn&apos;t receive it? <Text style={styles.resendBold}>Resend Code</Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#052146",
+  root: { flex: 1, backgroundColor: "#020617" },
+  scrollContent: { 
+    flexGrow: 1, 
+    // justifyContent: "center", // Remove to prevent vertical centering which causes issues on Android when keyboard opens
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingBottom: 40 
   },
-  headerSafe: {
+  container: { paddingHorizontal: 22, alignItems: "center" },
+
+  logoWrapper: {
+    marginBottom: 50,
     alignItems: "center",
-    paddingTop: 20,
-    paddingBottom: 10,
+    justifyContent: "center",
+  },
+  logoGlassBackground: {
+    backgroundColor: "rgba(255, 255, 255, 0.25)", 
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    zIndex: 2,
+  },
+  logoGlow: {
+    position: "absolute",
+    width: 140,
+    height: 70,
+    backgroundColor: "#38BDF8",
+    borderRadius: 100,
+    opacity: 0.1,
+    zIndex: 1,
   },
   logo: {
-    width: 200,
-    height: 50,
+    width: width * 0.55,
+    height: 48,
     resizeMode: "contain",
   },
-  keyboardView: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+
+  glassCard: {
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 35,
+    paddingHorizontal: 20,
+    paddingVertical: 35,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    alignItems: "center",
   },
-  formCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 24,
-    paddingTop: 40,
-    marginTop: 40,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-      },
-      android: { elevation: 10 },
-    }),
-  },
-  iconCircle: {
-    position: "absolute",
-    top: -35,
-    alignSelf: "center",
+  iconBadge: {
     width: 70,
     height: 70,
-    borderRadius: 35,
-    backgroundColor: "#FFF",
+    borderRadius: 25,
+    backgroundColor: "rgba(56, 189, 248, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#F8FAFC",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(56, 189, 248, 0.2)",
   },
   title: {
-    fontSize: 24,
-    fontWeight: "800",
-    textAlign: "center",
-    color: "#1E293B",
-    marginBottom: 8,
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#FFF",
+    marginBottom: 10,
+    letterSpacing: 0.5,
   },
   subtitle: {
-    textAlign: "center",
-    color: "#64748B",
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  inputContainer: { marginBottom: 20 },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#475569",
-    marginBottom: 8,
-    textTransform: "uppercase",
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  input: {
-    flex: 1,
-    marginLeft: 12,
     fontSize: 15,
-    color: "#1E293B",
+    color: "#94A3B8",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 35,
   },
-  button: { marginTop: 10 },
-  buttonGradient: {
-    height: 58,
-    borderRadius: 16,
+  emailHighlight: { color: "#38BDF8", fontWeight: "800" },
+
+  otpRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 40,
+  },
+  otpBox: {
+    width: (width - 110) / 6,
+    height: 64,
+    borderRadius: 16,
+    borderWidth: 2,
+    textAlign: "center",
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFF",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  otpBoxInactive: { borderColor: "rgba(255, 255, 255, 0.1)" },
+  otpBoxActive: { borderColor: "#38BDF8", backgroundColor: "rgba(56, 189, 248, 0.08)" },
+
+  submitBtn: {
+    width: "100%",
+    height: 60,
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 8,
+  },
+  btnGradient: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonText: {
-    color: "#FFFFFF",
+  btnText: {
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "900",
+    letterSpacing: 2,
   },
-  backButton: {
-    marginTop: 20,
-    alignSelf: "center",
-  },
-  backText: {
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  statusText: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  statusError: {
-    color: "#DC2626",
-  },
-  statusSuccess: {
-    color: "#16A34A",
-  },
+  resendTouch: { marginTop: 30 },
+  resendBase: { color: "#64748B", fontSize: 14 },
+  resendBold: { color: "#38BDF8", fontWeight: "900" },
 });
