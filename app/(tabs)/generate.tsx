@@ -268,11 +268,8 @@ export default function GenerateScreen() {
       setRequest("");
       setClaimDetails("");
       fetchData();
-    } catch (error) {
-      toast.error("You’ve used all your credits", {
-        description:
-          "Please upgrade your plan or wait for your credits to refresh.",
-      });
+    } catch (error: any) {
+      toast.error(error.message || "Generation failed");
     } finally {
       setIsGenerating(false);
     }
