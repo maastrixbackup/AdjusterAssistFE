@@ -1,10 +1,14 @@
+import { useAuth } from "@/providers/auth-provider";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,12 +17,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-import { useAuth } from "@/providers/auth-provider";
+const { width } = Dimensions.get("window");
 
 export default function ResetPasswordScreen() {
   const { resetPassword } = useAuth();
@@ -28,6 +33,7 @@ export default function ResetPasswordScreen() {
     verified?: string;
   }>();
 
+  // Logic remains identical
   const email = useMemo(() => {
     if (Array.isArray(params.email)) return (params.email[0] ?? "").toLowerCase();
     return (params.email ?? "").toLowerCase();
@@ -49,16 +55,30 @@ export default function ResetPasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   const logoImg = require("../assets/images/AdjusterAssist1.png");
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+    ]).start();
+
+    if (Platform.OS === "android") {
+      StatusBar.setTranslucent(true);
+      StatusBar.setBackgroundColor("transparent");
+    }
+  }, []);
 
   async function handleResetPassword() {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOtp = otp.trim();
 
     if (!verified || !normalizedEmail || !normalizedOtp) {
-      toast.error("Session Expired", {
-        description: "Please verify OTP again before resetting your password.",
-      });
+      toast.error("Session Expired", { description: "Please verify OTP again." });
       router.replace({
         pathname: "/verify-otp",
         params: normalizedEmail ? { email: normalizedEmail } : undefined,
@@ -67,16 +87,12 @@ export default function ResetPasswordScreen() {
     }
 
     if (!newPassword.trim() || !confirmPassword.trim()) {
-      toast.error("Required Fields", {
-        description: "Please enter and confirm your new password.",
-      });
+      toast.error("Required Fields", { description: "Please fill in both password fields." });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error("Password Mismatch", {
-        description: "New Password and Re-enter Password must match.",
-      });
+      toast.error("Password Mismatch", { description: "Passwords do not match." });
       return;
     }
 
@@ -85,14 +101,13 @@ export default function ResetPasswordScreen() {
       await toast.promise(
         resetPassword(normalizedEmail, normalizedOtp, newPassword),
         {
-          loading: "Updating your password...",
+          loading: "Updating security credentials...",
           success: () => {
             setTimeout(() => router.replace("/login"), 1500);
-            return "Password updated! Redirecting...";
+            return "Password updated successfully!";
           },
-          error: (err) =>
-            err instanceof Error ? err.message : "Unable to reset password",
-        },
+          error: (err) => err instanceof Error ? err.message : "Unable to reset password",
+        }
       );
     } finally {
       setLoading(false);
@@ -100,244 +115,214 @@ export default function ResetPasswordScreen() {
   }
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#052146" />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        
+        {/* Theme Consistent Gradient */}
+        <LinearGradient colors={["#040D1A", "#0A192F", "#020617"]} style={StyleSheet.absoluteFill} />
 
-      <LinearGradient
-        colors={["#1E63B6", "#052146"]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <SafeAreaView edges={["top"]} style={styles.headerSafe}>
-        <Image source={logoImg} style={styles.logo} />
-      </SafeAreaView>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
         >
-          <View style={styles.formCard}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons
-                name="shield-lock-outline"
-                size={32}
-                color="#1E63B6"
-              />
-            </View>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
+            <SafeAreaView style={styles.container}>
+              
+              {/* Logo Pedestal */}
+              <Animated.View style={[styles.logoWrapper, { opacity: fadeAnim }]}>
+                <View style={styles.logoGlassBackground}>
+                  <Image source={logoImg} style={styles.logo} />
+                </View>
+                <View style={styles.logoGlow} />
+              </Animated.View>
 
-            <Text style={styles.title}>Set New Password</Text>
-            <Text style={styles.subtitle}>
-              OTP is verified internally. Set your new password to complete reset.
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>New Password</Text>
-              <View style={styles.inputWrapper}>
-                <Feather name="lock" size={20} color="#94A3B8" />
-                <TextInput
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={!showPassword}
-                  placeholder="Min. 8 characters"
-                  placeholderTextColor="#CBD5E1"
-                  style={styles.input}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={20}
-                    color="#94A3B8"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Re-enter Password</Text>
-              <View style={styles.inputWrapper}>
-                <Feather name="lock" size={20} color="#94A3B8" />
-                <TextInput
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showConfirmPassword}
-                  placeholder="Re-enter new password"
-                  placeholderTextColor="#CBD5E1"
-                  style={styles.input}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons
-                    name={showConfirmPassword ? "eye-off" : "eye"}
-                    size={20}
-                    color="#94A3B8"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleResetPassword}
-              disabled={loading}
-            >
-              <LinearGradient
-                colors={["#276bbd", "#0B3C7A"]}
-                style={styles.buttonGradient}
+              {/* Glass Card */}
+              <Animated.View 
+                style={[
+                  styles.glassCard, 
+                  { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                ]}
               >
-                {loading ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>Update Password</Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={18}
-                      color="#FFF"
-                      style={{ marginLeft: 8 }}
-                    />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                <View style={styles.iconBadge}>
+                  <MaterialCommunityIcons name="lock-reset" size={34} color="#38BDF8" />
+                </View>
 
-            <TouchableOpacity
-              onPress={() =>
-                router.replace({
-                  pathname: "/verify-otp",
-                  params: email ? { email } : undefined,
-                })
-              }
-              style={styles.backButton}
-            >
-              <Text style={styles.backText}>Back to OTP Verification</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+                <Text style={styles.title}>New Password</Text>
+                <Text style={styles.subtitle}>
+                  Identity verified for <Text style={styles.emailHighlight}>{email || "user"}</Text>.{"\n"}Set your new secure password below.
+                </Text>
+
+                {/* New Password Input */}
+                <View style={styles.inputBox}>
+                  <Text style={styles.label}>New Password</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="lock" size={18} color="#38BDF8" style={{ opacity: 0.7 }} />
+                    <TextInput
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      secureTextEntry={!showPassword}
+                      placeholder="••••••••"
+                      placeholderTextColor="rgba(255,255,255,0.2)"
+                      style={styles.input}
+                      selectionColor="#38BDF8"
+                      editable={!loading}
+                    />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                      <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Confirm Password Input */}
+                <View style={styles.inputBox}>
+                  <Text style={styles.label}>Confirm Password</Text>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="shield" size={18} color="#38BDF8" style={{ opacity: 0.7 }} />
+                    <TextInput
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry={!showConfirmPassword}
+                      placeholder="••••••••"
+                      placeholderTextColor="rgba(255,255,255,0.2)"
+                      style={styles.input}
+                      selectionColor="#38BDF8"
+                      editable={!loading}
+                    />
+                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                      <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Action Button */}
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={handleResetPassword}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={["#38BDF8", "#1D4ED8"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.btnGradient}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <View style={styles.btnContent}>
+                        <Text style={styles.btnText}>UPDATE PASSWORD</Text>
+                        <MaterialCommunityIcons name="check-decagram" size={18} color="#FFF" />
+                      </View>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.backTouch} 
+                  onPress={() => router.replace({
+                    pathname: "/verify-otp",
+                    params: email ? { email } : undefined,
+                  })}
+                >
+                  <Text style={styles.backLink}>Back to Verification</Text>
+                </TouchableOpacity>
+              </Animated.View>
+
+            </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#052146",
+  root: { flex: 1, backgroundColor: "#020617" },
+  scrollContent: { 
+    flexGrow: 1, 
+    // justifyContent: "center",
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingBottom: 40 
   },
-  headerSafe: {
-    alignItems: "center",
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  logo: {
-    width: 200,
-    height: 50,
-    resizeMode: "contain",
-  },
-  keyboardView: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  formCard: {
-    backgroundColor: "#FFFFFF",
+  container: { paddingHorizontal: 22, alignItems: "center" },
+
+  // Logo Style (Shared across flow)
+  logoWrapper: { marginBottom: 35, alignItems: "center" },
+  logoGlassBackground: {
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    paddingHorizontal: 28,
+    paddingVertical: 18,
     borderRadius: 24,
-    padding: 24,
-    paddingTop: 40,
-    marginTop: 40,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-      },
-      android: { elevation: 10 },
-    }),
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    zIndex: 2,
   },
-  iconCircle: {
+  logoGlow: {
     position: "absolute",
-    top: -35,
-    alignSelf: "center",
+    width: 140,
+    height: 70,
+    backgroundColor: "#38BDF8",
+    borderRadius: 100,
+    opacity: 0.1,
+    zIndex: 1,
+  },
+  logo: { width: width * 0.55, height: 48, resizeMode: "contain" },
+
+  // Glass Card
+  glassCard: {
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 35,
+    paddingHorizontal: 24,
+    paddingVertical: 35,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    alignItems: "center",
+  },
+  iconBadge: {
     width: 70,
     height: 70,
-    borderRadius: 35,
-    backgroundColor: "#FFF",
+    borderRadius: 25,
+    backgroundColor: "rgba(56, 189, 248, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#F8FAFC",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(56, 189, 248, 0.2)",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    textAlign: "center",
-    color: "#1E293B",
-    marginBottom: 8,
-  },
-  subtitle: {
-    textAlign: "center",
-    color: "#64748B",
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  inputContainer: { marginBottom: 20 },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#475569",
-    marginBottom: 8,
-    textTransform: "uppercase",
-  },
+  title: { fontSize: 26, fontWeight: "900", color: "#FFF", marginBottom: 10 },
+  subtitle: { fontSize: 14, color: "#94A3B8", textAlign: "center", lineHeight: 22, marginBottom: 35 },
+  emailHighlight: { color: "#38BDF8", fontWeight: "700" },
+
+  // Inputs
+  inputBox: { width: "100%", marginBottom: 20 },
+  label: { fontSize: 11, fontWeight: "900", color: "#64748B", marginBottom: 10, letterSpacing: 1.2, textTransform: "uppercase" },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
+    height: 60,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    borderRadius: 18,
     paddingHorizontal: 16,
-    height: 56,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  input: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 15,
-    color: "#1E293B",
-  },
-  button: { marginTop: 10 },
-  buttonGradient: {
-    height: 58,
-    borderRadius: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  backButton: {
-    marginTop: 20,
-    alignSelf: "center",
-  },
-  backText: {
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  input: { flex: 1, marginLeft: 12, fontSize: 16, color: "#FFF", fontWeight: "600" },
+
+  // Button
+  actionBtn: { width: "100%", height: 62, borderRadius: 20, overflow: "hidden", marginTop: 15, elevation: 8 },
+  btnGradient: { flex: 1, justifyContent: "center", alignItems: "center" },
+  btnContent: { flexDirection: "row", alignItems: "center", gap: 10 },
+  btnText: { color: "#FFF", fontSize: 15, fontWeight: "900", letterSpacing: 1.5 },
+
+  // Footer
+  backTouch: { marginTop: 25 },
+  backLink: { color: "#64748B", fontSize: 14, fontWeight: "700" },
 });
