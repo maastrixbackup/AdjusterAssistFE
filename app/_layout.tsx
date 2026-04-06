@@ -97,7 +97,7 @@ export default function RootLayout() {
           <ThemeProvider value={AppTheme}>
             {/* Expo notifications temporarily disabled. Re-enable by restoring PushNotificationManager wrapper. */}
             {/* <PushNotificationManager> */}
-            <View style={{ flex: 1, backgroundColor: "#0B3C7A" }}>
+            <View style={{ flex: 1, backgroundColor: "#020617" }}>
               <NavigationGuard />
               <Toaster />
             </View>
