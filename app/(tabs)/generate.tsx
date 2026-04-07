@@ -366,7 +366,7 @@ export default function GenerateScreen() {
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Generation failed");
+      toast.error(error?.message || "Generation failed");
     } finally {
       setIsGenerating(false);
     }
@@ -957,10 +957,10 @@ const styles = StyleSheet.create({
     height: 40,
     gap: 8,
   },
-  workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c", },
+  workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c" },
   workspaceTile: {
     width: 140,
-    height: 40
+    height: 40,
     // marginBottom: 12,
   },
   workspaceText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
