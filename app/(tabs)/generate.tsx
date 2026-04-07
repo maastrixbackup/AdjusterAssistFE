@@ -210,47 +210,47 @@ export default function GenerateScreen() {
     }
   };
 
- const handlePickImage = async () => {
-  try {
-    setIsPickingImage(true);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (!permission.granted) {
-      Alert.alert("Permission required", "Media library access is required.");
-      return;
+  const handlePickImage = async () => {
+    try {
+      setIsPickingImage(true);
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert("Permission required", "Media library access is required.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        const imageAsset = result.assets[0];
+
+        // Use a fallback for the URI to avoid 'undefined'
+        const uri = imageAsset.uri;
+        setSelectedImage(uri);
+
+        // 2. Process for Backend (Base64)
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1024 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+
+        setImageBase64(manipulatedImage.base64 ?? null);
+        // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
+
+      }
+    } catch (error) {
+      console.error("Image picker error:", error);
+      // Use your toast or alert here
+    } finally {
+      setIsPickingImage(false);
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets?.[0]) {
-      const imageAsset = result.assets[0];
-
-      // Use a fallback for the URI to avoid 'undefined'
-      const uri = imageAsset.uri;
-      setSelectedImage(uri);
-
-      // 2. Process for Backend (Base64)
-      const manipulatedImage = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 1024 } }], 
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-
-      setImageBase64(manipulatedImage.base64 ?? null);
-      // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
-      
-    }
-  } catch (error) {
-    console.error("Image picker error:", error);
-    // Use your toast or alert here
-  } finally {
-    setIsPickingImage(false);
-  }
-};
+  };
 
   // const handleTakePhoto = async () => {
   //   try {
@@ -438,49 +438,49 @@ export default function GenerateScreen() {
         style={{ flex: 1 }}
       >
 
-        <View style={{ flex: 1, padding: 20 }}>
+        <View style={{  padding: 20 }}>
           <Text style={styles.sectionLabel}>Active Workspace</Text>
           <ScrollView style={styles.workspaceScroll} horizontal showsHorizontalScrollIndicator={false}>
-   <View style={styles.workspaceGrid}>
-            <Pressable
-              style={[styles.workspaceTile, styles.addWorkspaceBtn]}
-              onPress={() => setIsModalVisible(true)}
-            >
-              <Ionicons name="add" size={20} color="#0F4C9C" />
-              <Text style={styles.addWorkspaceText}>New Workspace</Text>
-            </Pressable>
-            {workspaces.map((ws) => (
+            <View style={styles.workspaceGrid}>
               <Pressable
-                key={ws.id}
-                onPress={() => setSelectedWorkspace(ws)}
-                style={[
-                  styles.workspaceTile,
-                  styles.workspaceItem,
-                  selectedWorkspace?.id === ws.id && styles.workspaceItemActive,
-                ]}
+                style={[styles.workspaceTile, styles.addWorkspaceBtn]}
+                onPress={() => setIsModalVisible(true)}
               >
-                <MaterialCommunityIcons
-                  name={
-                    selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
-                  }
-                  size={18}
-                  color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
-                />
-                <Text
+                <Ionicons name="add" size={20} color="#0F4C9C" />
+                <Text style={styles.addWorkspaceText}>New Workspace</Text>
+              </Pressable>
+              {workspaces.map((ws) => (
+                <Pressable
+                  key={ws.id}
+                  onPress={() => setSelectedWorkspace(ws)}
                   style={[
-                    styles.workspaceText,
-                    selectedWorkspace?.id === ws.id &&
-                    styles.workspaceTextActive,
+                    styles.workspaceTile,
+                    styles.workspaceItem,
+                    selectedWorkspace?.id === ws.id && styles.workspaceItemActive,
                   ]}
                 >
-                  {ws.client_name || ws.claim_number}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                  <MaterialCommunityIcons
+                    name={
+                      selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
+                    }
+                    size={18}
+                    color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
+                  />
+                  <Text
+                    style={[
+                      styles.workspaceText,
+                      selectedWorkspace?.id === ws.id &&
+                      styles.workspaceTextActive,
+                    ]}
+                  >
+                    {ws.client_name || ws.claim_number}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
           </ScrollView>
-       
+
           <Text style={styles.sectionLabel}>Assistant Task</Text>
           <Pressable
             style={styles.dropdownTrigger}
@@ -498,7 +498,7 @@ export default function GenerateScreen() {
             </View>
             <Ionicons name="chevron-down" size={20} color="#64748B" />
           </Pressable>
-{/* 
+          {/* 
           <Text style={styles.sectionLabel}>Output Format</Text>
           <ScrollView
             horizontal
@@ -688,6 +688,7 @@ export default function GenerateScreen() {
 
       {/* NEW WORKSPACE MODAL (11 FIELDS) */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: "85%" }]}>
             <View style={styles.modalHeader}>
@@ -1026,9 +1027,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     position: "relative",
 
-    height: 180,      
+    height: 180,
     overflow: "hidden",
-    
+
     paddingRight: 8,
   },
   mainTextInput: {
@@ -1228,5 +1229,5 @@ const styles = StyleSheet.create({
   // },
   micBtnActive: { transform: [{ scale: 1.1 }] },
   micBtnDisabled: { opacity: 0.5 },
-    workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
+  workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
 });
