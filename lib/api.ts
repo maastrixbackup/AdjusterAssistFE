@@ -94,6 +94,7 @@ export interface Draft {
 export type GenerateResponseRequest = {
   fileId: number;
   userInput: string;
+  image?: string | null;
   task_type: string;
 };
 
@@ -260,7 +261,8 @@ export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  console.log(payload);
+  console.log("Generating response with payload:", payload);
+
   const res = await apiRequest<{
     success: boolean;
     message: string;
