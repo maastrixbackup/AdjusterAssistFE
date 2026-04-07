@@ -97,10 +97,13 @@ export default function DraftsListScreen() {
           router.push({
             pathname: "/response",
             params: { 
-              text: item.content, 
+              draftId: item.id?.toString(),
+              output_format: item.draft_type,
               type: item.draft_type,
+              text: item.content,
               fileId: item.file_id?.toString(),
-              alreadySaved: isSynced ? "true" : "false" 
+              alreadySaved: isSynced ? "true" : "false",
+              created_at: item.created_at,
             }
           });
         }}

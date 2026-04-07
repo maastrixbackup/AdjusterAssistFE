@@ -1,17 +1,5 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
 
-export type OutputType =
-  | "file_note"
-  | "email_insured"
-  | "email_contractor"
-  | "escalation_response"
-  | "supplement_response"
-  | "coverage_analysis"
-  | "denial_support"
-  | "claim_summary"
-  | "xactanalysis_response"
-  | "damage_evaluation";
-
 export type AuthSession = {
   token: string;
   email: string;
@@ -86,7 +74,7 @@ export interface RecentDraft {
   id: number;
   file_id: number;
   user_id: number;
-  draft_type: OutputType;
+  draft_type: string;
   content: string;
   created_at: string;
   claim_number: string;
@@ -105,16 +93,18 @@ export interface Draft {
 
 export type GenerateResponseRequest = {
   fileId: number;
-  type: OutputType;
   userInput: string;
   task_type: string;
 };
 
 export type GenerateResponseResult = {
-  responseType: OutputType;
+  output_format: string;
   responseTypeLabel: string;
   responseText: string;
   fileId: number;
+  nextStep?: string;
+  logId?: number;
+  createdAt?: string;
 };
 
 export type SubscriptionStatus = {
@@ -131,7 +121,7 @@ export type SubscriptionStatus = {
 const API_BASE_URL = BASE_URL;
 const DEBUG_MODE = false;
 
-const responseTypeLabels: Record<OutputType, string> = {
+const responseTypeLabels: Record<string, string> = {
   file_note: "File",
   email_insured: "Email Response",
   email_contractor: "Contractor Response",
@@ -274,7 +264,13 @@ export async function generateResponse(
   const res = await apiRequest<{
     success: boolean;
     message: string;
-    data: { content: string; fileId: number };
+    data: {
+      content: string;
+      output_format: string;
+      next_step?: string;
+      log_id?: number;
+      created_at?: string;
+    };
   }>(
     "/drafts/generate",
     {
@@ -284,18 +280,28 @@ export async function generateResponse(
     token,
   );
 
+  if (!res.data?.output_format) {
+    throw new Error("Backend did not provide output_format");
+  }
+
+  const outputType = res.data.output_format;
+
   return {
-    responseType: payload.type,
-    responseTypeLabel: responseTypeLabels[payload.type] || "Response",
-    responseText: res.data?.content ?? "No content generated",
+    output_format: outputType,
+    responseTypeLabel:
+      responseTypeLabels[outputType] || res.data.output_format || "Response",
+    responseText: res.data.content,
     fileId: payload.fileId,
+    nextStep: res.data.next_step,
+    logId: res.data.log_id,
+    createdAt: res.data.created_at,
   };
 }
 
 export async function saveDraft(
   token: string,
   fileId: number,
-  type: OutputType,
+  type: string,
   content: string,
 ): Promise<{ success: boolean; draftId: number }> {
   const res = await apiRequest<{ success: boolean; data: { draftId: number } }>(
@@ -313,35 +319,16 @@ export async function updateDraft(
   token: string,
   draftId: number | string,
   updateData: { content?: string; draft_type?: string },
-): Promise<any> {
-  const sanitizedToken = token.startsWith("Bearer ")
-    ? token
-    : `Bearer ${token}`;
-
-  try {
-    const response = await fetch(
-      `${process.env.EXPO_PUBLIC_API_URL}/drafts/update/${draftId}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: sanitizedToken,
-        },
-        body: JSON.stringify(updateData),
-      },
-    );
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || "Failed to update draft");
-    }
-
-    return result.data; // Returns the updated draft object from Supabase
-  } catch (error) {
-    console.error("updateDraft Error:", error);
-    throw error;
-  }
+): Promise<{ success: boolean; draftId: number }> {
+  const res = await apiRequest<{ success: boolean; data: { draftId: number } }>(
+    `/drafts/update/${draftId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(updateData),
+    },
+    token,
+  );
+  return { success: res.success, draftId: res.data.draftId };
 }
 
 export async function deleteDraft(
