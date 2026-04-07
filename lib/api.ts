@@ -261,7 +261,7 @@ export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  console.log(payload);
+  console.log("GENERATION REQUEST");
   const res = await apiRequest<{
     success: boolean;
     message: string;
