@@ -240,7 +240,6 @@ export default function GenerateScreen() {
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
 
-      // The 'base64' property is guaranteed string here by the library
       setImageBase64(manipulatedImage.base64 ?? null);
       // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
       
@@ -253,41 +252,41 @@ export default function GenerateScreen() {
   }
 };
 
-  const handleTakePhoto = async () => {
-    try {
-      setIsTakingPhoto(true);
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          "Permission required",
-          "Camera access is required to take a photo.",
-        );
-        return;
-      }
+  // const handleTakePhoto = async () => {
+  //   try {
+  //     setIsTakingPhoto(true);
+  //     const permission = await ImagePicker.requestCameraPermissionsAsync();
+  //     if (!permission.granted) {
+  //       Alert.alert(
+  //         "Permission required",
+  //         "Camera access is required to take a photo.",
+  //       );
+  //       return;
+  //     }
 
-      const result: any = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-      });
+  //     const result: any = await ImagePicker.launchCameraAsync({
+  //       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  //       allowsEditing: false,
+  //       quality: 1,
+  //     });
 
-      const imageAsset = result.assets?.[0];
-      if (imageAsset?.uri) {
-        setSelectedImage(imageAsset.uri);
-        const fileName = imageAsset.uri.split("/").pop() ?? "photo";
-        setRequest((prev) =>
-          prev
-            ? `${prev}\n[Attached photo: ${fileName}]`
-            : `[Attached photo: ${fileName}]`,
-        );
-      }
-    } catch (error) {
-      console.error("Camera error:", error);
-      Alert.alert("Attachment failed", "Unable to take a photo.");
-    } finally {
-      setIsTakingPhoto(false);
-    }
-  };
+  //     const imageAsset = result.assets?.[0];
+  //     if (imageAsset?.uri) {
+  //       setSelectedImage(imageAsset.uri);
+  //       const fileName = imageAsset.uri.split("/").pop() ?? "photo";
+  //       setRequest((prev) =>
+  //         prev
+  //           ? `${prev}\n[Attached photo: ${fileName}]`
+  //           : `[Attached photo: ${fileName}]`,
+  //       );
+  //     }
+  //   } catch (error) {
+  //     console.error("Camera error:", error);
+  //     Alert.alert("Attachment failed", "Unable to take a photo.");
+  //   } finally {
+  //     setIsTakingPhoto(false);
+  //   }
+  // };
 
   const handleCreateWorkspace = async () => {
     if (!token) return;
@@ -353,7 +352,7 @@ export default function GenerateScreen() {
     try {
       const payload: GenerateResponseRequest = {
         fileId: selectedWorkspace.id,
-        // type: outputTypeMap[selectedOutput],
+        image: imageBase64,
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
         task_type: selectedTask.id,
       };

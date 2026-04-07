@@ -94,6 +94,7 @@ export interface Draft {
 export type GenerateResponseRequest = {
   fileId: number;
   userInput: string;
+  image?: string | null;
   task_type: string;
 };
 
