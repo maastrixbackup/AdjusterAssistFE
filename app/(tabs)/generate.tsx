@@ -375,7 +375,6 @@ export default function GenerateScreen() {
       });
       setRequest("");
       setClaimDetails("");
-      setImageBase64(null);
       fetchData();
     } catch (error: any) {
       toast.error(error?.message || "Generation failed");
