@@ -163,7 +163,7 @@ export default function DraftsListScreen() {
       
       <View style={styles.headerContainer}>
         <LinearGradient
-            colors={["#0F172A", "#0F4C9C"]}
+            colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}

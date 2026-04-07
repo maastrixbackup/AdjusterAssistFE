@@ -34,6 +34,7 @@ export interface ClaimFile {
   id: number;
   user_id: number;
   claim_number: string;
+  name?: string; // Optional display name
 
   // Insurance Metadata (Updated)
   client_name: string;
@@ -51,7 +52,7 @@ export interface ClaimFile {
   claim_stage: string; // e.g., 'mitigation_review', 'adjustment'
 
   // Status & Metadata
-  status: "active" | "closed";
+  status: "active" | "closed" | "draft";
   created_at: string;
   updated_at?: string;
 
