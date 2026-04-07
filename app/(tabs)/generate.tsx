@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -84,31 +85,31 @@ type OutputMode =
   | "Xact Analysis"
   | "Damage Evaluation";
 
-const outputModes: OutputMode[] = [
-  "File Note",
-  "Insured Email",
-  "Contractor Email",
-  "Escalation",
-  "Supplement",
-  "Coverage Analysis",
-  "Denial Support",
-  "Claim Summary",
-  "Xact Analysis",
-  "Damage Evaluation",
-];
+// const outputModes: OutputMode[] = [
+//   "File Note",
+//   "Insured Email",
+//   "Contractor Email",
+//   "Escalation",
+//   "Supplement",
+//   "Coverage Analysis",
+//   "Denial Support",
+//   "Claim Summary",
+//   "Xact Analysis",
+//   "Damage Evaluation",
+// ];
 
-const outputTypeMap: Record<OutputMode, string> = {
-  "File Note": "file_note",
-  "Insured Email": "email_insured",
-  "Contractor Email": "email_contractor",
-  Escalation: "escalation_response",
-  Supplement: "supplement_response",
-  "Coverage Analysis": "coverage_analysis",
-  "Denial Support": "denial_support",
-  "Claim Summary": "claim_summary",
-  "Xact Analysis": "xactanalysis_response",
-  "Damage Evaluation": "damage_evaluation",
-};
+// const outputTypeMap: Record<OutputMode, string> = {
+//   "File Note": "file_note",
+//   "Insured Email": "email_insured",
+//   "Contractor Email": "email_contractor",
+//   Escalation: "escalation_response",
+//   Supplement: "supplement_response",
+//   "Coverage Analysis": "coverage_analysis",
+//   "Denial Support": "denial_support",
+//   "Claim Summary": "claim_summary",
+//   "Xact Analysis": "xactanalysis_response",
+//   "Damage Evaluation": "damage_evaluation",
+// };
 
 export default function GenerateScreen() {
   const { token } = useAuth();
@@ -156,6 +157,7 @@ export default function GenerateScreen() {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
@@ -208,41 +210,48 @@ export default function GenerateScreen() {
     }
   };
 
-  const handlePickImage = async () => {
-    try {
-      setIsPickingImage(true);
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          "Permission required",
-          "Media library access is required to attach a photo.",
-        );
-        return;
-      }
-
-      const result: any = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      const imageAsset = result.assets?.[0];
-      if (imageAsset?.uri) {
-        setSelectedImage(imageAsset.uri);
-        const fileName = imageAsset.uri.split("/").pop() ?? "image";
-        setRequest((prev) =>
-          prev
-            ? `${prev}\n[Attached image: ${fileName}]`
-            : `[Attached image: ${fileName}]`,
-        );
-      }
-    } catch (error) {
-      console.error("Image picker error:", error);
-      Alert.alert("Attachment failed", "Unable to attach a photo.");
-    } finally {
-      setIsPickingImage(false);
+ const handlePickImage = async () => {
+  try {
+    setIsPickingImage(true);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (!permission.granted) {
+      Alert.alert("Permission required", "Media library access is required.");
+      return;
     }
-  };
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const imageAsset = result.assets[0];
+
+      // Use a fallback for the URI to avoid 'undefined'
+      const uri = imageAsset.uri;
+      setSelectedImage(uri);
+
+      // 2. Process for Backend (Base64)
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1024 } }], 
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+
+      // The 'base64' property is guaranteed string here by the library
+      setImageBase64(manipulatedImage.base64 ?? null);
+      // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
+      
+    }
+  } catch (error) {
+    console.error("Image picker error:", error);
+    // Use your toast or alert here
+  } finally {
+    setIsPickingImage(false);
+  }
+};
 
   const handleTakePhoto = async () => {
     try {
@@ -1069,10 +1078,10 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     position: "absolute",
-    left: 16,
-    bottom: 80,
-    width: 100,
-    height: 100,
+    right: 80,
+    bottom: 0,
+    width: 60,
+    height: 60,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
