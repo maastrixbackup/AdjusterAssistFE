@@ -50,6 +50,22 @@ export default function HomeScreen() {
     [files],
   );
 
+  const lastActiveClaim = useMemo(() => {
+    const activeFiles = files.filter((file) => file.status?.toLowerCase() === "active");
+    if (activeFiles.length === 0) return null;
+
+    // Sort by updated_at or created_at (assuming files have these fields)
+    // For now, we'll take the first active file as the "last" one
+    return activeFiles[0];
+  }, [files]);
+
+  const recentClaims = useMemo(() => {
+    // Get recent claims (active and draft), limit to 5
+    return files
+      .filter((file) => ["active", "draft"].includes(file.status?.toLowerCase() || ""))
+      .slice(0, 5);
+  }, [files]);
+
   const loadData = React.useCallback(
     async (showLoading = true) => {
       if (!token) return;
@@ -65,17 +81,17 @@ export default function HomeScreen() {
 
         setFiles(filesResponse ? filesResponse : []);
         setStatus(statusResponse);
-      } catch (err:any) {
+      } catch (err: any) {
         console.error("Error loading data:", err);
         if (err.message.includes("401") || err.message.includes("Unauthorized")) {
-          logoutUser(); 
+          logoutUser();
         }
         Toast.show({
           type: "error",
           text1: "Sync Failed",
           text2: "Could not load your workspace data.",
         });
-     
+
       } finally {
         setIsLoading(false);
         setRefreshing(false);
@@ -248,7 +264,7 @@ export default function HomeScreen() {
           <View style={styles.headerRow}>
             <View style={styles.brandBlock}>
               <Image source={logo} style={styles.logo} />
-              <Text style={styles.brandSubtitle}>Premium claims workspace</Text>
+
             </View>
 
             <View style={styles.creditPill}>
@@ -259,45 +275,11 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.heroCard}>
-            <View style={styles.heroTextWrap}>
-              <Text style={styles.heroTitle}>Welcome back</Text>
-              <Text style={styles.heroSubtitle}>
-                Track active files, manage client claims, and continue your work
-                with confidence.
-              </Text>
-            </View>
-
-            <View style={styles.heroBadge}>
-              <Ionicons name="flash" size={16} color="#0F4C9C" />
-              <Text style={styles.heroBadgeText}>
-                {status?.subscription?.plan_type || "Free"}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{files.length}</Text>
-              <Text style={styles.statLabel}>Total Files</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{activeFilesCount}</Text>
-              <Text style={styles.statLabel}>Active</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {status?.subscription?.remaining ?? 0}
-              </Text>
-              <Text style={styles.statLabel}>Credits Left</Text>
-            </View>
-          </View>
         </SafeAreaView>
+
       </LinearGradient>
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -307,45 +289,216 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={styles.centerCard}>
-          {/* Icon */}
-          <View style={styles.iconWrap}>
-            <LinearGradient
-              colors={["#EFF6FF", "#DBEAFE"]}
-              style={styles.iconGradient}
-            >
-              <Ionicons
-                name="document-text-outline"
-                size={28}
-                color="#1D4ED8"
-              />
-            </LinearGradient>
-          </View>
+        <View style={styles.contentWrapper}>
+          <Text style={styles.brandSubtitle}>Premium claims workspace</Text>
 
-          {/* Title */}
-          <Text style={styles.centerTitle}>Start a New Claim</Text>
+          <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{files.length}</Text>
+          <Text style={styles.statLabel}>Total Files</Text>
+        </View>
 
-          {/* Subtitle */}
-          <Text style={styles.centerSubtitle}>
-            Create and manage claims with speed and accuracy.
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{activeFilesCount}</Text>
+          <Text style={styles.statLabel}>Active</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>
+            {status?.subscription?.remaining ?? 0}
           </Text>
+          <Text style={styles.statLabel}>Credits Left</Text>
+        </View>
+      </View>
+    
+        {/* Continue Last Claim - Primary Action */}
+        {lastActiveClaim && (
+          <View style={styles.primaryActionCard}>
+            <View style={styles.primaryActionContent}>
+              <View style={styles.primaryActionIcon}>
+                <LinearGradient
+                  colors={["#0549a1", "#1E63B6"]}
+                  style={styles.primaryActionGradient}
+                >
+                  <Ionicons name="create-outline" size={24} color="#FFFFFF" />
+                </LinearGradient>
+              </View>
+              <View style={styles.primaryActionText}>
+                <Text style={styles.primaryActionTitle}>Continue Last Claim</Text>
+                <Text style={styles.primaryActionSubtitle}>
+                  {lastActiveClaim.claim_number || "Unnamed Claim"}
+                </Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryActionButton,
+                  pressed && styles.fabPressed,
+                ]}
+                onPress={() => router.push(`/response?id=${lastActiveClaim.id}`)}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#1E63B6" />
+              </Pressable>
+            </View>
+          </View>
+        )}
 
-          {/* CTA */}
+        {/* Quick Actions Row */}
+        <View style={styles.quickActionsRow}>
+          
           <Pressable
             style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.fabPressed,
+              styles.quickActionCard,
+              pressed && styles.quickActionPressed,
             ]}
             onPress={() => router.push("/generate")}
           >
             <LinearGradient
-              colors={["#276bbd", "#1D4ED8"]}
-              style={styles.primaryGradient}
+              colors={["#EFF6FF", "#DBEAFE"]}
+              style={styles.quickActionGradient}
             >
-              <Ionicons name="add" size={20} color="#FFF" />
-              <Text style={styles.primaryText}>New Claim</Text>
+              <Ionicons name="add" size={20} color="#1D4ED8" />
             </LinearGradient>
+            <Text style={styles.quickActionText}>Start a New Claim</Text>
           </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.quickActionCard,
+              pressed && styles.quickActionPressed,
+            ]}
+            onPress={() => router.push("/file-draft-history")}
+          >
+            <LinearGradient
+              colors={["#FEF3C7", "#FDE68A"]}
+              style={styles.quickActionGradient}
+            >
+              <Ionicons name="document-text" size={20} color="#92400E" />
+            </LinearGradient>
+            <Text style={styles.quickActionText}>Quick Draft</Text>
+          </Pressable>
+        </View>
+
+        {/* Recent Claims Section */}
+        {recentClaims.length > 0 && (
+          <View style={styles.recentClaimsSection}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionEyebrow}>RECENT ACTIVITY</Text>
+                <Text style={styles.sectionTitle}>Recent Claims</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.sectionAction,
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={() => router.push("/history")}
+              >
+                <Text style={styles.sectionActionText}>View All</Text>
+                <Ionicons name="chevron-forward" size={14} color="#276bbd" />
+              </Pressable>
+            </View>
+
+            <View style={styles.recentClaimsList}>
+              {recentClaims.map((file) => (
+                <Pressable
+                  key={file.id}
+                  style={({ pressed }) => [
+                    styles.recentClaimCard,
+                    pressed && styles.fileCardPressed,
+                  ]}
+                  onPress={() => router.push(`/response?id=${file.id}`)}
+                >
+                  <View style={styles.fileIconWrap}>
+                    <LinearGradient
+                      colors={["#EFF6FF", "#DBEAFE"]}
+                      style={styles.fileIconGradient}
+                    >
+                      <Ionicons
+                        name={getStatusStyle(file.status).icon as any}
+                        size={20}
+                        color="#1D4ED8"
+                      />
+                    </LinearGradient>
+                  </View>
+
+                  <View style={styles.fileInfo}>
+                    <View style={styles.fileTopRow}>
+                      <Text style={styles.fileName} numberOfLines={1}>
+                        {file.claim_number || "Unnamed Claim"}
+                      </Text>
+                      <View style={[styles.statusBadgeBase, getStatusStyle(file.status).badge]}>
+                        <Ionicons
+                          name={getStatusStyle(file.status).icon as any}
+                          size={10}
+                          color={getStatusStyle(file.status).text.color}
+                        />
+                        <Text style={[styles.statusTextBase, getStatusStyle(file.status).text]}>
+                          {file.status || "Unknown"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {file.client_name && (
+                      <Text style={styles.clientName} numberOfLines={1}>
+                        {file.client_name}
+                      </Text>
+                    )}
+
+                    <View style={styles.fileMetaRow}>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                        <Text style={styles.fileSubText}>
+                          {file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Recent"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.chevronWrap}>
+                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Empty State when no recent claims */}
+        {/* {recentClaims.length === 0 && !isLoading && (
+          <View style={styles.centerCard}>
+            <View style={styles.iconWrap}>
+              <LinearGradient
+                colors={["#EFF6FF", "#DBEAFE"]}
+                style={styles.iconGradient}
+              >
+                <Ionicons
+                  name="document-text-outline"
+                  size={28}
+                  color="#1D4ED8"
+                />
+              </LinearGradient>
+            </View>
+            <Text style={styles.centerTitle}>Start a New Claim</Text>
+            <Text style={styles.centerSubtitle}>
+              Create and manage claims with speed and accuracy.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.fabPressed,
+              ]}
+              onPress={() => router.push("/generate")}
+            >
+              <LinearGradient
+                colors={["#276bbd", "#1D4ED8"]}
+                style={styles.primaryGradient}
+              >
+                <Ionicons name="add" size={20} color="#FFF" />
+                <Text style={styles.primaryText}>New Claim</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        )} */}
         </View>
       </ScrollView>
       <CustomConfirmModal
@@ -441,6 +594,117 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
+  // "#0549a1", "#1E63B6"
+  primaryActionCard: {
+    marginTop: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#1E63B6",
+    borderLeftWidth: 4,
+
+    shadowColor: "#0549a1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  primaryActionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  primaryActionIcon: {
+    marginRight: 16,
+  },
+  primaryActionGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryActionText: {
+    flex: 1,
+  },
+  primaryActionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  primaryActionSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  primaryActionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f1f0fd",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionsRow: {
+    flexDirection: "row",
+    marginTop: 20,
+    gap: 12,
+  },
+  quickActionCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quickActionPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
+  },
+  quickActionGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+    textAlign: "center",
+  },
+  recentClaimsSection: {
+    marginTop: 24,
+  },
+  recentClaimsList: {
+  },
+  recentClaimCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   bottomFill: {
     flex: 1,
     backgroundColor: "#F8FAFC",
@@ -449,7 +713,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
   },
   headerGradient: {
-    paddingBottom: 28,
+    paddingBottom: 18,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
   },
@@ -478,9 +742,11 @@ const styles = StyleSheet.create({
 
   brandSubtitle: {
     marginTop: 8,
-    fontSize: 13,
-    color: "rgba(255,255,255,0.72)",
+    fontSize: 18,
+    color: "#0B2F5B",
     letterSpacing: 0.3,
+    fontFamily: "Inter-Regular",
+    fontWeight: "bold",
   },
 
   creditPill: {
@@ -552,10 +818,10 @@ const styles = StyleSheet.create({
     marginTop: 18,
     gap: 12,
   },
-
+  // colors={["#0549a1", "#1E63B6"]}
   statCard: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "#0549a1",
     borderRadius: 20,
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -583,7 +849,6 @@ const styles = StyleSheet.create({
   },
 
   sectionHeader: {
-    paddingHorizontal: 20,
     marginBottom: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -621,8 +886,14 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 100,
+  },
+
+  contentWrapper: {
     paddingHorizontal: 20,
-    paddingBottom: 110,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
 
   fileCard: {

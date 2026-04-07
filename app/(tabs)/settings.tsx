@@ -81,8 +81,8 @@ export default function SettingsScreen() {
     await logout(); // Perform the Supabase/Auth logout
   };
 
-  const usagePercentage = status?.subscription 
-    ? (status.subscription.current_usage / status.subscription.usage_limit) * 100 
+  const usagePercentage = status?.subscription
+    ? (status.subscription.current_usage / status.subscription.usage_limit) * 100
     : 0;
 
   return (
@@ -92,9 +92,11 @@ export default function SettingsScreen() {
       {/* Modern Glossy Header */}
       <View style={styles.headerContainer}>
         <LinearGradient
-          colors={["#0f4c9c", "#0a234b"]}
-          style={styles.headerGradient}
-        >
+                  colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.headerGradient}
+              >
           <SafeAreaView edges={["top"]}>
             <View style={styles.headerTopRow}>
               <View style={styles.userInfo}>
@@ -118,7 +120,7 @@ export default function SettingsScreen() {
         </LinearGradient>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadSubscription} tintColor="#0F4C9C" />}
@@ -144,7 +146,7 @@ export default function SettingsScreen() {
                 <Text style={styles.usageTotal}> / {status?.subscription?.usage_limit || 0}</Text>
               </Text>
             </View>
-            
+
             <View style={styles.progressTrack}>
               <LinearGradient
                 colors={["#3B82F6", "#8B5CF6"]}
@@ -167,8 +169,8 @@ export default function SettingsScreen() {
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>RENEWAL DATE</Text>
               <Text style={styles.statValue}>
-                {status?.subscription?.expires_at 
-                  ? new Date(status.subscription.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) 
+                {status?.subscription?.expires_at
+                  ? new Date(status.subscription.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
                   : "Permanent"}
               </Text>
             </View>
@@ -197,11 +199,11 @@ export default function SettingsScreen() {
           <MenuLink icon="notifications-outline" label="Push Notifications" color="#64748B" />
           <MenuLink icon="lock-closed-outline" label="Security & Privacy" color="#64748B" />
           {/* UPDATED: Trigger modal instead of direct logout */}
-          <MenuLink 
-            icon="log-out-outline" 
-            label="Logout Account" 
-            color="#EF4444" 
-            isLast 
+          <MenuLink
+            icon="log-out-outline"
+            label="Logout Account"
+            color="#EF4444"
+            isLast
             onPress={() => setLogoutModalVisible(true)}
           />
         </View>
@@ -214,10 +216,10 @@ export default function SettingsScreen() {
       <Toast />
 
       {/* Logout Confirmation Modal */}
-      <CustomConfirmModal 
+      <CustomConfirmModal
         isVisible={isLogoutModalVisible}
         title="Sign Out"
-        confirmText = 'Logout'
+        confirmText='Logout'
         message="Are you sure you want to log out of AdjusterAssist? You will need to sign in again to access your workspaces."
         onConfirm={handleLogoutConfirm}
         onCancel={() => setLogoutModalVisible(false)}
@@ -243,10 +245,10 @@ function MenuLink({ icon, label, color, isLast, onPress }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F1F5F9"},
+  screen: { flex: 1, backgroundColor: "#F1F5F9" },
   headerContainer: { borderBottomLeftRadius: 30, borderBottomRightRadius: 30, overflow: 'hidden', elevation: 20, shadowColor: '#0f4c9c', shadowOpacity: 0.3, shadowRadius: 15 },
-  headerGradient: { paddingBottom: 70,  paddingTop:40 },
-  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, paddingTop: 10 },
+  headerGradient: { paddingBottom: 16, paddingTop: 20 },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
   avatarContainer: { width: 50, height: 50, position: 'relative' },
   avatarGradient: { flex: 1, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
