@@ -21,7 +21,9 @@ import {
   ClaimFile,
   deleteFile,
   getMyFiles,
+  getRecentDrafts,
   getSubscriptionStatus,
+  RecentDraft,
   SubscriptionStatus,
   updateFile,
 } from "@/lib/api";
@@ -43,6 +45,7 @@ export default function HomeScreen() {
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
+  const [lastDraft, setLastDraft] = useState<RecentDraft | null>(null);
 
   const activeFilesCount = useMemo(
     () =>
@@ -50,22 +53,13 @@ export default function HomeScreen() {
     [files],
   );
 
-  const lastActiveClaim = useMemo(() => {
-    const activeFiles = files.filter((file) => file.status?.toLowerCase() === "active");
-    if (activeFiles.length === 0) return null;
-
-    // Sort by updated_at or created_at (assuming files have these fields)
-    // For now, we'll take the first active file as the "last" one
-    return activeFiles[0];
-  }, [files]);
-
   const recentClaims = useMemo(() => {
     // Get recent claims (active and draft), limit to 5
     return files
       .filter((file) => ["active", "draft"].includes(file.status?.toLowerCase() || ""))
       .slice(0, 5);
   }, [files]);
-
+console.log("Recent Claims:", recentClaims);
   const loadData = React.useCallback(
     async (showLoading = true) => {
       if (!token) return;
@@ -74,13 +68,22 @@ export default function HomeScreen() {
       if (!showLoading) setRefreshing(true);
 
       try {
-        const [filesResponse, statusResponse] = await Promise.all([
+        const [filesResponse, statusResponse, recentDrafts] = await Promise.all([
           getMyFiles(token),
           getSubscriptionStatus(token),
+          getRecentDrafts(token),
         ]);
 
         setFiles(filesResponse ? filesResponse : []);
         setStatus(statusResponse);
+
+        const sortedDrafts = (recentDrafts || [])
+          .slice()
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          );
+        setLastDraft(sortedDrafts[0] || null);
       } catch (err: any) {
         console.error("Error loading data:", err);
         if (err.message.includes("401") || err.message.includes("Unauthorized")) {
@@ -312,7 +315,7 @@ export default function HomeScreen() {
       </View>
     
         {/* Continue Last Claim - Primary Action */}
-        {lastActiveClaim && (
+        {lastDraft && (
           <View style={styles.primaryActionCard}>
             <View style={styles.primaryActionContent}>
               <View style={styles.primaryActionIcon}>
@@ -325,16 +328,29 @@ export default function HomeScreen() {
               </View>
               <View style={styles.primaryActionText}>
                 <Text style={styles.primaryActionTitle}>Continue Last Claim</Text>
-                <Text style={styles.primaryActionSubtitle}>
-                  {lastActiveClaim.claim_number || "Unnamed Claim"}
-                </Text>
+                {/* <Text style={styles.primaryActionSubtitle}>
+                  {lastDraft.claim_number || "Unnamed Draft"}
+                </Text> */}
               </View>
               <Pressable
                 style={({ pressed }) => [
                   styles.primaryActionButton,
                   pressed && styles.fabPressed,
                 ]}
-                onPress={() => router.push(`/response?id=${lastActiveClaim.id}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/response",
+                    params: {
+                      output_format: lastDraft.draft_type,
+                      type: lastDraft.draft_type,
+                      text: lastDraft.content,
+                      fileId: String(lastDraft.file_id),
+                      alreadySaved: "true",
+                      draftId: String(lastDraft.id),
+                      created_at: lastDraft.created_at,
+                    },
+                  })
+                }
               >
                 <Ionicons name="chevron-forward" size={20} color="#1E63B6" />
               </Pressable>
@@ -384,9 +400,9 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionEyebrow}>RECENT ACTIVITY</Text>
-                <Text style={styles.sectionTitle}>Recent Claims</Text>
+                {/* <Text style={styles.sectionTitle}>Recent Claims</Text> */}
               </View>
-              <Pressable
+              {/* <Pressable
                 style={({ pressed }) => [
                   styles.sectionAction,
                   pressed && { opacity: 0.7 },
@@ -395,7 +411,7 @@ export default function HomeScreen() {
               >
                 <Text style={styles.sectionActionText}>View All</Text>
                 <Ionicons name="chevron-forward" size={14} color="#276bbd" />
-              </Pressable>
+              </Pressable> */}
             </View>
 
             <View style={styles.recentClaimsList}>
@@ -406,7 +422,7 @@ export default function HomeScreen() {
                     styles.recentClaimCard,
                     pressed && styles.fileCardPressed,
                   ]}
-                  onPress={() => router.push(`/response?id=${file.id}`)}
+                  onPress={() => router.push("/workspaces")}
                 >
                   <View style={styles.fileIconWrap}>
                     <LinearGradient

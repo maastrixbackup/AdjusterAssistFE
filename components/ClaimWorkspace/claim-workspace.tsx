@@ -1,13 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    Share,
-    StyleSheet,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -17,19 +17,18 @@ import { OutputPanel } from '@/components/ClaimWorkspace/OutputPanel';
 import { TimelineLog } from '@/components/ClaimWorkspace/TimelineLog';
 import { UnifiedInput } from '@/components/ClaimWorkspace/UnifiedInput';
 
-import { OutputType } from '@/lib/api';
 import {
-    consolidateOCRInput,
-    consolidateTextInput,
-    consolidateVoiceInput,
-    formatForBackendSubmission,
-    type ConsolidatedInput,
+  consolidateOCRInput,
+  consolidateTextInput,
+  consolidateVoiceInput,
+  formatForBackendSubmission,
+  type ConsolidatedInput,
 } from '@/lib/services/inputConsolidation';
 import {
-    addTimelineEntry,
-    deleteTimelineEntry,
-    getTimeline,
-    type TimelineEntry,
+  addTimelineEntry,
+  deleteTimelineEntry,
+  getTimeline,
+  type TimelineEntry,
 } from '@/lib/utils/timelineStorage';
 
 interface NextStepType {
@@ -44,7 +43,7 @@ interface NextStepType {
 export default function ClaimWorkspaceScreen() {
   const [currentInput, setCurrentInput] = useState<ConsolidatedInput | null>(null);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
-  const [responseType, setResponseType] = useState<OutputType>('file_note');
+  const [responseType, setResponseType] = useState<string>('file_note');
   const [nextSteps, setNextSteps] = useState<NextStepType[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
