@@ -1,13 +1,15 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -31,7 +33,6 @@ import {
   getMyFiles,
   getRecentDrafts,
   getSubscriptionStatus,
-  OutputType,
   RecentDraft,
   SubscriptionStatus,
 } from "@/lib/api";
@@ -96,7 +97,7 @@ const outputModes: OutputMode[] = [
   "Damage Evaluation",
 ];
 
-const outputTypeMap: Record<OutputMode, OutputType> = {
+const outputTypeMap: Record<OutputMode, string> = {
   "File Note": "file_note",
   "Insured Email": "email_insured",
   "Contractor Email": "email_contractor",
@@ -147,8 +148,17 @@ export default function GenerateScreen() {
 
   const [selectedTask, setSelectedTask] = useState(TASK_TYPES[0]);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
-  // const { isRecording, startRecording, stopRecording } =
-  //   useVoiceToText(setRequest);
+  const [showScenarioScrollButton, setShowScenarioScrollButton] =
+    useState(false);
+  const scenarioTextInputRef = useRef<TextInput>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isPickingImage, setIsPickingImage] = useState(false);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -185,6 +195,92 @@ export default function GenerateScreen() {
       }, 50);
     }, []),
   );
+
+  // Handle Scenario Description Text Change
+  const handleScenarioTextChange = (text: string) => {
+    setRequest(text);
+    setShowScenarioScrollButton(text.length > 100);
+  };
+
+  // Handler for Scenario Scroll to Bottom
+  const handleScenarioScrollToBottom = () => {
+    if (scenarioTextInputRef.current) {
+      scenarioTextInputRef.current.focus();
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      setIsPickingImage(true);
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission required",
+          "Media library access is required to attach a photo.",
+        );
+        return;
+      }
+
+      const result: any = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      const imageAsset = result.assets?.[0];
+      if (imageAsset?.uri) {
+        setSelectedImage(imageAsset.uri);
+        const fileName = imageAsset.uri.split("/").pop() ?? "image";
+        setRequest((prev) =>
+          prev
+            ? `${prev}\n[Attached image: ${fileName}]`
+            : `[Attached image: ${fileName}]`,
+        );
+      }
+    } catch (error) {
+      console.error("Image picker error:", error);
+      Alert.alert("Attachment failed", "Unable to attach a photo.");
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      setIsTakingPhoto(true);
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission required",
+          "Camera access is required to take a photo.",
+        );
+        return;
+      }
+
+      const result: any = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      const imageAsset = result.assets?.[0];
+      if (imageAsset?.uri) {
+        setSelectedImage(imageAsset.uri);
+        const fileName = imageAsset.uri.split("/").pop() ?? "photo";
+        setRequest((prev) =>
+          prev
+            ? `${prev}\n[Attached photo: ${fileName}]`
+            : `[Attached photo: ${fileName}]`,
+        );
+      }
+    } catch (error) {
+      console.error("Camera error:", error);
+      Alert.alert("Attachment failed", "Unable to take a photo.");
+    } finally {
+      setIsTakingPhoto(false);
+    }
+  };
 
   const handleCreateWorkspace = async () => {
     if (!token) return;
@@ -250,7 +346,7 @@ export default function GenerateScreen() {
     try {
       const payload: GenerateResponseRequest = {
         fileId: selectedWorkspace.id,
-        type: outputTypeMap[selectedOutput],
+        // type: outputTypeMap[selectedOutput],
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
         task_type: selectedTask.id,
       };
@@ -258,18 +354,19 @@ export default function GenerateScreen() {
       router.push({
         pathname: "/response",
         params: {
-          outputType: result.responseType,
+          output_format: result.output_format,
           type: result.responseTypeLabel,
           text: result.responseText,
           fileId: result.fileId.toString(),
           alreadySaved: "false",
+          created_at: result.createdAt,
         },
       });
       setRequest("");
       setClaimDetails("");
       fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Generation failed");
+      toast.error(error?.message || "Generation failed");
     } finally {
       setIsGenerating(false);
     }
@@ -333,52 +430,51 @@ export default function GenerateScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={{ flex: 1, padding: 20 }}>
           <Text style={styles.sectionLabel}>Active Workspace</Text>
           <ScrollView
+            style={styles.workspaceScroll}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.workspaceScroll}
           >
-            <Pressable
-              style={styles.addWorkspaceBtn}
-              onPress={() => setIsModalVisible(true)}
-            >
-              <Ionicons name="add" size={20} color="#0F4C9C" />
-              <Text style={styles.addWorkspaceText}>New Workspace</Text>
-            </Pressable>
-            {workspaces.map((ws) => (
+            <View style={styles.workspaceGrid}>
               <Pressable
-                key={ws.id}
-                onPress={() => setSelectedWorkspace(ws)}
-                style={[
-                  styles.workspaceItem,
-                  selectedWorkspace?.id === ws.id && styles.workspaceItemActive,
-                ]}
+                style={[styles.workspaceTile, styles.addWorkspaceBtn]}
+                onPress={() => setIsModalVisible(true)}
               >
-                <MaterialCommunityIcons
-                  name={
-                    selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
-                  }
-                  size={18}
-                  color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
-                />
-                <Text
+                <Ionicons name="add" size={20} color="#0F4C9C" />
+                <Text style={styles.addWorkspaceText}>New Workspace</Text>
+              </Pressable>
+              {workspaces.map((ws) => (
+                <Pressable
+                  key={ws.id}
+                  onPress={() => setSelectedWorkspace(ws)}
                   style={[
-                    styles.workspaceText,
+                    styles.workspaceTile,
+                    styles.workspaceItem,
                     selectedWorkspace?.id === ws.id &&
-                      styles.workspaceTextActive,
+                      styles.workspaceItemActive,
                   ]}
                 >
-                  {ws.client_name || ws.claim_number}
-                </Text>
-              </Pressable>
-            ))}
+                  <MaterialCommunityIcons
+                    name={
+                      selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
+                    }
+                    size={18}
+                    color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
+                  />
+                  <Text
+                    style={[
+                      styles.workspaceText,
+                      selectedWorkspace?.id === ws.id &&
+                        styles.workspaceTextActive,
+                    ]}
+                  >
+                    {ws.client_name || ws.claim_number}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </ScrollView>
 
           <Text style={styles.sectionLabel}>Assistant Task</Text>
@@ -398,7 +494,7 @@ export default function GenerateScreen() {
             </View>
             <Ionicons name="chevron-down" size={20} color="#64748B" />
           </Pressable>
-
+          {/* 
           <Text style={styles.sectionLabel}>Output Format</Text>
           <ScrollView
             horizontal
@@ -424,10 +520,10 @@ export default function GenerateScreen() {
                 </Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </ScrollView> */}
 
           <View style={styles.glassCard}>
-            <View style={styles.fieldGroup}>
+            <View>
               <View style={styles.fieldHeader}>
                 <View style={styles.iconCircle}>
                   <MaterialCommunityIcons
@@ -449,35 +545,55 @@ export default function GenerateScreen() {
               </View>
               <View style={styles.inputWrapper}>
                 <TextInput
+                  ref={scenarioTextInputRef}
                   value={request}
-                  onChangeText={setRequest}
+                  onChangeText={handleScenarioTextChange}
                   multiline
-                  placeholder="What do you want to achieve?"
+                  scrollEnabled
+                  placeholder="What happened?"
                   placeholderTextColor="#94A3B8"
                   style={styles.mainTextInput}
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollRef.current?.scrollTo({
-                        y: 300, // ✅ force scroll down
-                        animated: true,
-                      });
-                    }, 250);
-                  }}
                 />
+                <View style={styles.inputActions}>
+                  {/* Attach */}
+                  <TouchableOpacity
+                    // style={styles.inputActionButton}
+                    onPress={handlePickImage}
+                  >
+                    <Ionicons name="attach" size={20} color="#475569" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      // TODO: hook your voice logic here
+                      setIsRecording((prev) => !prev);
+                    }}
+                  >
+                    <Ionicons
+                      name={isRecording ? "stop" : "mic"}
+                      size={20}
+                      color="#0F4C9C"
+                    />
+                  </TouchableOpacity>
+                </View>
 
-                {/* <TouchableOpacity
-                  onPress={isRecording ? stopRecording : startRecording}
-                  style={[
-                    styles.micButton,
-                    { backgroundColor: isRecording ? "#EF4444" : "#0F4C9C" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={isRecording ? "microphone-off" : "microphone"}
-                    size={20}
-                    color="#fff"
-                  />
-                </TouchableOpacity> */}
+                {selectedImage ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image
+                      source={{ uri: selectedImage }}
+                      style={styles.imagePreview}
+                    />
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => setSelectedImage(null)}
+                    >
+                      <MaterialCommunityIcons
+                        name="close"
+                        size={16}
+                        color="#0F172A"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
               </View>
               {/* {isRecording && (
                 <Text style={styles.listeningText}>Listening...</Text>
@@ -512,7 +628,7 @@ export default function GenerateScreen() {
               )}
             </LinearGradient>
           </Pressable>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
 
       {/* TASK MODAL */}
@@ -583,7 +699,7 @@ export default function GenerateScreen() {
             </View>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ gap: 12, paddingBottom: 40 }}
+              contentContainerStyle={styles.modalScrollContent}
             >
               <View>
                 <Text style={styles.modalLabel}>Claim Number *</Text>
@@ -616,8 +732,8 @@ export default function GenerateScreen() {
                   placeholder="Full Street Address"
                 />
               </View>
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <View style={{ flex: 1 }}>
+              <View style={styles.rowTwoColumn}>
+                <View style={styles.rowColumn}>
                   <Text style={styles.modalLabel}>Policy Form</Text>
                   <TextInput
                     style={styles.modalInput}
@@ -628,7 +744,7 @@ export default function GenerateScreen() {
                     placeholder="HO-3"
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.rowColumn}>
                   <Text style={styles.modalLabel}>Jurisdiction *</Text>
                   <TextInput
                     style={styles.modalInput}
@@ -640,8 +756,8 @@ export default function GenerateScreen() {
                   />
                 </View>
               </View>
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <View style={{ flex: 1 }}>
+              <View style={styles.rowTwoColumn}>
+                <View style={styles.rowColumn}>
                   <Text style={styles.modalLabel}>Date of Loss *</Text>
                   <TextInput
                     style={styles.modalInput}
@@ -652,7 +768,7 @@ export default function GenerateScreen() {
                     placeholder="YYYY-MM-DD"
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.rowColumn}>
                   <Text style={styles.modalLabel}>Reported Date</Text>
                   <TextInput
                     style={styles.modalInput}
@@ -726,9 +842,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 28,
     overflow: "hidden",
   },
-  safeHeader: { paddingHorizontal: 18, paddingBottom: 18 },
+  safeHeader: { paddingHorizontal: 18, paddingBottom: 10 },
   navBar: {
-    minHeight: 64,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -801,23 +917,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#0F4C9C",
   },
-  micButton: {
-    position: "absolute",
-    right: -10,
-    bottom: -20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-
-    // Shadow (Android + iOS)
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
   navTitle: { fontSize: 19, fontWeight: "800", color: "#FFFFFF" },
   creditBadge: {
     flexDirection: "row",
@@ -835,42 +934,46 @@ const styles = StyleSheet.create({
     backgroundColor: "#22C55E",
   },
   creditValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
-  scrollView: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 300,
-    padding: 20,
-  },
+
   sectionLabel: {
     fontSize: 11,
     fontWeight: "800",
     color: "#94A3B8",
     textTransform: "uppercase",
     letterSpacing: 1.5,
-    marginBottom: 14,
-    marginTop: 10,
+    marginBottom: 6,
+    marginTop: 6,
   },
-  workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
   workspaceItem: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#FFF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    // paddingVertical: 14,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    height: 40,
     gap: 8,
   },
   workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c" },
+  workspaceTile: {
+    width: 140,
+    height: 40,
+    // marginBottom: 12,
+  },
   workspaceText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
+  workspaceGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
   workspaceTextActive: { color: "#FFF" },
   addWorkspaceBtn: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#EEF2FF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 16,
     borderStyle: "dashed",
     borderWidth: 1,
@@ -878,7 +981,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addWorkspaceText: { fontSize: 14, fontWeight: "800", color: "#0F4C9C" },
-  tabContainer: { paddingVertical: 6, paddingHorizontal: 4, gap: 10 },
+  tabContainer: { paddingVertical: 10, paddingHorizontal: 4, gap: 10 },
   tabItem: {
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -892,25 +995,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     marginTop: 20,
     borderRadius: 20,
-    padding: 16,
-    minHeight: 180,
-    // Depth (very important)
+    padding: 12, // reduced from 16
+
     elevation: 8,
     shadowColor: "#0F4C9C",
     shadowOpacity: 0.12,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
 
-    // Subtle border highlight
     borderWidth: 1,
     borderColor: "rgba(15, 76, 156, 0.15)",
   },
-  fieldGroup: { marginVertical: 4 },
+  // fieldGroup: { marginVertical: 1 },
   fieldHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 12,
+    // marginBottom: 12,
   },
   iconCircle: {
     width: 28,
@@ -922,26 +1023,107 @@ const styles = StyleSheet.create({
   },
   inputLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
   inputWrapper: {
-    minHeight: 90,
     borderRadius: 16,
     backgroundColor: "#FFFFFF",
     position: "relative",
-    paddingRight: 50,
+
+    height: 180,
+    overflow: "hidden",
+
+    paddingRight: 8,
   },
   mainTextInput: {
     fontSize: 16,
     color: "#334155",
-    minHeight: 80,
+    height: 170,
     textAlignVertical: "top",
-    paddingVertical: 8,
+
+    paddingHorizontal: 12, // reduced
+    paddingTop: 8, // ADD (tight top)
+    paddingBottom: 8, // ADD (tight bottom)
+    paddingRight: 12,
+  },
+  inputActions: {
+    position: "absolute",
+    right: 10,
+    bottom: 0,
+
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  //   width: 36,
+  //   height: 36,
+  //   borderRadius: 10,
+  //   backgroundColor: "#F1F5F9",
+
+  //   alignItems: "center",
+  //   justifyContent: "center",
+
+  //   borderWidth: 1,
+  //   borderColor: "#E2E8F0",
+  // },
+  recordButton: {
+    backgroundColor: "#0F4C9C",
+    borderColor: "#0F4C9C",
+  },
+  recordingActive: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626",
+  },
+  recordingText: {
+    marginTop: 12,
+    color: "#0F4C9C",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  imagePreviewContainer: {
+    position: "absolute",
+    left: 16,
+    bottom: 80,
+    width: 100,
+    height: 100,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.9)",
+  },
+  scenarioScrollButton: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
   },
   listeningText: {
-    marginTop: 10,
+    // marginTop: 10,
     fontSize: 13,
     fontWeight: "700",
     color: "#0F4C9C",
   },
-  generateBtn: { marginTop: 30, borderRadius: 20, overflow: "hidden" },
+  generateBtn: { marginTop: 10, borderRadius: 20, overflow: "hidden" },
   gradientBtn: {
     height: 64,
     flexDirection: "row",
@@ -984,6 +1166,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0F172A",
   },
+  modalScrollContent: {
+    gap: 12,
+    paddingBottom: 40,
+  },
+  rowTwoColumn: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  rowColumn: {
+    flex: 1,
+  },
   modalActionBtn: {
     backgroundColor: "#0F4C9C",
     borderRadius: 18,
@@ -1002,7 +1195,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    marginBottom: 20,
+    // marginBottom: 20,
   },
   dropdownLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   taskIconCircle: {
@@ -1030,7 +1223,11 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
   taskOptionTextActive: { color: "#0F4C9C", fontWeight: "800" },
-  micBtn: { position: "absolute", right: 0, bottom: 0, padding: 10 },
+  // micBtn: {
+  //   // backgroundColor: "#0F4C9C",
+  //   // borderColor: "#0F4C9C",
+  // },
   micBtnActive: { transform: [{ scale: 1.1 }] },
   micBtnDisabled: { opacity: 0.5 },
+  workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
 });

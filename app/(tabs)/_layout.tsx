@@ -101,12 +101,27 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               size={26}
-              name={focused ? "file-document" : "file-document-outline"}
+             name={focused ? "briefcase" : "briefcase-outline"}
               color={color}
             />
           ),
         }}
       />
+      {/* <Tabs.Screen
+        name="claim-workspace"
+        options={{
+          headerShown: false,
+          title: "Claim Workspace",
+          tabBarLabel: "Workspace",
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              size={26}
+              name={focused ? "briefcase" : "briefcase-outline"}
+              color={color}
+            />
+          ),
+        }}
+      /> */}
       <Tabs.Screen
         name="settings"
         options={{

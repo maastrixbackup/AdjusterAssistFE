@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Image,
 } from "react-native";
 import { RefreshControl } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,6 +36,7 @@ export default function WorkspacesScreen() {
   // Modal state for deletion
   const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+  const logo = require("../../assets/images/AdjusterAssist1.png");
 
   const loadFiles = useCallback(
     async (showLoading = true) => {
@@ -152,40 +154,44 @@ export default function WorkspacesScreen() {
       >
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
           <View style={styles.topRow}>
-            <View>
-              <Text style={styles.eyebrow}>AdjusterAssist</Text>
-              <Text style={styles.headerTitle}>Workspaces</Text>
-            </View>
-            <View style={styles.iconCircle}>
+      
+              <View style={styles.brandBlock}>
+                <Image source={logo} style={styles.logo} />
+
+              </View>
+            {/* <View style={styles.iconCircle}>
               <Ionicons name="folder-open" size={20} color="#FFFFFF" />
-            </View>
+            </View> */}
           </View>
 
-          <View style={styles.glassCard}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{files.length}</Text>
-              <Text style={styles.statLabel}>Total Files</Text>
-            </View>
-            {/* FIX: Changed div to View */}
-            <View style={styles.divider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>
-                {files.filter((f) => f.status === "active").length}
-              </Text>
-              <Text style={styles.statLabel}>Active Now</Text>
-            </View>
-            {/* FIX: Changed div to View */}
-            <View style={styles.divider} />
-            <View style={styles.statItem}>
-              <View style={styles.syncBadge}>
-                <Ionicons name="cloud-done" size={14} color="#10B981" />
-                <Text style={styles.syncText}>Synced</Text>
-              </View>
-            </View>
-          </View>
         </SafeAreaView>
       </LinearGradient>
 
+      <View style={{ paddingHorizontal: 18, marginTop: 10, }}>
+        <Text style={styles.headerTitle}>Workspaces</Text>
+        <View style={styles.glassCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{files.length}</Text>
+            <Text style={styles.statLabel}>Total Files</Text>
+          </View>
+          {/* FIX: Changed div to View */}
+          <View style={styles.divider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>
+              {files.filter((f) => f.status === "active").length}
+            </Text>
+            <Text style={styles.statLabel}>Active Now</Text>
+          </View>
+          {/* FIX: Changed div to View */}
+          <View style={styles.divider} />
+          <View style={styles.statItem}>
+            <View style={styles.syncBadge}>
+              <Ionicons name="cloud-done" size={14} color="#10B981" />
+              <Text style={styles.syncText}>Synced</Text>
+            </View>
+          </View>
+        </View>
+      </View>
       <FlatList
         data={files}
         keyExtractor={(item) => item.id.toString()}
@@ -236,9 +242,9 @@ export default function WorkspacesScreen() {
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
+  mainContainer: { flex: 1, backgroundColor: "#F1F5F9" },
   headerGradient: {
-    paddingBottom: 25,
+    // paddingBottom: 25,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     shadowColor: "#000",
@@ -247,12 +253,15 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 10,
   },
-  headerContent: { paddingHorizontal: 20, marginTop: 10 },
+  headerContent: { paddingHorizontal: 20, },
   headerTitle: {
-    color: "#FFFFFF",
-    fontSize: 30,
-    fontWeight: "900",
-    letterSpacing: -0.5,
+    marginTop: 8,
+    fontSize: 18,
+    color: "#0B2F5B",
+    letterSpacing: 0.3,
+    fontFamily: "Inter-Regular",
+    fontWeight: "bold",
+    marginBottom: 12,
   },
   listContent: { padding: 20, paddingBottom: 120 },
   loaderContainer: {
@@ -303,9 +312,10 @@ const styles = StyleSheet.create({
   },
   glassCard: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 24,
-    padding: 18,
+    backgroundColor: "#0F4C9C",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
@@ -330,4 +340,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   syncText: { color: "#34D399", fontSize: 12, fontWeight: "900" },
+  brandBlock: {
+    flex: 1,
+    paddingRight: 16,
+  },
+
+  logo: {
+    width: 160,
+    height: 50,
+    resizeMode: "contain",
+  },
 });

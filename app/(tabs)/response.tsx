@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { OutputType, saveDraft, updateDraft } from "@/lib/api"; // Added updateDraft
+import { AllDraftsofUser, saveDraft, updateDraft } from "@/lib/api"; // Added updateDraft and draft loader
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
@@ -25,47 +25,70 @@ import { toast } from "sonner-native";
 type Params = {
   text?: string;
   type?: string;
-  outputType?: OutputType;
+  output_format?: string;
   fileId?: string;
   alreadySaved?: string;
   draftId?: string; // Added draftId to params
+  created_at?: string; // Added created_at to params
 };
 
 const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
-const defaultLabels: Record<OutputType, string> = {
-  file_note: "File Note",
-  email_insured: "Insured Correspondence",
-  email_contractor: "Contractor Correspondence",
-  escalation_response: "Escalation Response",
-  supplement_response: "Supplement Response",
-  coverage_analysis: "Coverage Analysis",
-  denial_support: "Denial Support",
-  claim_summary: "Claim Summary",
-  xactanalysis_response: "Xact Analysis",
-  damage_evaluation: "Damage Evaluation",
-};
+
 
 export default function ResponseScreen() {
   const { token } = useAuth();
   const params = useLocalSearchParams<Params>();
   const insets = useSafeAreaInsets();
 
+  const responseTypeLabel = params.output_format;
+
   const [copying, setCopying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(params.alreadySaved === "true");
+  const [draftCreatedAt, setDraftCreatedAt] = useState(params.created_at || "");
 
   // --- NEW EDITING STATES ---
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(params.text || "");
 
-  const responseTypeLabel = params.type || defaultLabels[params.outputType || "file_note"] || "Generated Output";
+  useEffect(() => {
+    const loadDraftById = async () => {
+      if (params.text || !params.draftId || !token) return;
+      const draftIdNumber = Number(params.draftId);
+      if (Number.isNaN(draftIdNumber)) return;
+
+      try {
+        const stored = await AsyncStorage.getItem(SESSION_HISTORY_KEY);
+        let draft: any = null;
+
+        if (stored) {
+          const sessionList = JSON.parse(stored);
+          draft = sessionList.find((item: any) => Number(item.id) === draftIdNumber);
+        }
+
+        if (!draft) {
+          const allDrafts = await AllDraftsofUser(token);
+          draft = allDrafts.find((item: any) => Number(item.id) === draftIdNumber);
+        }
+
+        if (draft) {
+          setEditedText(draft.content || "");
+          setDraftCreatedAt(draft.created_at || "");
+        }
+      } catch (error) {
+        console.error("Failed to load draft by ID:", error);
+      }
+    };
+
+    loadDraftById();
+  }, [params.draftId, params.text, token]);
 
   /**
    * 1. AUTOMATIC LOCAL SESSION SAVE
    */
   useEffect(() => {
     const logToSession = async () => {
-      if (params.alreadySaved === "true") return;
+      if (params.alreadySaved === "true" || !editedText) return;
 
       try {
         const rawData = await AsyncStorage.getItem(SESSION_HISTORY_KEY);
@@ -76,9 +99,9 @@ export default function ResponseScreen() {
           const newEntry = {
             id: Date.now(),
             content: editedText,
-            draft_type: params.outputType || 'email',
+            draft_type: params.output_format || "",
             file_id: params.fileId,
-            created_at: new Date().toISOString(),
+            created_at: draftCreatedAt || params.created_at,
           };
           currentData.unshift(newEntry);
           await AsyncStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(currentData.slice(0, 50)));
@@ -88,11 +111,13 @@ export default function ResponseScreen() {
       }
     };
     logToSession();
-  }, [params.text]);
+  }, [editedText, params.alreadySaved, draftCreatedAt]);
 
   useEffect(() => {
     setIsSaved(params.alreadySaved === "true");
-    setEditedText(params.text || "");
+    if (params.text) {
+      setEditedText(params.text);
+    }
     setSaving(false);
   }, [params.text, params.alreadySaved]);
 
@@ -130,13 +155,13 @@ export default function ResponseScreen() {
       if (params.alreadySaved === "true" && params.draftId) {
         result = await updateDraft(sanitizedToken, params.draftId, {
           content: editedText,
-          draft_type: params.outputType || 'email'
+          draft_type: params.output_format || ""
         });
       } else {
         result = await saveDraft(
           sanitizedToken,
           Number(fId),
-          params.outputType || 'file_note',
+          params.output_format || "",
           editedText
         );
       }
@@ -148,8 +173,8 @@ export default function ResponseScreen() {
         });
       }
     } catch (error: any) {
-      toast.error("Error", { description: "Save failed" });
-      console.log(error);
+      console.error("Save error:", error);
+      toast.error("Error", { description: error?.message || "Save failed" });
     } finally {
       setSaving(false);
     }
@@ -211,7 +236,11 @@ export default function ResponseScreen() {
             <Text style={styles.typeText}>{responseTypeLabel}</Text>
           </View>
           <Text style={styles.timestamp}>
-            {isEditing ? "EDIT MODE" : new Date().toLocaleDateString()}
+            {draftCreatedAt && draftCreatedAt.trim() !== ""
+              ? new Date(draftCreatedAt).toLocaleString()
+              : params.created_at && params.created_at.trim() !== ""
+              ? new Date(params.created_at).toLocaleString()
+              : new Date().toLocaleString()}
           </Text>
         </View>
 

@@ -97,10 +97,13 @@ export default function DraftsListScreen() {
           router.push({
             pathname: "/response",
             params: { 
-              text: item.content, 
+              draftId: item.id?.toString(),
+              output_format: item.draft_type,
               type: item.draft_type,
+              text: item.content,
               fileId: item.file_id?.toString(),
-              alreadySaved: isSynced ? "true" : "false" 
+              alreadySaved: isSynced ? "true" : "false",
+              created_at: item.created_at,
             }
           });
         }}
@@ -163,7 +166,7 @@ export default function DraftsListScreen() {
       
       <View style={styles.headerContainer}>
         <LinearGradient
-            colors={["#0F172A", "#0F4C9C"]}
+            colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
