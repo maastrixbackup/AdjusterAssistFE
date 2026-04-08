@@ -19,7 +19,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -38,8 +38,6 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
-
-
 
 export default function GenerateScreen() {
   const { token } = useAuth();
@@ -293,7 +291,7 @@ export default function GenerateScreen() {
         params: {
           output_format: result.output_format,
           type: result.responseTypeLabel,
-          userInput:payload.userInput,
+          userInput: payload.userInput,
           text: result.responseText,
           fileId: result.fileId.toString(),
           alreadySaved: "false",
@@ -309,12 +307,7 @@ export default function GenerateScreen() {
       setImageBase64(null);
       setIsGenerating(false);
     }
-  }, [
-    token,
-    request,
-    claimDetails,
-    selectedWorkspace,
-  ]);
+  }, [token, request, claimDetails, selectedWorkspace]);
 
   if (isLoading && !refreshing) {
     return (
@@ -389,7 +382,7 @@ export default function GenerateScreen() {
                     styles.workspaceTile,
                     styles.workspaceItem,
                     selectedWorkspace?.id === ws.id &&
-                    styles.workspaceItemActive,
+                      styles.workspaceItemActive,
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -403,7 +396,7 @@ export default function GenerateScreen() {
                     style={[
                       styles.workspaceText,
                       selectedWorkspace?.id === ws.id &&
-                      styles.workspaceTextActive,
+                        styles.workspaceTextActive,
                     ]}
                   >
                     {ws.client_name || ws.claim_number}
@@ -523,7 +516,6 @@ export default function GenerateScreen() {
       </KeyboardAvoidingView>
 
       {/* TASK MODAL */}
-
 
       {/* NEW WORKSPACE MODAL (11 FIELDS) */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
