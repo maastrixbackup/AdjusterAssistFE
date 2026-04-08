@@ -25,6 +25,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
+import { VoiceOverlay } from "@/components/VoiceOverlay";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 import {
   ClaimFile,
   createFile,
@@ -127,13 +129,6 @@ export default function GenerateScreen() {
   const handleScenarioTextChange = (text: string) => {
     setRequest(text);
     setShowScenarioScrollButton(text.length > 100);
-  };
-
-  // Handler for Scenario Scroll to Bottom
-  const handleScenarioScrollToBottom = () => {
-    if (scenarioTextInputRef.current) {
-      scenarioTextInputRef.current.focus();
-    }
   };
 
   const handlePickImage = async () => {
@@ -269,6 +264,23 @@ export default function GenerateScreen() {
       toast.error(error.response?.data?.message || "Creation failed");
     } finally {
       setIsCreatingFile(false);
+    }
+  };
+
+  const voice = useVoiceInput();
+
+  const handleVoiceToggle = async () => {
+    if (voice.isRecording) {
+      const transcript = await voice.stop();
+      if (transcript) {
+        setRequest((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    } else {
+      try {
+        await voice.start();
+      } catch {
+        toast.warning("Microphone permission required.");
+      }
     }
   };
 
@@ -439,26 +451,37 @@ export default function GenerateScreen() {
                   style={styles.mainTextInput}
                 />
                 <View style={styles.inputActions}>
-                  {/* Attach */}
-                  <TouchableOpacity
-                    // style={styles.inputActionButton}
-                    onPress={handlePickImage}
-                  >
+                  <TouchableOpacity onPress={handlePickImage}>
                     <Ionicons name="attach" size={20} color="#475569" />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      // TODO: hook your voice logic here
-                      setIsRecording((prev) => !prev);
-                    }}
-                  >
+
+                  <TouchableOpacity onPress={handleVoiceToggle}>
                     <Ionicons
-                      name={isRecording ? "stop" : "mic"}
+                      name={
+                        voice.isRecording
+                          ? "stop-circle"
+                          : voice.isTranscribing
+                            ? "hourglass"
+                            : "mic"
+                      }
                       size={20}
-                      color="#0F4C9C"
+                      color={
+                        voice.isRecording
+                          ? "#DC2626"
+                          : voice.isTranscribing
+                            ? "#94A3B8"
+                            : "#0F4C9C"
+                      }
                     />
                   </TouchableOpacity>
                 </View>
+
+                {/* Single VoiceOverlay — outside inputActions */}
+                <VoiceOverlay
+                  visible={voice.isRecording}
+                  meteringLevel={voice.meteringLevel}
+                  onCancel={handleVoiceToggle}
+                />
 
                 {selectedImage ? (
                   <View style={styles.imagePreviewContainer}>
