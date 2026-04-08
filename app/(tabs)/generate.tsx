@@ -1,6 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -9,7 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -19,111 +17,41 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
 import {
   ClaimFile,
   createFile,
-  generateResponse,
   GenerateResponseRequest,
+  generateResponse,
   getMyFiles,
-  getRecentDrafts,
   getSubscriptionStatus,
-  RecentDraft,
   SubscriptionStatus,
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
-const TASK_TYPES = [
-  {
-    id: "claim_note_drafting",
-    label: "Claim Note Drafting",
-    icon: "note-text-outline",
-  },
-  {
-    id: "coverage_analysis_drafting",
-    label: "Coverage Analysis",
-    icon: "shield-search",
-  },
-  {
-    id: "damage_evaluation_drafting",
-    label: "Damage Evaluation",
-    icon: "home-alert",
-  },
-  {
-    id: "claim_communication_drafting",
-    label: "Claim Communication",
-    icon: "message-text-outline",
-  },
-  {
-    id: "vendor_response_drafting",
-    label: "Vendor Response",
-    icon: "store-outline",
-  },
-  {
-    id: "professional_documentation",
-    label: "Professional Formatting",
-    icon: "file-check-outline",
-  },
-];
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+const isSmallScreen = screenWidth < 375;
 
-type OutputMode =
-  | "File Note"
-  | "Insured Email"
-  | "Contractor Email"
-  | "Escalation"
-  | "Supplement"
-  | "Coverage Analysis"
-  | "Denial Support"
-  | "Claim Summary"
-  | "Xact Analysis"
-  | "Damage Evaluation";
+const scale = (size: number) => Math.round((screenWidth / 375) * size);
+const verticalScale = (size: number) => Math.round((screenHeight / 667) * size);
+const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 
-// const outputModes: OutputMode[] = [
-//   "File Note",
-//   "Insured Email",
-//   "Contractor Email",
-//   "Escalation",
-//   "Supplement",
-//   "Coverage Analysis",
-//   "Denial Support",
-//   "Claim Summary",
-//   "Xact Analysis",
-//   "Damage Evaluation",
-// ];
-
-// const outputTypeMap: Record<OutputMode, string> = {
-//   "File Note": "file_note",
-//   "Insured Email": "email_insured",
-//   "Contractor Email": "email_contractor",
-//   Escalation: "escalation_response",
-//   Supplement: "supplement_response",
-//   "Coverage Analysis": "coverage_analysis",
-//   "Denial Support": "denial_support",
-//   "Claim Summary": "claim_summary",
-//   "Xact Analysis": "xactanalysis_response",
-//   "Damage Evaluation": "damage_evaluation",
-// };
+const TASK_TYPE = "claim_note_drafting";
 
 export default function GenerateScreen() {
   const { token } = useAuth();
-  const scrollRef = useRef<ScrollView>(null);
 
   const [workspaces, setWorkspaces] = useState<ClaimFile[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(
-    null,
-  );
+  const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(null);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
 
-  // Unified Form State for all 11 fields (Plus status)
   const [fileForm, setFileForm] = useState({
     claim_number: "",
     client_name: "",
@@ -138,48 +66,36 @@ export default function GenerateScreen() {
     status: "active" as const,
   });
 
-  const [selectedOutput, setSelectedOutput] = useState<OutputMode>("File Note");
   const [request, setRequest] = useState("");
   const [claimDetails, setClaimDetails] = useState("");
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
-  const [recentDrafts, setRecentDrafts] = useState<RecentDraft[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [selectedTask, setSelectedTask] = useState(TASK_TYPES[0]);
-  const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
-  const [showScenarioScrollButton, setShowScenarioScrollButton] =
-    useState(false);
-  const scenarioTextInputRef = useRef<TextInput>(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      const [statusData, draftsData, filesData] = await Promise.all([
+      const [statusData, filesData] = await Promise.all([
         getSubscriptionStatus(token),
-        getRecentDrafts(token),
         getMyFiles(token),
       ]);
       setStatus(statusData);
-      setRecentDrafts(draftsData ?? []);
       setWorkspaces(filesData ?? []);
-      if (filesData?.length > 0 && !selectedWorkspace)
+      if (filesData?.length > 0 && !selectedWorkspace) {
         setSelectedWorkspace(filesData[0]);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
-      setRefreshing(false);
     }
   }, [token, selectedWorkspace]);
 
@@ -187,132 +103,106 @@ export default function GenerateScreen() {
     fetchData();
   }, [fetchData]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({
-          y: 0,
-          animated: false, // instant reset
-        });
-      }, 50);
-    }, []),
-  );
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
 
-  // Handle Scenario Description Text Change
-  const handleScenarioTextChange = (text: string) => {
-    setRequest(text);
-    setShowScenarioScrollButton(text.length > 100);
-  };
-
-  // Handler for Scenario Scroll to Bottom
-  const handleScenarioScrollToBottom = () => {
-    if (scenarioTextInputRef.current) {
-      scenarioTextInputRef.current.focus();
+  const handleVoiceToggle = () => {
+    if (isRecording) {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setIsRecording(false);
+      if (recordingDuration > 0) {
+        setRequest((prev) =>
+          prev
+            ? `${prev}\n[Voice note captured: ${recordingDuration}s. Add transcript details here.]`
+            : `[Voice note captured: ${recordingDuration}s. Add transcript details here.]`,
+        );
+      }
+      setRecordingDuration(0);
+      return;
     }
+
+    setIsRecording(true);
+    setRecordingDuration(0);
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingDuration((prev) => prev + 1);
+    }, 1000);
   };
 
   const handlePickImage = async () => {
     try {
       setIsPickingImage(true);
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission required", "Media library access is required.");
+        Alert.alert("Permission required", "Media library access is required to attach a photo.");
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result: any = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         quality: 1,
       });
 
-      if (!result.canceled && result.assets?.[0]) {
-        const imageAsset = result.assets[0];
-
-        // Use a fallback for the URI to avoid 'undefined'
-        const uri = imageAsset.uri;
-        setSelectedImage(uri);
-
-        // 2. Process for Backend (Base64)
-        const manipulatedImage = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 1024 } }],
-          {
-            compress: 0.7,
-            format: ImageManipulator.SaveFormat.JPEG,
-            base64: true,
-          },
+      const imageAsset = result.assets?.[0];
+      if (imageAsset?.uri) {
+        setSelectedImage(imageAsset.uri);
+        const fileName = imageAsset.uri.split("/").pop() ?? "image";
+        setRequest((prev) =>
+          prev ? `${prev}\n[Attached image: ${fileName}]` : `[Attached image: ${fileName}]`,
         );
-
-        setImageBase64(manipulatedImage.base64 ?? null);
-        // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
       }
     } catch (error) {
       console.error("Image picker error:", error);
-      // Use your toast or alert here
+      Alert.alert("Attachment failed", "Unable to attach a photo.");
     } finally {
       setIsPickingImage(false);
     }
   };
 
-  // const handleTakePhoto = async () => {
-  //   try {
-  //     setIsTakingPhoto(true);
-  //     const permission = await ImagePicker.requestCameraPermissionsAsync();
-  //     if (!permission.granted) {
-  //       Alert.alert(
-  //         "Permission required",
-  //         "Camera access is required to take a photo.",
-  //       );
-  //       return;
-  //     }
+  const handleTakePhoto = async () => {
+    try {
+      setIsTakingPhoto(true);
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission required", "Camera access is required to take a photo.");
+        return;
+      }
 
-  //     const result: any = await ImagePicker.launchCameraAsync({
-  //       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-  //       allowsEditing: false,
-  //       quality: 1,
-  //     });
+      const result: any = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
 
-  //     const imageAsset = result.assets?.[0];
-  //     if (imageAsset?.uri) {
-  //       setSelectedImage(imageAsset.uri);
-  //       const fileName = imageAsset.uri.split("/").pop() ?? "photo";
-  //       setRequest((prev) =>
-  //         prev
-  //           ? `${prev}\n[Attached photo: ${fileName}]`
-  //           : `[Attached photo: ${fileName}]`,
-  //       );
-  //     }
-  //   } catch (error) {
-  //     console.error("Camera error:", error);
-  //     Alert.alert("Attachment failed", "Unable to take a photo.");
-  //   } finally {
-  //     setIsTakingPhoto(false);
-  //   }
-  // };
+      const imageAsset = result.assets?.[0];
+      if (imageAsset?.uri) {
+        setSelectedImage(imageAsset.uri);
+        const fileName = imageAsset.uri.split("/").pop() ?? "photo";
+        setRequest((prev) =>
+          prev ? `${prev}\n[Attached photo: ${fileName}]` : `[Attached photo: ${fileName}]`,
+        );
+      }
+    } catch (error) {
+      console.error("Camera error:", error);
+      Alert.alert("Attachment failed", "Unable to take a photo.");
+    } finally {
+      setIsTakingPhoto(false);
+    }
+  };
 
   const handleCreateWorkspace = async () => {
     if (!token) return;
 
-    // Validation for the 11 mandatory fields
-    const {
-      claim_number,
-      client_name,
-      address,
-      jurisdiction,
-      loss_type,
-      date_of_loss,
-    } = fileForm;
-    if (
-      !claim_number ||
-      !client_name ||
-      !address ||
-      !jurisdiction ||
-      !loss_type ||
-      !date_of_loss
-    ) {
+    const { claim_number, client_name, address, jurisdiction, loss_type, date_of_loss } = fileForm;
+    if (!claim_number || !client_name || !address || !jurisdiction || !loss_type || !date_of_loss) {
       toast.warning("Missing required insurance metadata");
       return;
     }
@@ -349,17 +239,15 @@ export default function GenerateScreen() {
 
   const onGenerate = useCallback(async () => {
     if (!token) return router.replace("/login");
-    if (!selectedWorkspace) return toast.warning("Select a Workspace first.");
-    if (!request || request.trim().length < 5)
-      return toast.warning("Describe the scenario.");
+    if (!selectedWorkspace) return toast.warning("Select a workspace first.");
+    if (!request || request.trim().length < 5) return toast.warning("Describe what happened.");
 
     setIsGenerating(true);
     try {
       const payload: GenerateResponseRequest = {
         fileId: selectedWorkspace.id,
-        image: imageBase64,
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
-        task_type: selectedTask.id,
+        task_type: TASK_TYPE,
       };
       const result = await generateResponse(token, payload);
       router.push({
@@ -375,40 +263,25 @@ export default function GenerateScreen() {
       });
       setRequest("");
       setClaimDetails("");
+      setSelectedImage(null);
       fetchData();
     } catch (error: any) {
       toast.error(error?.message || "Generation failed");
     } finally {
-      setImageBase64(null);
       setIsGenerating(false);
     }
-  }, [
-    token,
-    request,
-    claimDetails,
-    selectedOutput,
-    selectedWorkspace,
-    selectedTask,
-    fetchData,
-  ]);
+  }, [token, selectedWorkspace, request, claimDetails, fetchData]);
 
-  if (isLoading && !refreshing) {
+  if (isLoading) {
     return (
       <View style={styles.loaderScreen}>
-        <LinearGradient
-          colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
-          style={styles.loaderGradient}
-        >
+        <LinearGradient colors={["#0F4C9C", "#123C78", "#0B2F5B"]} style={styles.loaderGradient}>
           <View style={styles.loaderContent}>
             <View style={styles.loaderIconWrap}>
-              <Ionicons name="sparkles" size={34} color="#FFFFFF" />
+              <Ionicons name="sparkles" size={scale(34)} color="#FFFFFF" />
             </View>
-            <Text style={styles.loaderTitle}>Preparing AI Workspace</Text>
-            <ActivityIndicator
-              size="small"
-              color="#FFFFFF"
-              style={{ marginTop: 18 }}
-            />
+            <Text style={styles.loaderTitle}>Preparing Claim Workspace</Text>
+            <ActivityIndicator size="small" color="#FFFFFF" style={{ marginTop: 18 }} />
           </View>
         </LinearGradient>
       </View>
@@ -418,309 +291,168 @@ export default function GenerateScreen() {
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#0F4C9C", "#123C78"]}
-        style={styles.headerGradient}
-      >
+      <LinearGradient colors={["#0F4C9C", "#123C78"]} style={styles.headerGradient}>
         <SafeAreaView edges={["top"]} style={styles.safeHeader}>
           <View style={styles.navBar}>
             <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+              <Ionicons name="chevron-back" size={scale(22)} color="#FFFFFF" />
             </Pressable>
-            <Text style={styles.navTitle}>AI Studio</Text>
+            <Text style={styles.navTitle}>Claim Workspace</Text>
             <View style={styles.creditBadge}>
               <View style={styles.statusDot} />
-              <Text style={styles.creditValue}>
-                {status?.subscription?.remaining ?? 0} Credits
-              </Text>
+              <Text style={styles.creditValue}>{status?.subscription?.remaining ?? 0} Credits</Text>
             </View>
           </View>
         </SafeAreaView>
       </LinearGradient>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <View style={{ padding: 20 }}>
-          <Text style={styles.sectionLabel}>Active Workspace</Text>
-          <ScrollView
-            style={styles.workspaceScroll}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            <View style={styles.workspaceGrid}>
-              <Pressable
-                style={[styles.workspaceTile, styles.addWorkspaceBtn]}
-                onPress={() => setIsModalVisible(true)}
-              >
-                <Ionicons name="add" size={20} color="#0F4C9C" />
-                <Text style={styles.addWorkspaceText}>New Workspace</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.mainScrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Select Workspace</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.workspaceScrollContent}>
+              <Pressable style={[styles.workspaceChip, styles.addWorkspaceChip]} onPress={() => setIsModalVisible(true)}>
+                <Ionicons name="add" size={scale(16)} color="#0F4C9C" />
+                <Text style={styles.addWorkspaceChipText}>New</Text>
               </Pressable>
               {workspaces.map((ws) => (
                 <Pressable
                   key={ws.id}
                   onPress={() => setSelectedWorkspace(ws)}
-                  style={[
-                    styles.workspaceTile,
-                    styles.workspaceItem,
-                    selectedWorkspace?.id === ws.id &&
-                      styles.workspaceItemActive,
-                  ]}
+                  style={[styles.workspaceChip, selectedWorkspace?.id === ws.id && styles.workspaceChipActive]}
                 >
                   <MaterialCommunityIcons
-                    name={
-                      selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
-                    }
-                    size={18}
+                    name="folder"
+                    size={scale(14)}
                     color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
                   />
                   <Text
-                    style={[
-                      styles.workspaceText,
-                      selectedWorkspace?.id === ws.id &&
-                        styles.workspaceTextActive,
-                    ]}
+                    style={[styles.workspaceChipText, selectedWorkspace?.id === ws.id && styles.workspaceChipTextActive]}
+                    numberOfLines={1}
                   >
                     {ws.client_name || ws.claim_number}
                   </Text>
                 </Pressable>
               ))}
-            </View>
-          </ScrollView>
-
-          <Text style={styles.sectionLabel}>Assistant Task</Text>
-          <Pressable
-            style={styles.dropdownTrigger}
-            onPress={() => setIsTaskModalVisible(true)}
-          >
-            <View style={styles.dropdownLeft}>
-              <View style={styles.taskIconCircle}>
-                <MaterialCommunityIcons
-                  name={selectedTask.icon as any}
-                  size={20}
-                  color="#0F4C9C"
-                />
-              </View>
-              <Text style={styles.dropdownValueText}>{selectedTask.label}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={20} color="#64748B" />
-          </Pressable>
-          {/* 
-          <Text style={styles.sectionLabel}>Output Format</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabContainer}
-          >
-            {outputModes.map((mode) => (
-              <Pressable
-                key={mode}
-                onPress={() => setSelectedOutput(mode)}
-                style={[
-                  styles.tabItem,
-                  mode === selectedOutput && styles.tabItemActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    mode === selectedOutput && styles.tabTextActive,
-                  ]}
-                >
-                  {mode}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView> */}
-
-          <View style={styles.glassCard}>
-            <View>
-              <View style={styles.fieldHeader}>
-                <View style={styles.iconCircle}>
-                  <MaterialCommunityIcons
-                    name="text-box-search-outline"
-                    size={16}
-                    color="#0F4C9C"
-                  />
-                </View>
-                <Text style={styles.inputLabel}>Scenario Description</Text>
-                {request.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setRequest("")}
-                    style={styles.clearTextButton}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.clearText}>Clear</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  ref={scenarioTextInputRef}
-                  value={request}
-                  onChangeText={handleScenarioTextChange}
-                  multiline
-                  scrollEnabled
-                  placeholder="What happened?"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.mainTextInput}
-                />
-                <View style={styles.inputActions}>
-                  {/* Attach */}
-                  <TouchableOpacity
-                    // style={styles.inputActionButton}
-                    onPress={handlePickImage}
-                  >
-                    <Ionicons name="attach" size={20} color="#475569" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      // TODO: hook your voice logic here
-                      setIsRecording((prev) => !prev);
-                    }}
-                  >
-                    <Ionicons
-                      name={isRecording ? "stop" : "mic"}
-                      size={20}
-                      color="#0F4C9C"
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {selectedImage ? (
-                  <View style={styles.imagePreviewContainer}>
-                    <Image
-                      source={{ uri: selectedImage }}
-                      style={styles.imagePreview}
-                    />
-                    <TouchableOpacity
-                      style={styles.removeImageButton}
-                      onPress={() => setSelectedImage(null)}
-                    >
-                      <MaterialCommunityIcons
-                        name="close"
-                        size={16}
-                        color="#0F172A"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-              </View>
-              {/* {isRecording && (
-                <Text style={styles.listeningText}>Listening...</Text>
-              )} */}
-              {/* 
-              {isProcessing && (
-                <Text style={styles.listeningText}>Converting speech...</Text>
-              )} */}
-            </View>
+            </ScrollView>
           </View>
 
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Chat</Text>
+            <View style={styles.assistantHintRow}>
+              <MaterialCommunityIcons name="robot-outline" size={scale(16)} color="#0F4C9C" />
+              <Text style={styles.assistantHintText}>Tell me what happened and include only key claim facts.</Text>
+            </View>
+
+            {selectedImage && (
+              <View style={styles.imagePreviewStrip}>
+                <Image source={{ uri: selectedImage }} style={styles.imagePreviewSmall} />
+                <Text style={styles.attachmentText}>Image attached</Text>
+                <Pressable style={styles.removeImageSmall} onPress={() => setSelectedImage(null)}>
+                  <Ionicons name="close-circle" size={scale(20)} color="#EF4444" />
+                </Pressable>
+              </View>
+            )}
+
+            <TextInput
+              value={request}
+              onChangeText={setRequest}
+              placeholder="What happened?"
+              placeholderTextColor="#94A3B8"
+              style={styles.chatInput}
+              multiline
+              maxLength={1000}
+              scrollEnabled
+              textAlignVertical="top"
+            />
+
+            {/* <TextInput
+              value={claimDetails}
+              onChangeText={setClaimDetails}
+              placeholder="Optional context (policy notes, timeline, people involved...)"
+              placeholderTextColor="#94A3B8"
+              style={styles.contextInput}
+              multiline
+              maxLength={500}
+              textAlignVertical="top"
+            /> */}
+
+            <View style={styles.quickActionRow}>
+              <Pressable style={styles.quickActionButton} onPress={handlePickImage} disabled={isPickingImage}>
+                {isPickingImage ? (
+                  <ActivityIndicator size="small" color="#0F4C9C" />
+                ) : (
+                  <>
+                    <Ionicons name="images-outline" size={scale(16)} color="#0F4C9C" />
+                    <Text style={styles.quickActionText}>Upload</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable style={styles.quickActionButton} onPress={handleTakePhoto} disabled={isTakingPhoto}>
+                {isTakingPhoto ? (
+                  <ActivityIndicator size="small" color="#0F4C9C" />
+                ) : (
+                  <>
+                    <Ionicons name="camera-outline" size={scale(16)} color="#0F4C9C" />
+                    <Text style={styles.quickActionText}>Photo</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={[styles.quickActionButton, isRecording && styles.quickActionButtonRecording]}
+                onPress={handleVoiceToggle}
+              >
+                <Ionicons
+                  name={isRecording ? "stop-circle-outline" : "mic-outline"}
+                  size={scale(16)}
+                  color={isRecording ? "#B91C1C" : "#0F4C9C"}
+                />
+                <Text style={[styles.quickActionText, isRecording && styles.quickActionTextRecording]}>
+                  {isRecording ? `${recordingDuration}s` : "Voice"}
+                </Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.charCount}>{request.length}/1000</Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.generateFooter}>
           <Pressable
+            style={[styles.generateButton, (!request.trim() || isGenerating) && styles.generateButtonDisabled]}
             onPress={onGenerate}
-            disabled={isGenerating}
-            style={styles.generateBtn}
+            disabled={!request.trim() || isGenerating}
           >
-            <LinearGradient
-              colors={["#0F4C9C", "#1E3A8A"]}
-              style={styles.gradientBtn}
-            >
-              {isGenerating ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Text style={styles.btnText}>Generate Draft</Text>
-                  <MaterialCommunityIcons
-                    name="auto-fix"
-                    size={20}
-                    color="#FFF"
-                  />
-                </>
-              )}
-            </LinearGradient>
+            {isGenerating ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="file-document-edit-outline" size={scale(18)} color="#FFF" />
+                <Text style={styles.generateButtonText}>Generate Draft</Text>
+              </>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
 
-      {/* TASK MODAL */}
-      <Modal
-        visible={isTaskModalVisible}
-        animationType="fade"
-        transparent={true}
-      >
+      <Modal visible={isModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { minHeight: 350 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Assistant Task</Text>
-              <Pressable onPress={() => setIsTaskModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#94A3B8" />
-              </Pressable>
-            </View>
-            <FlatList
-              data={TASK_TYPES}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.taskOption,
-                    selectedTask.id === item.id && styles.taskOptionActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedTask(item);
-                    setIsTaskModalVisible(false);
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name={item.icon as any}
-                    size={22}
-                    color={selectedTask.id === item.id ? "#0F4C9C" : "#64748B"}
-                  />
-                  <Text
-                    style={[
-                      styles.taskOptionText,
-                      selectedTask.id === item.id &&
-                        styles.taskOptionTextActive,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                  {selectedTask.id === item.id && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color="#0F4C9C"
-                    />
-                  )}
-                </Pressable>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* NEW WORKSPACE MODAL (11 FIELDS) */}
-      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: "85%" }]}>
+          <View style={[styles.modalContent, { height: screenHeight * 0.85 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Initialize Claim File</Text>
               <Pressable onPress={() => setIsModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#94A3B8" />
+                <Ionicons name="close" size={scale(24)} color="#94A3B8" />
               </Pressable>
             </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.modalScrollContent}
-            >
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               <View>
                 <Text style={styles.modalLabel}>Claim Number *</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={fileForm.claim_number}
-                  onChangeText={(t) =>
-                    setFileForm({ ...fileForm, claim_number: t })
-                  }
+                  onChangeText={(t) => setFileForm({ ...fileForm, claim_number: t })}
                   placeholder="e.g. CLM-2026-001"
                 />
               </View>
@@ -729,9 +461,7 @@ export default function GenerateScreen() {
                 <TextInput
                   style={styles.modalInput}
                   value={fileForm.client_name}
-                  onChangeText={(t) =>
-                    setFileForm({ ...fileForm, client_name: t })
-                  }
+                  onChangeText={(t) => setFileForm({ ...fileForm, client_name: t })}
                   placeholder="Insured Name"
                 />
               </View>
@@ -750,9 +480,7 @@ export default function GenerateScreen() {
                   <TextInput
                     style={styles.modalInput}
                     value={fileForm.policy_form}
-                    onChangeText={(t) =>
-                      setFileForm({ ...fileForm, policy_form: t })
-                    }
+                    onChangeText={(t) => setFileForm({ ...fileForm, policy_form: t })}
                     placeholder="HO-3"
                   />
                 </View>
@@ -761,9 +489,7 @@ export default function GenerateScreen() {
                   <TextInput
                     style={styles.modalInput}
                     value={fileForm.jurisdiction}
-                    onChangeText={(t) =>
-                      setFileForm({ ...fileForm, jurisdiction: t })
-                    }
+                    onChangeText={(t) => setFileForm({ ...fileForm, jurisdiction: t })}
                     placeholder="CT, FL, etc."
                   />
                 </View>
@@ -774,9 +500,7 @@ export default function GenerateScreen() {
                   <TextInput
                     style={styles.modalInput}
                     value={fileForm.date_of_loss}
-                    onChangeText={(t) =>
-                      setFileForm({ ...fileForm, date_of_loss: t })
-                    }
+                    onChangeText={(t) => setFileForm({ ...fileForm, date_of_loss: t })}
                     placeholder="YYYY-MM-DD"
                   />
                 </View>
@@ -785,22 +509,16 @@ export default function GenerateScreen() {
                   <TextInput
                     style={styles.modalInput}
                     value={fileForm.reported_date}
-                    onChangeText={(t) =>
-                      setFileForm({ ...fileForm, reported_date: t })
-                    }
+                    onChangeText={(t) => setFileForm({ ...fileForm, reported_date: t })}
                   />
                 </View>
               </View>
               <View>
-                <Text style={styles.modalLabel}>
-                  Loss Type (water/fire/etc) *
-                </Text>
+                <Text style={styles.modalLabel}>Loss Type *</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={fileForm.loss_type}
-                  onChangeText={(t) =>
-                    setFileForm({ ...fileForm, loss_type: t })
-                  }
+                  onChangeText={(t) => setFileForm({ ...fileForm, loss_type: t })}
                 />
               </View>
               <View>
@@ -808,9 +526,7 @@ export default function GenerateScreen() {
                 <TextInput
                   style={styles.modalInput}
                   value={fileForm.line_of_business}
-                  onChangeText={(t) =>
-                    setFileForm({ ...fileForm, line_of_business: t })
-                  }
+                  onChangeText={(t) => setFileForm({ ...fileForm, line_of_business: t })}
                 />
               </View>
               <View>
@@ -818,24 +534,12 @@ export default function GenerateScreen() {
                 <TextInput
                   style={styles.modalInput}
                   value={fileForm.claim_stage}
-                  onChangeText={(t) =>
-                    setFileForm({ ...fileForm, claim_stage: t })
-                  }
+                  onChangeText={(t) => setFileForm({ ...fileForm, claim_stage: t })}
                 />
               </View>
 
-              <Pressable
-                style={styles.modalActionBtn}
-                onPress={handleCreateWorkspace}
-                disabled={isCreatingFile}
-              >
-                {isCreatingFile ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.modalActionText}>
-                    Initialize Workspace
-                  </Text>
-                )}
+              <Pressable style={styles.modalActionBtn} onPress={handleCreateWorkspace} disabled={isCreatingFile}>
+                {isCreatingFile ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalActionText}>Initialize Workspace</Text>}
               </Pressable>
             </ScrollView>
           </View>
@@ -850,300 +554,242 @@ export default function GenerateScreen() {
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
   headerGradient: {
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: moderateScale(28),
+    borderBottomRightRadius: moderateScale(28),
     overflow: "hidden",
   },
-  safeHeader: { paddingHorizontal: 18, paddingBottom: 10 },
+  safeHeader: {
+    paddingHorizontal: scale(18),
+    paddingBottom: verticalScale(10),
+  },
   navBar: {
-    minHeight: 58,
+    minHeight: verticalScale(58),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  loaderScreen: { flex: 1 },
-  loaderGradient: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loaderContent: { alignItems: "center", paddingHorizontal: 30 },
-  loaderIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  loaderTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    textAlign: "center",
-  },
   iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: scale(42),
+    height: scale(42),
+    borderRadius: moderateScale(14),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
-  clearButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-
-    backgroundColor: "rgba(255,255,255,0.9)",
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    // subtle shadow
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+  navTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
-  clearTextButton: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-
-    borderRadius: 8,
-    backgroundColor: "rgba(15, 76, 156, 0.08)",
-
-    borderWidth: 1,
-    borderColor: "rgba(15, 76, 156, 0.2)",
-  },
-  clearText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#0F4C9C",
-  },
-  navTitle: { fontSize: 19, fontWeight: "800", color: "#FFFFFF" },
   creditBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: scale(8),
     backgroundColor: "rgba(255,255,255,0.14)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(8),
+    borderRadius: moderateScale(14),
   },
   statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: scale(7),
+    height: scale(7),
+    borderRadius: moderateScale(4),
     backgroundColor: "#22C55E",
   },
-  creditValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
-
-  sectionLabel: {
-    fontSize: 11,
+  creditValue: {
+    color: "#FFFFFF",
+    fontSize: moderateScale(13),
     fontWeight: "800",
-    color: "#94A3B8",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 6,
-    marginTop: 6,
   },
-  workspaceItem: {
-    flexDirection: "row",
+  loaderScreen: { flex: 1 },
+  loaderGradient: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loaderContent: { alignItems: "center", paddingHorizontal: scale(30) },
+  loaderIconWrap: {
+    width: scale(72),
+    height: scale(72),
+    borderRadius: moderateScale(20),
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF",
-    paddingHorizontal: 20,
-    // paddingVertical: 14,
-    borderRadius: 16,
+    marginBottom: verticalScale(20),
+  },
+  loaderTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: "800",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
+  mainScrollContent: {
+    paddingHorizontal: scale(isSmallScreen ? 14 : 18),
+    paddingTop: verticalScale(16),
+    paddingBottom: verticalScale(18),
+    gap: verticalScale(12),
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: moderateScale(16),
+    padding: scale(14),
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    height: 40,
-    gap: 8,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c" },
-  workspaceTile: {
-    width: 140,
-    height: 40,
-    // marginBottom: 12,
+  sectionTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: verticalScale(10),
   },
-  workspaceText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
-  workspaceGrid: {
-    flexDirection: "row",
-    gap: 8,
+  workspaceScrollContent: {
+    paddingRight: scale(6),
+    gap: scale(8),
   },
-  workspaceTextActive: { color: "#FFF" },
-  addWorkspaceBtn: {
+  workspaceChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EEF2FF",
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    borderStyle: "dashed",
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#0F4C9C",
-    gap: 4,
+    borderColor: "#E2E8F0",
+    borderRadius: moderateScale(20),
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(8),
+    gap: scale(6),
+    maxWidth: scale(190),
   },
-  addWorkspaceText: { fontSize: 14, fontWeight: "800", color: "#0F4C9C" },
-  tabContainer: { paddingVertical: 10, paddingHorizontal: 4, gap: 10 },
-  tabItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: "#F3F4F6",
-  },
-  tabItemActive: { backgroundColor: "#1F2937", elevation: 3 },
-  tabText: { fontSize: 14, color: "#374151", fontWeight: "500" },
-  tabTextActive: { color: "#FFFFFF", fontWeight: "600" },
-  glassCard: {
-    backgroundColor: "#FFFFFF",
-    marginTop: 20,
-    borderRadius: 20,
-    padding: 12, // reduced from 16
-
-    elevation: 8,
-    shadowColor: "#0F4C9C",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-
-    borderWidth: 1,
-    borderColor: "rgba(15, 76, 156, 0.15)",
-  },
-  // fieldGroup: { marginVertical: 1 },
-  fieldHeader: {
+  workspaceChipActive: { backgroundColor: "#0F4C9C", borderColor: "#0F4C9C" },
+  addWorkspaceChip: { backgroundColor: "#EEF2FF", borderColor: "#BFDBFE" },
+  addWorkspaceChipText: { fontSize: moderateScale(12), fontWeight: "600", color: "#0F4C9C" },
+  workspaceChipText: { fontSize: moderateScale(12), fontWeight: "600", color: "#64748B" },
+  workspaceChipTextActive: { color: "#FFFFFF" },
+  assistantHintRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    // marginBottom: 12,
+    gap: scale(8),
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    borderRadius: moderateScale(12),
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(8),
+    marginBottom: verticalScale(10),
   },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
+  assistantHintText: {
+    flex: 1,
+    fontSize: moderateScale(12),
+    color: "#1E3A8A",
+    fontWeight: "600",
   },
-  inputLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
-  inputWrapper: {
-    borderRadius: 16,
+  chatInput: {
+    height: verticalScale(160),
+    maxHeight: verticalScale(160),
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: moderateScale(14),
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(10),
+    fontSize: moderateScale(15),
+    color: "#0F172A",
     backgroundColor: "#FFFFFF",
-    position: "relative",
-
-    height: 180,
-    overflow: "hidden",
-
-    paddingRight: 8,
   },
-  mainTextInput: {
-    fontSize: 16,
+  contextInput: {
+    marginTop: verticalScale(10),
+    minHeight: verticalScale(74),
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: moderateScale(12),
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(10),
+    fontSize: moderateScale(13),
     color: "#334155",
-    height: 170,
-    textAlignVertical: "top",
-
-    paddingHorizontal: 12, // reduced
-    paddingTop: 8, // ADD (tight top)
-    paddingBottom: 8, // ADD (tight bottom)
-    paddingRight: 12,
-  },
-  inputActions: {
-    position: "absolute",
-    right: 10,
-    bottom: 0,
-
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  //   width: 36,
-  //   height: 36,
-  //   borderRadius: 10,
-  //   backgroundColor: "#F1F5F9",
-
-  //   alignItems: "center",
-  //   justifyContent: "center",
-
-  //   borderWidth: 1,
-  //   borderColor: "#E2E8F0",
-  // },
-  recordButton: {
-    backgroundColor: "#0F4C9C",
-    borderColor: "#0F4C9C",
-  },
-  recordingActive: {
-    backgroundColor: "#DC2626",
-    borderColor: "#DC2626",
-  },
-  recordingText: {
-    marginTop: 12,
-    color: "#0F4C9C",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  imagePreviewContainer: {
-    position: "absolute",
-    right: 80,
-    bottom: 0,
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
     backgroundColor: "#F8FAFC",
   },
-  imagePreview: {
-    width: "100%",
-    height: "100%",
+  quickActionRow: {
+    marginTop: verticalScale(10),
+    flexDirection: "row",
+    gap: scale(8),
   },
-  removeImageButton: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.9)",
-  },
-  scenarioScrollButton: {
-    position: "absolute",
-    right: 8,
-    bottom: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#EFF6FF",
-    justifyContent: "center",
-    alignItems: "center",
+  quickActionButton: {
+    flex: 1,
+    minHeight: verticalScale(40),
+    borderRadius: moderateScale(10),
     borderWidth: 1,
-    borderColor: "#BFDBFE",
-  },
-  listeningText: {
-    // marginTop: 10,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#0F4C9C",
-  },
-  generateBtn: { marginTop: 10, borderRadius: 20, overflow: "hidden" },
-  gradientBtn: {
-    height: 64,
+    borderColor: "#DBEAFE",
+    backgroundColor: "#EFF6FF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    gap: scale(6),
   },
-  btnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  quickActionButtonRecording: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  quickActionText: {
+    color: "#0F4C9C",
+    fontSize: moderateScale(12),
+    fontWeight: "700",
+  },
+  quickActionTextRecording: {
+    color: "#B91C1C",
+  },
+  imagePreviewStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderRadius: moderateScale(12),
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(6),
+    marginBottom: verticalScale(10),
+    gap: scale(8),
+  },
+  imagePreviewSmall: {
+    width: scale(30),
+    height: scale(30),
+    borderRadius: moderateScale(8),
+  },
+  removeImageSmall: {
+    padding: scale(2),
+    marginLeft: "auto",
+  },
+  attachmentText: {
+    fontSize: moderateScale(12),
+    color: "#475569",
+    fontWeight: "600",
+  },
+  charCount: {
+    marginTop: verticalScale(8),
+    textAlign: "right",
+    fontSize: moderateScale(11),
+    color: "#94A3B8",
+  },
+  generateFooter: {
+    paddingHorizontal: scale(isSmallScreen ? 14 : 18),
+    paddingTop: verticalScale(10),
+    paddingBottom: Platform.OS === "ios" ? verticalScale(22) : verticalScale(14),
+    backgroundColor: "#F8FAFC",
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  generateButton: {
+    minHeight: verticalScale(48),
+    borderRadius: moderateScale(14),
+    backgroundColor: "#0F4C9C",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: scale(8),
+  },
+  generateButtonDisabled: { backgroundColor: "#94A3B8" },
+  generateButtonText: {
+    color: "#FFFFFF",
+    fontSize: moderateScale(15),
+    fontWeight: "800",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.6)",
@@ -1151,95 +797,51 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#FFF",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 24,
+    borderTopLeftRadius: moderateScale(28),
+    borderTopRightRadius: moderateScale(28),
+    padding: scale(20),
+    maxHeight: screenHeight * 0.9,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: verticalScale(16),
   },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
+  modalTitle: {
+    fontSize: moderateScale(19),
+    fontWeight: "800",
+    color: "#0F172A",
+  },
   modalLabel: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "800",
     color: "#94A3B8",
     textTransform: "uppercase",
-    marginBottom: 6,
+    marginBottom: verticalScale(6),
   },
   modalInput: {
     backgroundColor: "#F8FAFC",
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: moderateScale(14),
+    padding: scale(14),
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: "#0F172A",
   },
-  modalScrollContent: {
-    gap: 12,
-    paddingBottom: 40,
-  },
-  rowTwoColumn: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  rowColumn: {
-    flex: 1,
-  },
+  modalScrollContent: { gap: scale(12), paddingBottom: verticalScale(36) },
+  rowTwoColumn: { flexDirection: "row", gap: scale(10) },
+  rowColumn: { flex: 1 },
   modalActionBtn: {
     backgroundColor: "#0F4C9C",
-    borderRadius: 18,
-    paddingVertical: 18,
+    borderRadius: moderateScale(16),
+    paddingVertical: verticalScale(16),
     alignItems: "center",
-    marginTop: 10,
+    marginTop: verticalScale(8),
   },
-  modalActionText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
-  dropdownTrigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFF",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    // marginBottom: 20,
+  modalActionText: {
+    color: "#FFF",
+    fontSize: moderateScale(16),
+    fontWeight: "800",
   },
-  dropdownLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  taskIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dropdownValueText: { fontSize: 15, fontWeight: "700", color: "#1E293B" },
-  taskOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 8,
-    gap: 12,
-  },
-  taskOptionActive: { backgroundColor: "#F1F5F9" },
-  taskOptionText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  taskOptionTextActive: { color: "#0F4C9C", fontWeight: "800" },
-  // micBtn: {
-  //   // backgroundColor: "#0F4C9C",
-  //   // borderColor: "#0F4C9C",
-  // },
-  micBtnActive: { transform: [{ scale: 1.1 }] },
-  micBtnDisabled: { opacity: 0.5 },
-  workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
 });
