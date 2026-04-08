@@ -17,7 +17,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AllDraftsofUser, saveDraft, updateDraft } from "@/lib/api"; // Added updateDraft and draft loader
+import {
+  AllDraftsofUser,
+  generateNextStep,
+  generateResponse,
+  saveDraft,
+  updateDraft
+} from "@/lib/api"; // Added updateDraft and draft loader
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
@@ -30,9 +36,11 @@ type Params = {
   alreadySaved?: string;
   draftId?: string; // Added draftId to params
   created_at?: string; // Added created_at to params
+  workflow_user_input?: string;
 };
 
 const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
+const NEXT_STEP_TASK_TYPE = "claim_note_drafting";
 
 
 export default function ResponseScreen() {
@@ -44,6 +52,8 @@ export default function ResponseScreen() {
 
   const [copying, setCopying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [generatingNextStep, setGeneratingNextStep] = useState(false);
   const [isSaved, setIsSaved] = useState(params.alreadySaved === "true");
   const [draftCreatedAt, setDraftCreatedAt] = useState(params.created_at || "");
 
@@ -111,7 +121,14 @@ export default function ResponseScreen() {
       }
     };
     logToSession();
-  }, [editedText, params.alreadySaved, draftCreatedAt]);
+  }, [
+    editedText,
+    params.alreadySaved,
+    params.created_at,
+    params.fileId,
+    params.output_format,
+    draftCreatedAt,
+  ]);
 
   useEffect(() => {
     setIsSaved(params.alreadySaved === "true");
@@ -199,6 +216,149 @@ export default function ResponseScreen() {
     }
   }
 
+  async function onGenerateNextStep() {
+    if (!token) {
+      toast.warning("Session Expired");
+      router.replace("/login");
+      return;
+    }
+
+    if (!params.fileId || !params.output_format) {
+      toast.warning("Missing workflow context");
+      return;
+    }
+
+    const fileId = Number(params.fileId);
+    if (Number.isNaN(fileId)) {
+      toast.warning("Invalid workspace");
+      return;
+    }
+
+    const workflowInput = (params.workflow_user_input || "").trim() || editedText.trim();
+    if (!workflowInput) {
+      toast.warning("Missing claim input");
+      return;
+    }
+
+    setGeneratingNextStep(true);
+    try {
+      const nextStepResult = await generateNextStep(token, {
+        fileId: params.fileId,
+        userInput: workflowInput,
+        previousResponse: editedText,
+        output_format: params.output_format,
+      });
+
+      const generatedText =
+        nextStepResult.responseText ||
+        nextStepResult.content ||
+        "";
+
+      if (generatedText.trim()) {
+        router.push({
+          pathname: "/response",
+          params: {
+            output_format:
+              nextStepResult.output_format ||
+              nextStepResult.next_output_format ||
+              "file_note",
+            type: "Next Step",
+            text: generatedText,
+            fileId: params.fileId,
+            alreadySaved: "false",
+            created_at: nextStepResult.created_at || new Date().toISOString(),
+            workflow_user_input: workflowInput,
+          },
+        });
+        return;
+      }
+
+      const fallbackInstruction =
+        nextStepResult.next_step ||
+        "Create the next required workflow response and document claim handling.";
+
+      const fallbackResponse = await generateResponse(token, {
+        fileId,
+        userInput: fallbackInstruction,
+        task_type: NEXT_STEP_TASK_TYPE,
+      });
+
+      router.push({
+        pathname: "/response",
+        params: {
+          output_format: fallbackResponse.output_format,
+          type: fallbackResponse.responseTypeLabel,
+          text: fallbackResponse.responseText,
+          fileId: fallbackResponse.fileId.toString(),
+          alreadySaved: "false",
+          created_at: fallbackResponse.createdAt,
+          workflow_user_input: workflowInput,
+        },
+      });
+    } catch (error: any) {
+      console.error("Generate next step error:", error);
+      toast.error("Error", {
+        description: error?.message || "Failed to generate next workflow step.",
+      });
+    } finally {
+      setGeneratingNextStep(false);
+    }
+  }
+
+  async function onRegenerate() {
+    if (!token) {
+      toast.warning("Session Expired");
+      router.replace("/login");
+      return;
+    }
+
+    if (!params.fileId) {
+      toast.warning("Workspace is missing");
+      return;
+    }
+
+    const fileId = Number(params.fileId);
+    if (Number.isNaN(fileId)) {
+      toast.warning("Invalid workspace");
+      return;
+    }
+
+    const workflowInput = (params.workflow_user_input || "").trim() || editedText.trim();
+    if (!workflowInput) {
+      toast.warning("Missing claim input");
+      return;
+    }
+
+    try {
+      setRegenerating(true);
+      const result = await generateResponse(token, {
+        fileId,
+        userInput: workflowInput,
+        task_type: NEXT_STEP_TASK_TYPE,
+      });
+
+      router.replace({
+        pathname: "/response",
+        params: {
+          output_format: result.output_format,
+          type: result.responseTypeLabel,
+          text: result.responseText,
+          fileId: result.fileId.toString(),
+          alreadySaved: "false",
+          created_at: result.createdAt || new Date().toISOString(),
+          workflow_user_input: workflowInput,
+        },
+      });
+    } catch (error: any) {
+      console.error("Regenerate error:", error);
+      toast.error("Error", {
+        description: error?.message || "Failed to regenerate response.",
+      });
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -246,10 +406,16 @@ export default function ResponseScreen() {
 
         <View style={[styles.documentCard, isEditing && styles.editingCard]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardHeaderLabel}>
-               {isEditing ? "EDIT DRAFT" : "AI GENERATED CONTENT"}
-            </Text>
-            <View style={styles.cardHeaderLine} />
+            <View style={styles.cardHeaderLeft}>
+              <Text style={styles.cardHeaderLabel}>
+                {isEditing ? "EDIT DRAFT" : "AI GENERATED CONTENT"}
+              </Text>
+              <View style={styles.cardHeaderLine} />
+            </View>
+            <Pressable onPress={onCopy} style={styles.copyTopButton}>
+              <Ionicons name={copying ? "checkmark" : "copy-outline"} size={16} color="#0B3C7A" />
+              <Text style={styles.copyTopButtonText}>{copying ? "Copied" : "Copy"}</Text>
+            </Pressable>
           </View>
           
           {/* TOGGLE BETWEEN TEXT AND TEXTINPUT */}
@@ -270,13 +436,35 @@ export default function ResponseScreen() {
             <Text style={styles.footerNote}>Check for accuracy before sending.</Text>
           </View>
         </View>
+          <Pressable
+          onPress={onGenerateNextStep}
+          disabled={generatingNextStep}
+          style={[styles.nextStepButton, generatingNextStep && { opacity: 0.8 }]}
+        >
+          <LinearGradient colors={["#0F766E", "#115E59"]} style={styles.nextStepGradient}>
+            {generatingNextStep ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="source-branch" size={18} color="#FFFFFF" />
+                <Text style={styles.nextStepButtonText}>Generate Next Step</Text>
+              </>
+            )}
+          </LinearGradient>
+        </Pressable>
       </ScrollView>
 
       <View style={[styles.floatingFooter, { paddingBottom: insets.bottom + 20 }]}>
         <View style={styles.buttonRow}>
-          <Pressable onPress={onCopy} style={styles.secondaryButton}>
-            <Ionicons name={copying ? "checkmark" : "copy-outline"} size={20} color="#0B3C7A" />
-            <Text style={styles.secondaryButtonText}>{copying ? "Copied" : "Copy"}</Text>
+          <Pressable onPress={onRegenerate} disabled={regenerating} style={[styles.secondaryButton, regenerating && { opacity: 0.8 }]}>
+            {regenerating ? (
+              <ActivityIndicator color="#0B3C7A" size="small" />
+            ) : (
+              <>
+                <Ionicons name="refresh-outline" size={20} color="#0B3C7A" />
+                <Text style={styles.secondaryButtonText}>Regenerate</Text>
+              </>
+            )}
           </Pressable>
 
           <Pressable
@@ -301,6 +489,7 @@ export default function ResponseScreen() {
             </LinearGradient>
           </Pressable>
         </View>
+      
       </View>
     </View>
   );
@@ -320,9 +509,22 @@ const styles = StyleSheet.create({
   timestamp: { color: "#64748B", fontSize: 12 },
   documentCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 24, borderWidth: 1, borderColor: "#E2E8F0" },
   editingCard: { borderColor: "#276bbd", borderWidth: 2, backgroundColor: "#F0F7FF" }, // Highlight card when editing
-  cardHeader: { marginBottom: 20, flexDirection: "row", alignItems: "center", gap: 10 },
+  cardHeader: { marginBottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  cardHeaderLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   cardHeaderLabel: { fontSize: 10, color: "#94A3B8", fontWeight: "800" },
   cardHeaderLine: { flex: 1, height: 1, backgroundColor: "#F1F5F9" },
+  copyTopButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  copyTopButtonText: { color: "#0B3C7A", fontSize: 12, fontWeight: "700" },
   bodyText: { color: "#334155", fontSize: 16, lineHeight: 28 },
   textInput: { color: "#334155", fontSize: 16, lineHeight: 28, minHeight: 200, padding: 0 }, // Style for editable text
   cardFooter: { marginTop: 30, paddingTop: 20, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
@@ -331,7 +533,10 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: "row", gap: 12 },
   secondaryButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#276bbd", borderRadius: 16, height: 56, gap: 8 },
   secondaryButtonText: { color: "#0B3C7A", fontWeight: "700", fontSize: 15 },
-  primaryButton: { flex: 2, borderRadius: 16, overflow: "hidden" },
-  buttonGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", height: 56, gap: 10 },
-  buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
+  primaryButton: { flex: 1, borderRadius: 16, overflow: "hidden" },
+  buttonGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", height: 56, gap: 10 ,paddingHorizontal: 20},
+  buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800",  },
+  nextStepButton: { marginTop: 10, borderRadius: 14, overflow: "hidden" },
+  nextStepGradient: { height: 50, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  nextStepButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
 });

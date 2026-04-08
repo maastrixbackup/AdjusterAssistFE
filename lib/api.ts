@@ -108,6 +108,24 @@ export type GenerateResponseResult = {
   createdAt?: string;
 };
 
+export type GenerateNextStepRequest = {
+  fileId: number | string;
+  userInput: string;
+  previousResponse: string;
+  output_format: string;
+};
+
+export type GenerateNextStepResult = {
+  next_output_format: string;
+  next_step: string;
+  rationale?: string;
+  source?: string;
+  output_format?: string;
+  responseText?: string;
+  content?: string;
+  created_at?: string;
+};
+
 export type SubscriptionStatus = {
   success: boolean;
   subscription: {
@@ -297,6 +315,56 @@ export async function generateResponse(
     nextStep: res.data.next_step,
     logId: res.data.log_id,
     createdAt: res.data.created_at,
+  };
+}
+
+export async function generateNextStep(
+  token: string,
+  payload: GenerateNextStepRequest,
+): Promise<GenerateNextStepResult> {
+  const res = await apiRequest<{
+    success: boolean;
+    message?: string;
+    data?: {
+      next_output_format?: string;
+      next_step?: string;
+      rationale?: string;
+      source?: string;
+      output_format?: string;
+      content?: string;
+      response_text?: string;
+      created_at?: string;
+    };
+    next_output_format?: string;
+    next_step?: string;
+    rationale?: string;
+    source?: string;
+    output_format?: string;
+    content?: string;
+    response_text?: string;
+    created_at?: string;
+  }>(
+    "/drafts/generate-next-step",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
+
+  return {
+    next_output_format:
+      res?.data?.next_output_format || res?.next_output_format || "file_note",
+    next_step:
+      res?.data?.next_step ||
+      res?.next_step ||
+      "Create a File Note documenting this step.",
+    rationale: res?.data?.rationale || res?.rationale,
+    source: res?.data?.source || res?.source || "api",
+    output_format: res?.data?.output_format || res?.output_format,
+    responseText: res?.data?.response_text || res?.response_text,
+    content: res?.data?.content || res?.content,
+    created_at: res?.data?.created_at || res?.created_at,
   };
 }
 

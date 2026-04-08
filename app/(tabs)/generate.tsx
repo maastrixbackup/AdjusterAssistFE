@@ -259,6 +259,7 @@ export default function GenerateScreen() {
           fileId: result.fileId.toString(),
           alreadySaved: "false",
           created_at: result.createdAt,
+          workflow_user_input: payload.userInput,
         },
       });
       setRequest("");
