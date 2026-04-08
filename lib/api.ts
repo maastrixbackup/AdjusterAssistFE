@@ -107,6 +107,24 @@ export type GenerateResponseResult = {
   createdAt?: string;
 };
 
+export type GenerateNextStepRequest = {
+  fileId: number | string;
+  userInput: string;
+  previousResponse: string;
+  output_format: string;
+};
+
+export type GenerateNextStepResult = {
+  next_output_format: string;
+  next_step: string;
+  rationale?: string;
+  source?: string;
+  output_format?: string;
+  responseText?: string;
+  content?: string;
+  created_at?: string;
+};
+
 export type SubscriptionStatus = {
   success: boolean;
   subscription: {

@@ -1,258 +1,1206 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
+import { useFocusEffect } from "@react-navigation/native";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
-  Share,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Ensure generateNextStep is exported from your @/lib/api
-import { generateNextStep, saveDraft, updateDraft } from "@/lib/api";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
+
+import {
+  ClaimFile,
+  createFile,
+  generateResponse,
+  GenerateResponseRequest,
+  getMyFiles,
+  getRecentDrafts,
+  getSubscriptionStatus,
+  RecentDraft,
+  SubscriptionStatus,
+} from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
-type Params = {
-  text?: string;
-  type?: string;
-  output_format?: string;
-  userInput?: string;
-  fileId?: string;
-  alreadySaved?: string;
-  draftId?: string;
-  created_at?: string;
-};
-
-const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
-
-export default function ResponseScreen() {
+export default function GenerateScreen() {
   const { token } = useAuth();
-  const params = useLocalSearchParams<Params>();
-  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
 
-  const [copying, setCopying] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(params.alreadySaved === "true");
-  const [draftCreatedAt, setDraftCreatedAt] = useState(params.created_at || "");
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedText, setEditedText] = useState(params.text || "");
-  
-  // --- NEXT STEP STATE ---
-  const [isGeneratingNext, setIsGeneratingNext] = useState(false);
+  const [workspaces, setWorkspaces] = useState<ClaimFile[]>([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<ClaimFile | null>(
+    null,
+  );
 
-  /**
-   * TRIGGER WORKFLOW CHAIN
-   * This calls your new API and pushes the user to a NEW response screen
-   */
-  const handleWorkflowChain = async () => {
-    if (!token || isGeneratingNext) return;
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
 
+  // Unified Form State for all 11 fields (Plus status)
+  const [fileForm, setFileForm] = useState({
+    claim_number: "",
+    client_name: "",
+    address: "",
+    policy_form: "HO-3",
+    date_of_loss: new Date().toISOString().split("T")[0],
+    reported_date: new Date().toISOString().split("T")[0],
+    loss_type: "water",
+    jurisdiction: "",
+    line_of_business: "homeowners",
+    claim_stage: "mitigation_review",
+    status: "active" as const,
+  });
+
+  const [request, setRequest] = useState("");
+  const [claimDetails, setClaimDetails] = useState("");
+  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
+  const [recentDrafts, setRecentDrafts] = useState<RecentDraft[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [showScenarioScrollButton, setShowScenarioScrollButton] =
+    useState(false);
+  const scenarioTextInputRef = useRef<TextInput>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [isPickingImage, setIsPickingImage] = useState(false);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!token) return;
     try {
-      setIsGeneratingNext(true);
-      const sanitizedToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
-
-      const result = await generateNextStep(sanitizedToken, {
-        fileId: params.fileId || "",
-        userInput: params.userInput, // Fallback context
-        previousResponse: editedText,
-        output_format: params.output_format || "",
-        // nextPrompt: "Generate the mandatory follow-up documentation for this file." // Static prompt for now
-      });
-
-      if (result) {
-        toast.success("Workflow Advanced");
-        // Push to a fresh response screen with the new AI content
-        router.push({
-          pathname: "/response",
-          params: {
-            text: result.responseText,
-            output_format: result.output_format,
-            fileId: params.fileId,
-            alreadySaved: "false",
-            created_at: result.createdAt
-          }
-        });
-      }
-    } catch (error: any) {
-      toast.error("Workflow Error", { description: error.message });
+      const [statusData, draftsData, filesData] = await Promise.all([
+        getSubscriptionStatus(token),
+        getRecentDrafts(token),
+        getMyFiles(token),
+      ]);
+      setStatus(statusData);
+      setRecentDrafts(draftsData ?? []);
+      setWorkspaces(filesData ?? []);
+      if (filesData?.length > 0 && !selectedWorkspace)
+        setSelectedWorkspace(filesData[0]);
+    } catch (err) {
+      console.error(err);
     } finally {
-      setIsGeneratingNext(false);
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, [token, selectedWorkspace]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          y: 0,
+          animated: false, // instant reset
+        });
+      }, 50);
+    }, []),
+  );
+
+  // Handle Scenario Description Text Change
+  const handleScenarioTextChange = (text: string) => {
+    setRequest(text);
+    setShowScenarioScrollButton(text.length > 100);
+  };
+
+  // Handler for Scenario Scroll to Bottom
+  const handleScenarioScrollToBottom = () => {
+    if (scenarioTextInputRef.current) {
+      scenarioTextInputRef.current.focus();
     }
   };
 
-  // ... [Keep your existing useEffects for loading and session logging] ...
-
-  async function onSave() {
-    if (isEditing) { setIsEditing(false); toast.success("Draft updated locally."); return; }
-    if (isSaved || saving) return;
-    const fId = params.fileId;
-    if (!fId || fId === "undefined") { toast.warning("Workspace missing"); return; }
+  const handlePickImage = async () => {
     try {
-      setSaving(true);
-      const sanitizedToken = token?.startsWith("Bearer ") ? token.split(" ")[1] : token;
-      let result = (params.alreadySaved === "true" && params.draftId)
-        ? await updateDraft(sanitizedToken!, params.draftId, { content: editedText, output_format: params.output_format || "" })
-        : await saveDraft(sanitizedToken!, Number(fId), params.output_format || "", editedText);
-      if (result) { setIsSaved(true); toast.success("Draft Saved"); }
-    } catch (e: any) { toast.error("Save failed"); } finally { setSaving(false); }
+      setIsPickingImage(true);
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert("Permission required", "Media library access is required.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        const imageAsset = result.assets[0];
+
+        // Use a fallback for the URI to avoid 'undefined'
+        const uri = imageAsset.uri;
+        setSelectedImage(uri);
+
+        // 2. Process for Backend (Base64)
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1024 } }],
+          {
+            compress: 0.7,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true,
+          },
+        );
+
+        setImageBase64(manipulatedImage.base64 ?? null);
+        // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
+      }
+    } catch (error) {
+      console.error("Image picker error:", error);
+      // Use your toast or alert here
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
+  // const handleTakePhoto = async () => {
+  //   try {
+  //     setIsTakingPhoto(true);
+  //     const permission = await ImagePicker.requestCameraPermissionsAsync();
+  //     if (!permission.granted) {
+  //       Alert.alert(
+  //         "Permission required",
+  //         "Camera access is required to take a photo.",
+  //       );
+  //       return;
+  //     }
+
+  //     const result: any = await ImagePicker.launchCameraAsync({
+  //       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  //       allowsEditing: false,
+  //       quality: 1,
+  //     });
+
+  //     const imageAsset = result.assets?.[0];
+  //     if (imageAsset?.uri) {
+  //       setSelectedImage(imageAsset.uri);
+  //       const fileName = imageAsset.uri.split("/").pop() ?? "photo";
+  //       setRequest((prev) =>
+  //         prev
+  //           ? `${prev}\n[Attached photo: ${fileName}]`
+  //           : `[Attached photo: ${fileName}]`,
+  //       );
+  //     }
+  //   } catch (error) {
+  //     console.error("Camera error:", error);
+  //     Alert.alert("Attachment failed", "Unable to take a photo.");
+  //   } finally {
+  //     setIsTakingPhoto(false);
+  //   }
+  // };
+
+  const handleCreateWorkspace = async () => {
+    if (!token) return;
+
+    // Validation for the 11 mandatory fields
+    const {
+      claim_number,
+      client_name,
+      address,
+      jurisdiction,
+      loss_type,
+      date_of_loss,
+    } = fileForm;
+    if (
+      !claim_number ||
+      !client_name ||
+      !address ||
+      !jurisdiction ||
+      !loss_type ||
+      !date_of_loss
+    ) {
+      toast.warning("Missing required insurance metadata");
+      return;
+    }
+
+    setIsCreatingFile(true);
+    try {
+      const response = await createFile(token, fileForm);
+      if (response.success) {
+        const newFile = response.file;
+        setWorkspaces((prev) => [newFile, ...prev]);
+        setSelectedWorkspace(newFile);
+        setIsModalVisible(false);
+        setFileForm({
+          claim_number: "",
+          client_name: "",
+          address: "",
+          policy_form: "HO-3",
+          date_of_loss: new Date().toISOString().split("T")[0],
+          reported_date: new Date().toISOString().split("T")[0],
+          loss_type: "water",
+          jurisdiction: "",
+          line_of_business: "homeowners",
+          claim_stage: "mitigation_review",
+          status: "active",
+        });
+        toast.success("Workspace initialized");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Creation failed");
+    } finally {
+      setIsCreatingFile(false);
+    }
+  };
+
+  const onGenerate = useCallback(async () => {
+    if (!token) return router.replace("/login");
+    if (!selectedWorkspace) return toast.warning("Select a Workspace first.");
+    if (!request || request.trim().length < 5)
+      return toast.warning("Describe the scenario.");
+
+    setIsGenerating(true);
+    try {
+      const payload: GenerateResponseRequest = {
+        fileId: selectedWorkspace.id,
+        image: imageBase64,
+        userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
+      };
+      const result = await generateResponse(token, payload);
+      router.push({
+        pathname: "/response",
+        params: {
+          output_format: result.output_format,
+          type: result.responseTypeLabel,
+          userInput: payload.userInput,
+          text: result.responseText,
+          fileId: result.fileId.toString(),
+          alreadySaved: "false",
+          created_at: result.createdAt,
+        },
+      });
+      setRequest("");
+      setClaimDetails("");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error?.message || "Generation failed");
+    } finally {
+      setImageBase64(null);
+      setIsGenerating(false);
+    }
+  }, [token, request, claimDetails, selectedWorkspace]);
+
+  if (isLoading && !refreshing) {
+    return (
+      <View style={styles.loaderScreen}>
+        <LinearGradient
+          colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
+          style={styles.loaderGradient}
+        >
+          <View style={styles.loaderContent}>
+            <View style={styles.loaderIconWrap}>
+              <Ionicons name="sparkles" size={34} color="#FFFFFF" />
+            </View>
+            <Text style={styles.loaderTitle}>Preparing AI Workspace</Text>
+            <ActivityIndicator
+              size="small"
+              color="#FFFFFF"
+              style={{ marginTop: 18 }}
+            />
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
+
+  async function onGenerateNextStep() {
+    if (!token) {
+      toast.warning("Session Expired");
+      router.replace("/login");
+      return;
+    }
+
+    if (!params.fileId || !params.output_format) {
+      toast.warning("Missing workflow context");
+      return;
+    }
+
+    const fileId = Number(params.fileId);
+    if (Number.isNaN(fileId)) {
+      toast.warning("Invalid workspace");
+      return;
+    }
+
+    const workflowInput =
+      (params.workflow_user_input || "").trim() || editedText.trim();
+    if (!workflowInput) {
+      toast.warning("Missing claim input");
+      return;
+    }
+
+    setGeneratingNextStep(true);
+    try {
+      const nextStepResult = await generateNextStep(token, {
+        fileId: params.fileId,
+        userInput: workflowInput,
+        previousResponse: editedText,
+        output_format: params.output_format,
+      });
+
+      const generatedText =
+        nextStepResult.responseText || nextStepResult.content || "";
+
+      if (generatedText.trim()) {
+        router.push({
+          pathname: "/response",
+          params: {
+            output_format:
+              nextStepResult.output_format ||
+              nextStepResult.next_output_format ||
+              "file_note",
+            type: "Next Step",
+            text: generatedText,
+            fileId: params.fileId,
+            alreadySaved: "false",
+            created_at: nextStepResult.created_at || new Date().toISOString(),
+            workflow_user_input: workflowInput,
+          },
+        });
+        return;
+      }
+
+      const fallbackInstruction =
+        nextStepResult.next_step ||
+        "Create the next required workflow response and document claim handling.";
+
+      const fallbackResponse = await generateResponse(token, {
+        fileId,
+        userInput: fallbackInstruction,
+        task_type: NEXT_STEP_TASK_TYPE,
+      });
+
+      router.push({
+        pathname: "/response",
+        params: {
+          output_format: fallbackResponse.output_format,
+          type: fallbackResponse.responseTypeLabel,
+          text: fallbackResponse.responseText,
+          fileId: fallbackResponse.fileId.toString(),
+          alreadySaved: "false",
+          created_at: fallbackResponse.createdAt,
+          workflow_user_input: workflowInput,
+        },
+      });
+    } catch (error: any) {
+      console.error("Generate next step error:", error);
+      toast.error("Error", {
+        description: error?.message || "Failed to generate next workflow step.",
+      });
+    } finally {
+      setGeneratingNextStep(false);
+    }
+  }
+
+  async function onRegenerate() {
+    if (!token) {
+      toast.warning("Session Expired");
+      router.replace("/login");
+      return;
+    }
+
+    if (!params.fileId) {
+      toast.warning("Workspace is missing");
+      return;
+    }
+
+    const fileId = Number(params.fileId);
+    if (Number.isNaN(fileId)) {
+      toast.warning("Invalid workspace");
+      return;
+    }
+
+    const workflowInput =
+      (params.workflow_user_input || "").trim() || editedText.trim();
+    if (!workflowInput) {
+      toast.warning("Missing claim input");
+      return;
+    }
+
+    try {
+      setRegenerating(true);
+      const result = await generateResponse(token, {
+        fileId,
+        userInput: workflowInput,
+        task_type: NEXT_STEP_TASK_TYPE,
+      });
+
+      router.replace({
+        pathname: "/response",
+        params: {
+          output_format: result.output_format,
+          type: result.responseTypeLabel,
+          text: result.responseText,
+          fileId: result.fileId.toString(),
+          alreadySaved: "false",
+          created_at: result.createdAt || new Date().toISOString(),
+          workflow_user_input: workflowInput,
+        },
+      });
+    } catch (error: any) {
+      console.error("Regenerate error:", error);
+      toast.error("Error", {
+        description: error?.message || "Failed to regenerate response.",
+      });
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-
-      <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerContent}>
-          <Pressable onPress={() => router.back()} style={styles.iconButton}>
-            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
-          </Pressable>
-          <Text style={styles.headerTitle}>Review Draft</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => setIsEditing(!isEditing)} style={styles.iconButton}>
-              <MaterialCommunityIcons name={isEditing ? "close-circle" : "pencil-outline"} size={24} color={isEditing ? "#ff4444" : "#FFFFFF"} />
+    <View style={styles.mainContainer}>
+      <StatusBar style="light" />
+      <LinearGradient
+        colors={["#0F4C9C", "#123C78"]}
+        style={styles.headerGradient}
+      >
+        <SafeAreaView edges={["top"]} style={styles.safeHeader}>
+          <View style={styles.navBar}>
+            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </Pressable>
-            <Pressable onPress={() => Share.share({ message: editedText })} style={styles.iconButton}>
-              <Ionicons name="share-outline" size={24} color="#FFFFFF" />
-            </Pressable>
+            <Text style={styles.navTitle}>AI Studio</Text>
+            <View style={styles.creditBadge}>
+              <View style={styles.statusDot} />
+              <Text style={styles.creditValue}>
+                {status?.subscription?.remaining ?? 0} Credits
+              </Text>
+            </View>
           </View>
-        </View>
+        </SafeAreaView>
       </LinearGradient>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 180 }]}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        <View style={styles.metaRow}>
-          <View style={styles.typeBadge}>
-            <MaterialCommunityIcons name="robot" size={16} color="#1469C9" />
-            <Text style={styles.typeText}>{params.output_format}</Text>
-          </View>
-          <Text style={styles.timestamp}>{new Date().toLocaleTimeString()}</Text>
-        </View>
-
-        <View style={[styles.documentCard, isEditing && styles.editingCard]}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardHeaderLabel}>{isEditing ? "EDITING" : "AI CONTENT"}</Text>
-            <View style={styles.cardHeaderLine} />
-          </View>
-          
-          {isEditing ? (
-            <TextInput
-              style={styles.textInput}
-              multiline
-              value={editedText}
-              onChangeText={setEditedText}
-              autoFocus
-              textAlignVertical="top"
-            />
-          ) : (
-            <Text style={styles.bodyText}>{editedText}</Text>
-          )}
-        </View>
-
-        {/* STATIC NEXT STEP BUTTON (Triggering the Workflow API) */}
-        {!isEditing && (
-          <Pressable 
-            onPress={handleWorkflowChain} 
-            disabled={isGeneratingNext}
-            style={({ pressed }) => [styles.nextStepBar, pressed && { opacity: 0.8 }]}
+        <View style={{ padding: 20 }}>
+          <Text style={styles.sectionLabel}>Active Workspace</Text>
+          <ScrollView
+            style={styles.workspaceScroll}
+            horizontal
+            showsHorizontalScrollIndicator={false}
           >
-            <View style={styles.nextStepContent}>
-              <MaterialCommunityIcons name="lightning-bolt" size={20} color="#F59E0B" />
-              <View>
-                <Text style={styles.nextStepTitle}>Generate Next Step</Text>
-                <Text style={styles.nextStepSub}>Draft the mandatory follow-up documentation</Text>
-              </View>
+            <View style={styles.workspaceGrid}>
+              <Pressable
+                style={[styles.workspaceTile, styles.addWorkspaceBtn]}
+                onPress={() => setIsModalVisible(true)}
+              >
+                <Ionicons name="add" size={20} color="#0F4C9C" />
+                <Text style={styles.addWorkspaceText}>New Workspace</Text>
+              </Pressable>
+              {workspaces.map((ws) => (
+                <Pressable
+                  key={ws.id}
+                  onPress={() => setSelectedWorkspace(ws)}
+                  style={[
+                    styles.workspaceTile,
+                    styles.workspaceItem,
+                    selectedWorkspace?.id === ws.id &&
+                      styles.workspaceItemActive,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={
+                      selectedWorkspace?.id === ws.id ? "folder-open" : "folder"
+                    }
+                    size={18}
+                    color={selectedWorkspace?.id === ws.id ? "#FFF" : "#64748B"}
+                  />
+                  <Text
+                    style={[
+                      styles.workspaceText,
+                      selectedWorkspace?.id === ws.id &&
+                        styles.workspaceTextActive,
+                    ]}
+                  >
+                    {ws.client_name || ws.claim_number}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-            {isGeneratingNext ? (
-              <ActivityIndicator color="#276bbd" />
-            ) : (
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-            )}
-          </Pressable>
-        )}
-      </ScrollView>
+          </ScrollView>
 
-      {/* FIXED FOOTER */}
-      <View style={[styles.floatingFooter, { paddingBottom: insets.bottom + 20 }]}>
-        <View style={styles.buttonRow}>
-          <Pressable onPress={() => { Clipboard.setStringAsync(editedText); setCopying(true); setTimeout(() => setCopying(false), 2000); toast.success("Copied"); }} style={styles.secondaryButton}>
-            <Ionicons name={copying ? "checkmark" : "copy-outline"} size={20} color="#0B3C7A" />
-            <Text style={styles.secondaryButtonText}>{copying ? "Copied" : "Copy"}</Text>
-          </Pressable>
+          <View style={styles.glassCard}>
+            <View>
+              <View style={styles.fieldHeader}>
+                <View style={styles.iconCircle}>
+                  <MaterialCommunityIcons
+                    name="text-box-search-outline"
+                    size={16}
+                    color="#020617"
+                  />
+                </View>
+                <Text style={styles.inputLabel}>Scenario Description</Text>
+                {request.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setRequest("")}
+                    style={styles.clearTextButton}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.clearText}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  ref={scenarioTextInputRef}
+                  value={request}
+                  onChangeText={handleScenarioTextChange}
+                  multiline
+                  scrollEnabled
+                  placeholder="What happened?"
+                  placeholderTextColor="#94A3B8"
+                  style={styles.mainTextInput}
+                />
+                <View style={styles.inputActions}>
+                  {/* Attach */}
+                  <TouchableOpacity
+                    // style={styles.inputActionButton}
+                    onPress={handlePickImage}
+                  >
+                    <Ionicons name="attach" size={20} color="#475569" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      // TODO: hook your voice logic here
+                      setIsRecording((prev) => !prev);
+                    }}
+                  >
+                    <Ionicons
+                      name={isRecording ? "stop" : "mic"}
+                      size={20}
+                      color="#0F4C9C"
+                    />
+                  </TouchableOpacity>
+                </View>
 
-          <Pressable onPress={onSave} disabled={saving || (isSaved && !isEditing)} style={styles.primaryButton}>
+                {selectedImage ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image
+                      source={{ uri: selectedImage }}
+                      style={styles.imagePreview}
+                    />
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => setSelectedImage(null)}
+                    >
+                      <MaterialCommunityIcons
+                        name="close"
+                        size={16}
+                        color="#0F172A"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </View>
+              {/* {isRecording && (
+                <Text style={styles.listeningText}>Listening...</Text>
+              )} */}
+              {/* 
+              {isProcessing && (
+                <Text style={styles.listeningText}>Converting speech...</Text>
+              )} */}
+            </View>
+          </View>
+
+          <Pressable
+            onPress={onGenerate}
+            disabled={isGenerating}
+            style={styles.generateBtn}
+          >
             <LinearGradient
-              colors={isEditing || isSaved ? ["#10B981", "#059669"] : ["#276bbd", "#0B3C7A"]}
-              style={styles.buttonGradient}
+              colors={["#004db1", "#0c1736"]}
+              style={styles.gradientBtn}
             >
-              {saving ? <ActivityIndicator color="#FFF" /> : (
+              {isGenerating ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
                 <>
-                  <Ionicons name={isEditing ? "checkmark-done" : (isSaved ? "cloud-done" : "cloud-upload-outline")} size={20} color="#FFF" />
-                  <Text style={styles.buttonText}>{isEditing ? "Confirm" : (isSaved ? "Saved" : "Save Draft")}</Text>
+                  <Text style={styles.btnText}>Generate Draft</Text>
+                  <MaterialCommunityIcons
+                    name="auto-fix"
+                    size={20}
+                    color="#FFF"
+                  />
                 </>
               )}
             </LinearGradient>
           </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
+
+      {/* TASK MODAL */}
+
+      {/* NEW WORKSPACE MODAL (11 FIELDS) */}
+      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: "85%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Initialize Claim File</Text>
+              <Pressable onPress={() => setIsModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#94A3B8" />
+              </Pressable>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              <View>
+                <Text style={styles.modalLabel}>Claim Number *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fileForm.claim_number}
+                  onChangeText={(t) =>
+                    setFileForm({ ...fileForm, claim_number: t })
+                  }
+                  placeholder="e.g. CLM-2026-001"
+                />
+              </View>
+              <View>
+                <Text style={styles.modalLabel}>Client Name *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fileForm.client_name}
+                  onChangeText={(t) =>
+                    setFileForm({ ...fileForm, client_name: t })
+                  }
+                  placeholder="Insured Name"
+                />
+              </View>
+              <View>
+                <Text style={styles.modalLabel}>Property Address *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fileForm.address}
+                  onChangeText={(t) => setFileForm({ ...fileForm, address: t })}
+                  placeholder="Full Street Address"
+                />
+              </View>
+              <View style={styles.rowTwoColumn}>
+                <View style={styles.rowColumn}>
+                  <Text style={styles.modalLabel}>Policy Form</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={fileForm.policy_form}
+                    onChangeText={(t) =>
+                      setFileForm({ ...fileForm, policy_form: t })
+                    }
+                    placeholder="HO-3"
+                  />
+                </View>
+                <View style={styles.rowColumn}>
+                  <Text style={styles.modalLabel}>Jurisdiction *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={fileForm.jurisdiction}
+                    onChangeText={(t) =>
+                      setFileForm({ ...fileForm, jurisdiction: t })
+                    }
+                    placeholder="CT, FL, etc."
+                  />
+                </View>
+              </View>
+              <View style={styles.rowTwoColumn}>
+                <View style={styles.rowColumn}>
+                  <Text style={styles.modalLabel}>Date of Loss *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={fileForm.date_of_loss}
+                    onChangeText={(t) =>
+                      setFileForm({ ...fileForm, date_of_loss: t })
+                    }
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+                <View style={styles.rowColumn}>
+                  <Text style={styles.modalLabel}>Reported Date</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={fileForm.reported_date}
+                    onChangeText={(t) =>
+                      setFileForm({ ...fileForm, reported_date: t })
+                    }
+                  />
+                </View>
+              </View>
+              <View>
+                <Text style={styles.modalLabel}>
+                  Loss Type (water/fire/etc) *
+                </Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fileForm.loss_type}
+                  onChangeText={(t) =>
+                    setFileForm({ ...fileForm, loss_type: t })
+                  }
+                />
+              </View>
+              <View>
+                <Text style={styles.modalLabel}>Line of Business</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fileForm.line_of_business}
+                  onChangeText={(t) =>
+                    setFileForm({ ...fileForm, line_of_business: t })
+                  }
+                />
+              </View>
+              <View>
+                <Text style={styles.modalLabel}>Claim Stage</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fileForm.claim_stage}
+                  onChangeText={(t) =>
+                    setFileForm({ ...fileForm, claim_stage: t })
+                  }
+                />
+              </View>
+
+              <Pressable
+                style={styles.modalActionBtn}
+                onPress={handleCreateWorkspace}
+                disabled={isCreatingFile}
+              >
+                {isCreatingFile ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.modalActionText}>
+                    Initialize Workspace
+                  </Text>
+                )}
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Toast />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
-  header: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24, elevation: 4 },
-  headerContent: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, height: 64 },
-  headerTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
-  iconButton: { padding: 8 },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 20 },
-  metaRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  typeBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#DBEAFE", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 4 },
-  typeText: { color: "#1E40AF", fontSize: 12, fontWeight: "700" },
-  timestamp: { color: "#94A3B8", fontSize: 11 },
-  documentCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 20, borderWidth: 1, borderColor: "#E2E8F0", elevation: 1 },
-  editingCard: { borderColor: "#276bbd", backgroundColor: "#F9FBFF", borderWidth: 2 },
-  cardHeader: { marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 8 },
-  cardHeaderLabel: { fontSize: 10, color: "#94A3B8", fontWeight: "800", letterSpacing: 1 },
-  cardHeaderLine: { flex: 1, height: 1, backgroundColor: "#F1F5F9" },
-  bodyText: { color: "#334155", fontSize: 15, lineHeight: 24 },
-  textInput: { color: "#334155", fontSize: 15, lineHeight: 24, minHeight: 250 },
-  
-  // NEXT STEP BAR STYLES
-  nextStepBar: { 
-    marginTop: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    backgroundColor: '#FFF', 
-    borderRadius: 16, 
-    padding: 16, 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0',
-    borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B'
+  mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
+  headerGradient: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
   },
-  nextStepContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  nextStepTitle: { fontWeight: '800', color: '#1E293B', fontSize: 14 },
-  nextStepSub: { color: '#64748B', fontSize: 11, marginTop: 2 },
+  safeHeader: { paddingHorizontal: 18, paddingBottom: 10 },
+  navBar: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  loaderScreen: { flex: 1 },
+  loaderGradient: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loaderContent: { alignItems: "center", paddingHorizontal: 30 },
+  loaderIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  loaderTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  clearButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
 
-  floatingFooter: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#FFF", paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#E2E8F0" },
-  buttonRow: { flexDirection: "row", gap: 10 },
-  secondaryButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#276bbd", borderRadius: 14, height: 52 },
-  secondaryButtonText: { color: "#0B3C7A", fontWeight: "700", fontSize: 14 },
-  primaryButton: { flex: 2, borderRadius: 14, overflow: "hidden" },
-  buttonGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", height: 52, gap: 8 },
-  buttonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+
+    backgroundColor: "rgba(255,255,255,0.9)",
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    // subtle shadow
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  clearTextButton: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+
+    borderRadius: 8,
+    backgroundColor: "rgba(15, 76, 156, 0.08)",
+
+    borderWidth: 1,
+    borderColor: "rgba(15, 76, 156, 0.2)",
+  },
+  clearText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#0F4C9C",
+  },
+  navTitle: { fontSize: 19, fontWeight: "800", color: "#FFFFFF" },
+  creditBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
+  },
+  creditValue: { color: "#ecf843", fontSize: 13, fontWeight: "800" },
+
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    marginBottom: 6,
+    marginTop: 6,
+  },
+  workspaceItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
+    paddingHorizontal: 20,
+    // paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    height: 40,
+    gap: 8,
+  },
+  workspaceItemActive: { backgroundColor: "#0F4C9C", borderColor: "#0f4c9c" },
+  workspaceTile: {
+    width: 140,
+    height: 40,
+    // marginBottom: 12,
+  },
+  workspaceText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
+  workspaceGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  workspaceTextActive: { color: "#FFF" },
+  addWorkspaceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    borderColor: "#0F4C9C",
+    gap: 4,
+  },
+  addWorkspaceText: { fontSize: 14, fontWeight: "800", color: "#0F4C9C" },
+  tabContainer: { paddingVertical: 10, paddingHorizontal: 4, gap: 10 },
+  tabItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
+  },
+  tabItemActive: { backgroundColor: "#1F2937", elevation: 3 },
+  tabText: { fontSize: 14, color: "#374151", fontWeight: "500" },
+  tabTextActive: { color: "#FFFFFF", fontWeight: "600" },
+  glassCard: {
+    backgroundColor: "#FFFFFF",
+    marginTop: 20,
+    borderRadius: 20,
+    padding: 12, // reduced from 16
+
+    elevation: 8,
+    shadowColor: "#0F4C9C",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+
+    borderWidth: 1,
+    borderColor: "rgba(15, 76, 156, 0.15)",
+  },
+  // fieldGroup: { marginVertical: 1 },
+  fieldHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    // marginBottom: 12,
+  },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  inputWrapper: {
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    position: "relative",
+
+    height: 180,
+    overflow: "hidden",
+
+    paddingRight: 8,
+  },
+  mainTextInput: {
+    fontSize: 16,
+    color: "#334155",
+    height: 170,
+    textAlignVertical: "top",
+
+    paddingHorizontal: 12, // reduced
+    paddingTop: 8, // ADD (tight top)
+    paddingBottom: 8, // ADD (tight bottom)
+    paddingRight: 12,
+  },
+  inputActions: {
+    position: "absolute",
+    right: 10,
+    bottom: 0,
+
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  //   width: 36,
+  //   height: 36,
+  //   borderRadius: 10,
+  //   backgroundColor: "#F1F5F9",
+
+  //   alignItems: "center",
+  //   justifyContent: "center",
+
+  //   borderWidth: 1,
+  //   borderColor: "#E2E8F0",
+  // },
+  recordButton: {
+    backgroundColor: "#0F4C9C",
+    borderColor: "#0F4C9C",
+  },
+  recordingActive: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626",
+  },
+  recordingText: {
+    marginTop: 12,
+    color: "#0F4C9C",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  imagePreviewContainer: {
+    position: "absolute",
+    right: 80,
+    bottom: 0,
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.9)",
+  },
+  scenarioScrollButton: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  listeningText: {
+    // marginTop: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F4C9C",
+  },
+  generateBtn: { marginTop: 10, borderRadius: 20, overflow: "hidden" },
+  gradientBtn: {
+    height: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  btnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A" },
+  modalLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  modalScrollContent: {
+    gap: 12,
+    paddingBottom: 40,
+  },
+  rowTwoColumn: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  rowColumn: {
+    flex: 1,
+  },
+  modalActionBtn: {
+    backgroundColor: "#0F4C9C",
+    borderRadius: 18,
+    paddingVertical: 18,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  modalActionText: { color: "#FFF", fontSize: 16, fontWeight: "800" },
+  dropdownTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    // marginBottom: 20,
+  },
+  dropdownLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  taskIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropdownValueText: { fontSize: 15, fontWeight: "700", color: "#1E293B" },
+  taskOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 8,
+    gap: 12,
+  },
+  taskOptionActive: { backgroundColor: "#F1F5F9" },
+  taskOptionText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  taskOptionTextActive: { color: "#0F4C9C", fontWeight: "800" },
+  // micBtn: {
+  //   // backgroundColor: "#0F4C9C",
+  //   // borderColor: "#0F4C9C",
+  // },
+  micBtnActive: { transform: [{ scale: 1.1 }] },
+  micBtnDisabled: { opacity: 0.5 },
+  workspaceScroll: { paddingLeft: 4, gap: 10, marginBottom: 25 },
 });
