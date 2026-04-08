@@ -95,7 +95,6 @@ export type GenerateResponseRequest = {
   fileId: number;
   userInput: string;
   image?: string | null;
-  task_type: string;
 };
 
 export type GenerateResponseResult = {
@@ -300,17 +299,69 @@ export async function generateResponse(
   };
 }
 
+export async function generateNextStep(
+  token: string,
+  payload: {
+    fileId: string | number;
+    userInput: string | undefined;
+    previousResponse: string;
+    output_format: string;
+    // nextPrompt: string;
+  },
+): Promise<GenerateResponseResult> {
+  console.log("Chaining workflow for Next Step:", payload);
+
+  const res = await apiRequest<{
+    success: boolean;
+    message: string;
+    data: {
+      content: string;
+      next_step?: string;
+      output_format: string;
+      // suggestions?: any[];
+      log_id?: number;
+      created_at?: string;
+    };
+  }>(
+    "/drafts/generate-next-step",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to generate next workflow step");
+  }
+
+  // Consistent return mapping
+  return {
+    output_format: res.data.output_format,
+    responseTypeLabel:
+      responseTypeLabels[res.data.output_format] ||
+      res.data.output_format ||
+      "Follow-up",
+    responseText: res.data.content,
+    fileId: Number(payload.fileId),
+    nextStep: res.data.next_step,
+    // suggestions: res.data.suggestions,
+    logId: res.data.log_id,
+    createdAt: res.data.created_at,
+  };
+}
+
 export async function saveDraft(
   token: string,
   fileId: number,
-  type: string,
+  output_format: string,
   content: string,
 ): Promise<{ success: boolean; draftId: number }> {
   const res = await apiRequest<{ success: boolean; data: { draftId: number } }>(
     "/drafts/save",
     {
       method: "POST",
-      body: JSON.stringify({ fileId, type, content }),
+      body: JSON.stringify({ fileId, output_format, content }),
     },
     token,
   );
@@ -320,7 +371,7 @@ export async function saveDraft(
 export async function updateDraft(
   token: string,
   draftId: number | string,
-  updateData: { content?: string; draft_type?: string },
+  updateData: { content?: string; output_format?: string },
 ): Promise<{ success: boolean; draftId: number }> {
   const res = await apiRequest<{ success: boolean; data: { draftId: number } }>(
     `/drafts/update/${draftId}`,

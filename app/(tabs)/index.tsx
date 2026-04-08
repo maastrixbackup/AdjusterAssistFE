@@ -59,7 +59,7 @@ export default function HomeScreen() {
       .filter((file) => ["active", "draft"].includes(file.status?.toLowerCase() || ""))
       .slice(0, 5);
   }, [files]);
-console.log("Recent Claims:", recentClaims);
+// console.log("Recent Claims:", recentClaims);
   const loadData = React.useCallback(
     async (showLoading = true) => {
       if (!token) return;
@@ -258,7 +258,7 @@ console.log("Recent Claims:", recentClaims);
       <StatusBar style="light" />
 
       <LinearGradient
-        colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
+        colors={["#0F4C9C", "#123C78", "#020617"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -320,7 +320,7 @@ console.log("Recent Claims:", recentClaims);
             <View style={styles.primaryActionContent}>
               <View style={styles.primaryActionIcon}>
                 <LinearGradient
-                  colors={["#0549a1", "#1E63B6"]}
+                  colors={["#0549a1", "#020617"]}
                   style={styles.primaryActionGradient}
                 >
                   <Ionicons name="create-outline" size={24} color="#FFFFFF" />
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
 
     // shadow (iOS)
-    shadowColor: "#1D4ED8",
+    shadowColor: "#020617",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 12,

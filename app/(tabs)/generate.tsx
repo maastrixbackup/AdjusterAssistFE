@@ -9,7 +9,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -20,7 +19,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -40,76 +39,7 @@ import {
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
-const TASK_TYPES = [
-  {
-    id: "claim_note_drafting",
-    label: "Claim Note Drafting",
-    icon: "note-text-outline",
-  },
-  {
-    id: "coverage_analysis_drafting",
-    label: "Coverage Analysis",
-    icon: "shield-search",
-  },
-  {
-    id: "damage_evaluation_drafting",
-    label: "Damage Evaluation",
-    icon: "home-alert",
-  },
-  {
-    id: "claim_communication_drafting",
-    label: "Claim Communication",
-    icon: "message-text-outline",
-  },
-  {
-    id: "vendor_response_drafting",
-    label: "Vendor Response",
-    icon: "store-outline",
-  },
-  {
-    id: "professional_documentation",
-    label: "Professional Formatting",
-    icon: "file-check-outline",
-  },
-];
 
-type OutputMode =
-  | "File Note"
-  | "Insured Email"
-  | "Contractor Email"
-  | "Escalation"
-  | "Supplement"
-  | "Coverage Analysis"
-  | "Denial Support"
-  | "Claim Summary"
-  | "Xact Analysis"
-  | "Damage Evaluation";
-
-// const outputModes: OutputMode[] = [
-//   "File Note",
-//   "Insured Email",
-//   "Contractor Email",
-//   "Escalation",
-//   "Supplement",
-//   "Coverage Analysis",
-//   "Denial Support",
-//   "Claim Summary",
-//   "Xact Analysis",
-//   "Damage Evaluation",
-// ];
-
-// const outputTypeMap: Record<OutputMode, string> = {
-//   "File Note": "file_note",
-//   "Insured Email": "email_insured",
-//   "Contractor Email": "email_contractor",
-//   Escalation: "escalation_response",
-//   Supplement: "supplement_response",
-//   "Coverage Analysis": "coverage_analysis",
-//   "Denial Support": "denial_support",
-//   "Claim Summary": "claim_summary",
-//   "Xact Analysis": "xactanalysis_response",
-//   "Damage Evaluation": "damage_evaluation",
-// };
 
 export default function GenerateScreen() {
   const { token } = useAuth();
@@ -138,7 +68,6 @@ export default function GenerateScreen() {
     status: "active" as const,
   });
 
-  const [selectedOutput, setSelectedOutput] = useState<OutputMode>("File Note");
   const [request, setRequest] = useState("");
   const [claimDetails, setClaimDetails] = useState("");
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
@@ -147,8 +76,6 @@ export default function GenerateScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [selectedTask, setSelectedTask] = useState(TASK_TYPES[0]);
-  const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [showScenarioScrollButton, setShowScenarioScrollButton] =
     useState(false);
   const scenarioTextInputRef = useRef<TextInput>(null);
@@ -359,7 +286,6 @@ export default function GenerateScreen() {
         fileId: selectedWorkspace.id,
         image: imageBase64,
         userInput: `${request.trim()}${claimDetails ? `\n\nContext: ${claimDetails.trim()}` : ""}`,
-        task_type: selectedTask.id,
       };
       const result = await generateResponse(token, payload);
       router.push({
@@ -367,6 +293,7 @@ export default function GenerateScreen() {
         params: {
           output_format: result.output_format,
           type: result.responseTypeLabel,
+          userInput:payload.userInput,
           text: result.responseText,
           fileId: result.fileId.toString(),
           alreadySaved: "false",
@@ -386,10 +313,7 @@ export default function GenerateScreen() {
     token,
     request,
     claimDetails,
-    selectedOutput,
     selectedWorkspace,
-    selectedTask,
-    fetchData,
   ]);
 
   if (isLoading && !refreshing) {
@@ -465,7 +389,7 @@ export default function GenerateScreen() {
                     styles.workspaceTile,
                     styles.workspaceItem,
                     selectedWorkspace?.id === ws.id &&
-                      styles.workspaceItemActive,
+                    styles.workspaceItemActive,
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -479,7 +403,7 @@ export default function GenerateScreen() {
                     style={[
                       styles.workspaceText,
                       selectedWorkspace?.id === ws.id &&
-                        styles.workspaceTextActive,
+                      styles.workspaceTextActive,
                     ]}
                   >
                     {ws.client_name || ws.claim_number}
@@ -489,51 +413,6 @@ export default function GenerateScreen() {
             </View>
           </ScrollView>
 
-          <Text style={styles.sectionLabel}>Assistant Task</Text>
-          <Pressable
-            style={styles.dropdownTrigger}
-            onPress={() => setIsTaskModalVisible(true)}
-          >
-            <View style={styles.dropdownLeft}>
-              <View style={styles.taskIconCircle}>
-                <MaterialCommunityIcons
-                  name={selectedTask.icon as any}
-                  size={20}
-                  color="#0F4C9C"
-                />
-              </View>
-              <Text style={styles.dropdownValueText}>{selectedTask.label}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={20} color="#64748B" />
-          </Pressable>
-          {/* 
-          <Text style={styles.sectionLabel}>Output Format</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabContainer}
-          >
-            {outputModes.map((mode) => (
-              <Pressable
-                key={mode}
-                onPress={() => setSelectedOutput(mode)}
-                style={[
-                  styles.tabItem,
-                  mode === selectedOutput && styles.tabItemActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    mode === selectedOutput && styles.tabTextActive,
-                  ]}
-                >
-                  {mode}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView> */}
-
           <View style={styles.glassCard}>
             <View>
               <View style={styles.fieldHeader}>
@@ -541,7 +420,7 @@ export default function GenerateScreen() {
                   <MaterialCommunityIcons
                     name="text-box-search-outline"
                     size={16}
-                    color="#0F4C9C"
+                    color="#020617"
                   />
                 </View>
                 <Text style={styles.inputLabel}>Scenario Description</Text>
@@ -623,7 +502,7 @@ export default function GenerateScreen() {
             style={styles.generateBtn}
           >
             <LinearGradient
-              colors={["#0F4C9C", "#1E3A8A"]}
+              colors={["#004db1", "#0c1736"]}
               style={styles.gradientBtn}
             >
               {isGenerating ? (
@@ -644,60 +523,7 @@ export default function GenerateScreen() {
       </KeyboardAvoidingView>
 
       {/* TASK MODAL */}
-      <Modal
-        visible={isTaskModalVisible}
-        animationType="fade"
-        transparent={true}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { minHeight: 350 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Assistant Task</Text>
-              <Pressable onPress={() => setIsTaskModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#94A3B8" />
-              </Pressable>
-            </View>
-            <FlatList
-              data={TASK_TYPES}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.taskOption,
-                    selectedTask.id === item.id && styles.taskOptionActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedTask(item);
-                    setIsTaskModalVisible(false);
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name={item.icon as any}
-                    size={22}
-                    color={selectedTask.id === item.id ? "#0F4C9C" : "#64748B"}
-                  />
-                  <Text
-                    style={[
-                      styles.taskOptionText,
-                      selectedTask.id === item.id &&
-                        styles.taskOptionTextActive,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                  {selectedTask.id === item.id && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color="#0F4C9C"
-                    />
-                  )}
-                </Pressable>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+
 
       {/* NEW WORKSPACE MODAL (11 FIELDS) */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
@@ -945,7 +771,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#22C55E",
   },
-  creditValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
+  creditValue: { color: "#ecf843", fontSize: 13, fontWeight: "800" },
 
   sectionLabel: {
     fontSize: 11,
