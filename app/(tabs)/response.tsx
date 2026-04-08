@@ -332,6 +332,149 @@ export default function GenerateScreen() {
     );
   }
 
+  async function onGenerateNextStep() {
+    if (!token) {
+      toast.warning("Session Expired");
+      router.replace("/login");
+      return;
+    }
+
+    if (!params.fileId || !params.output_format) {
+      toast.warning("Missing workflow context");
+      return;
+    }
+
+    const fileId = Number(params.fileId);
+    if (Number.isNaN(fileId)) {
+      toast.warning("Invalid workspace");
+      return;
+    }
+
+    const workflowInput =
+      (params.workflow_user_input || "").trim() || editedText.trim();
+    if (!workflowInput) {
+      toast.warning("Missing claim input");
+      return;
+    }
+
+    setGeneratingNextStep(true);
+    try {
+      const nextStepResult = await generateNextStep(token, {
+        fileId: params.fileId,
+        userInput: workflowInput,
+        previousResponse: editedText,
+        output_format: params.output_format,
+      });
+
+      const generatedText =
+        nextStepResult.responseText || nextStepResult.content || "";
+
+      if (generatedText.trim()) {
+        router.push({
+          pathname: "/response",
+          params: {
+            output_format:
+              nextStepResult.output_format ||
+              nextStepResult.next_output_format ||
+              "file_note",
+            type: "Next Step",
+            text: generatedText,
+            fileId: params.fileId,
+            alreadySaved: "false",
+            created_at: nextStepResult.created_at || new Date().toISOString(),
+            workflow_user_input: workflowInput,
+          },
+        });
+        return;
+      }
+
+      const fallbackInstruction =
+        nextStepResult.next_step ||
+        "Create the next required workflow response and document claim handling.";
+
+      const fallbackResponse = await generateResponse(token, {
+        fileId,
+        userInput: fallbackInstruction,
+        task_type: NEXT_STEP_TASK_TYPE,
+      });
+
+      router.push({
+        pathname: "/response",
+        params: {
+          output_format: fallbackResponse.output_format,
+          type: fallbackResponse.responseTypeLabel,
+          text: fallbackResponse.responseText,
+          fileId: fallbackResponse.fileId.toString(),
+          alreadySaved: "false",
+          created_at: fallbackResponse.createdAt,
+          workflow_user_input: workflowInput,
+        },
+      });
+    } catch (error: any) {
+      console.error("Generate next step error:", error);
+      toast.error("Error", {
+        description: error?.message || "Failed to generate next workflow step.",
+      });
+    } finally {
+      setGeneratingNextStep(false);
+    }
+  }
+
+  async function onRegenerate() {
+    if (!token) {
+      toast.warning("Session Expired");
+      router.replace("/login");
+      return;
+    }
+
+    if (!params.fileId) {
+      toast.warning("Workspace is missing");
+      return;
+    }
+
+    const fileId = Number(params.fileId);
+    if (Number.isNaN(fileId)) {
+      toast.warning("Invalid workspace");
+      return;
+    }
+
+    const workflowInput =
+      (params.workflow_user_input || "").trim() || editedText.trim();
+    if (!workflowInput) {
+      toast.warning("Missing claim input");
+      return;
+    }
+
+    try {
+      setRegenerating(true);
+      const result = await generateResponse(token, {
+        fileId,
+        userInput: workflowInput,
+        task_type: NEXT_STEP_TASK_TYPE,
+      });
+
+      router.replace({
+        pathname: "/response",
+        params: {
+          output_format: result.output_format,
+          type: result.responseTypeLabel,
+          text: result.responseText,
+          fileId: result.fileId.toString(),
+          alreadySaved: "false",
+          created_at: result.createdAt || new Date().toISOString(),
+          workflow_user_input: workflowInput,
+        },
+      });
+    } catch (error: any) {
+      console.error("Regenerate error:", error);
+      toast.error("Error", {
+        description: error?.message || "Failed to regenerate response.",
+      });
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
