@@ -1,5 +1,6 @@
 import { Audio } from "expo-av";
 import { useCallback, useRef, useState } from "react";
+import { Platform } from "react-native";
 
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_KEY ?? "";
 
@@ -20,8 +21,27 @@ export function useVoiceInput() {
         });
 
         const { recording } = await Audio.Recording.createAsync({
-            ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
             isMeteringEnabled: true,
+            android: {
+                extension: ".mp4",
+                outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+                audioEncoder: Audio.AndroidAudioEncoder.AAC,
+                sampleRate: 16000,
+                numberOfChannels: 1,
+                bitRate: 128000,
+            },
+            ios: {
+                extension: ".m4a",
+                outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+                audioQuality: Audio.IOSAudioQuality.HIGH,
+                sampleRate: 44100,
+                numberOfChannels: 1,
+                bitRate: 128000,
+                linearPCMBitDepth: 16,
+                linearPCMIsBigEndian: false,
+                linearPCMIsFloat: false,
+            },
+            web: {},
         });
 
         recording.setOnRecordingStatusUpdate((status) => {
@@ -47,32 +67,32 @@ export function useVoiceInput() {
         recordingRef.current = null;
         setMeteringLevel(0);
 
-        console.log("cancelled:", cancelledRef.current, "uri:", uri);
-
-        if (cancelledRef.current || !uri) return null; // ✅ reads ref directly
+        console.log("uri:", uri);
+        if (cancelledRef.current || !uri) return null;
 
         setIsTranscribing(true);
         try {
             const formData = new FormData();
+            const isAndroid = Platform.OS === "android";
             formData.append("file", {
                 uri,
-                type: "audio/m4a",
-                name: "voice.m4a",
+                type: isAndroid ? "audio/mp4" : "audio/m4a",
+                name: isAndroid ? "voice.mp4" : "voice.m4a",
             } as any);
-            formData.append("model", "whisper-1");
+            formData.append("model", "whisper-1"); // ✅ already there
 
-            console.log("calling whisper with key:", OPENAI_KEY.slice(0, 10));
-
-            const res = await fetch(
-                "https://api.openai.com/v1/audio/transcriptions",
-                {
-                    method: "POST",
-                    headers: { Authorization: `Bearer ${OPENAI_KEY}` },
-                    body: formData,
+            console.log("sending to whisper...");
+            const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${OPENAI_KEY}`,
+                    "Content-Type": "multipart/form-data", // ✅ add this
                 },
-            );
+                body: formData,
+            });
+
             const data = await res.json();
-            console.log("whisper response:", data);
+            console.log("whisper response:", JSON.stringify(data));
             return data.text ?? null;
         } catch (err) {
             console.error("transcription error:", err);
