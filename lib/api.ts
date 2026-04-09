@@ -491,7 +491,7 @@ export const updateFile = async (
     jurisdiction?: string;
     line_of_business?: string;
     claim_stage?: string;
-    status?: "active" | "closed";
+    status?: "active" | "closed" | "draft";
   },
 ): Promise<{ success: boolean; message: string; data?: any }> => {
   try {
