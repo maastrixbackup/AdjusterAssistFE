@@ -2,7 +2,7 @@ import { ClaimFile } from '@/lib/api';
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
@@ -34,6 +34,21 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = -75;
 const DELETE_WIDTH = -110;
 
+// Date Formatter Utility
+const formatDate = (dateString?: string) => {
+    if (!dateString) return "No date set";
+    try {
+        const date = new Date(dateString);
+        return new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }).format(date);
+    } catch {
+        return dateString;
+    }
+};
+
 interface Props {
     item: ClaimFile;
     onPress: () => void;
@@ -42,7 +57,6 @@ interface Props {
     getStatusStyle: (status?: string) => any;
 }
 
-// --- MOVE THIS OUTSIDE TO PREVENT KEYBOARD DISMISSAL ---
 const RenderInput = ({ 
     label, 
     value, 
@@ -63,6 +77,7 @@ const RenderInput = ({
             placeholder={placeholder}
             placeholderTextColor="#94A3B8"
             autoCapitalize="sentences"
+            selectionColor="#4F46E5"
         />
     </View>
 );
@@ -94,7 +109,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
 
     const statusStyle = getStatusStyle(item.status);
 
-    const handlePressIn = () => { scale.value = withTiming(0.97, { duration: 100 }); };
+    const handlePressIn = () => { scale.value = withTiming(0.98, { duration: 150 }); };
     const handlePressOut = () => { scale.value = withSpring(1); };
     const closeSwipe = () => { translateX.value = withSpring(0); };
 
@@ -123,7 +138,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
         .onEnd((event) => {
             if (event.translationX < SWIPE_THRESHOLD) {
                 translateX.value = withSpring(DELETE_WIDTH);
-                if (Platform.OS !== 'web') runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+                if (Platform.OS !== 'web') runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
             } else {
                 translateX.value = withSpring(0);
             }
@@ -138,19 +153,20 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
 
     const deleteOpacityStyle = useAnimatedStyle(() => ({
         opacity: interpolate(translateX.value, [DELETE_WIDTH, 0], [1, 0]),
-        transform: [{ scale: interpolate(translateX.value, [DELETE_WIDTH, 0], [1, 0.5]) }]
+        transform: [{ scale: interpolate(translateX.value, [DELETE_WIDTH, 0], [1, 0.8]) }]
     }));
-
 
     return (
         <View style={styles.wrapper}>
             <TouchableOpacity 
-                activeOpacity={0.9}
+                activeOpacity={1}
                 style={styles.deleteAction} 
                 onPress={() => { closeSwipe(); onDelete(); }}
             >
                 <Animated.View style={[styles.deleteContent, deleteOpacityStyle]}>
-                    <Feather name="trash-2" size={24} color="#FFF" />
+                    <View style={styles.deleteIconBg}>
+                        <Feather name="trash-2" size={20} color="#FFF" />
+                    </View>
                     <Text style={styles.deleteText}>Delete</Text>
                 </Animated.View>
             </TouchableOpacity>
@@ -169,36 +185,42 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                         style={styles.pressArea}
                     >
                         <View style={styles.mainRow}>
-                            <LinearGradient colors={["#6366F1", "#4F46E5"]} style={styles.statusLine} />
-                            
-                            <View style={styles.iconContainer}>
-                                <MaterialCommunityIcons 
-                                    name={item.status?.toLowerCase() === 'closed' ? "folder-lock" : "folder-text"} 
-                                    size={28} 
-                                    color={item.status?.toLowerCase() === 'closed' ? "#94A3B8" : "#4F46E5"} 
-                                />
+                            <View style={styles.iconWrapper}>
+                                <LinearGradient 
+                                    colors={item.status?.toLowerCase() === 'closed' ? ["#F1F5F9", "#E2E8F0"] : ["#EEF2FF", "#E0E7FF"]} 
+                                    style={styles.iconContainer}
+                                >
+                                    <MaterialCommunityIcons 
+                                        name={item.status?.toLowerCase() === 'closed' ? "folder-lock-outline" : "folder-open"} 
+                                        size={26} 
+                                        color={item.status?.toLowerCase() === 'closed' ? "#64748B" : "#4F46E5"} 
+                                    />
+                                </LinearGradient>
                             </View>
 
                             <View style={styles.infoColumn}>
                                 <View style={styles.headerRow}>
-                                    <Text style={styles.claimNoLabel}>Claim #</Text>
-                                    <Text style={styles.claimNoText}>{item.claim_number || "---"}</Text>
-                                </View>
-                                <Text style={styles.clientText} numberOfLines={1}>
-                                    {item.client_name || "New Property Claim"}
-                                </Text>
-                                <View style={styles.badgeRow}>
+                                    <Text style={styles.claimNoText}>{item.claim_number || "NO-ID"}</Text>
                                     <View style={[styles.miniBadge, { backgroundColor: statusStyle.badge.backgroundColor }]}>
+                                        <View style={[styles.statusDot, { backgroundColor: statusStyle.text.color }]} />
                                         <Text style={[styles.miniBadgeText, { color: statusStyle.text.color }]}>
                                             {item.status?.toUpperCase()}
                                         </Text>
                                     </View>
-                                    <Text style={styles.stageText}>• {item.claim_stage || "Initial Intake"}</Text>
                                 </View>
-                                <Text style={styles.dateText}>{item.created_at || "Unknown"}</Text>
+                                
+                                <Text style={styles.clientText} numberOfLines={1}>
+                                    {item.client_name || "Untitled Workspace"}
+                                </Text>
+                                
+                                <View style={styles.metaRow}>
+                                    <Text style={styles.stageText}>{item.claim_stage || "Intake"}</Text>
+                                    <Text style={styles.metaDivider}>•</Text>
+                                    <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+                                </View>
                             </View>
 
-                            <Feather name="chevron-right" size={20} color="#E2E8F0" />
+                            <Feather name="chevron-right" size={18} color="#CBD5E1" />
                         </View>
                     </Pressable>
                 </Animated.View>
@@ -218,9 +240,12 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                         <View style={styles.sheet}>
                             <View style={styles.handle} />
                             <View style={styles.sheetHeader}>
-                                <Text style={styles.sheetTitle}>File Parameters</Text>
+                                <View>
+                                    <Text style={styles.sheetTitle}>File Details</Text>
+                                    <Text style={styles.sheetSubtitle}>Update claim metadata and status</Text>
+                                </View>
                                 <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.circleClose}>
-                                    <Feather name="x" size={20} color="#64748B" />
+                                    <Feather name="x" size={18} color="#64748B" />
                                 </TouchableOpacity>
                             </View>
 
@@ -230,44 +255,44 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                 keyboardShouldPersistTaps="handled"
                             >
                                 <RenderInput 
-                                    label="Claim ID" 
+                                    label="Claim Identifier" 
                                     value={editData.claim_number} 
                                     onChange={(t) => setEditData(prev => ({ ...prev, claim_number: t }))} 
-                                    placeholder="Assign Claim ID..." 
+                                    placeholder="Enter claim number..." 
                                 />
                                 <RenderInput 
-                                    label="Policyholder" 
+                                    label="Client / Policyholder" 
                                     value={editData.client_name} 
                                     onChange={(t) => setEditData(prev => ({ ...prev, client_name: t }))} 
-                                    placeholder="John Doe..." 
+                                    placeholder="Full name..." 
                                 />
                                 <RenderInput 
-                                    label="Loss Location" 
+                                    label="Site Address" 
                                     value={editData.address} 
                                     onChange={(t) => setEditData(prev => ({ ...prev, address: t }))} 
-                                    placeholder="123 Maple St..." 
+                                    placeholder="Property address..." 
                                 />
                                 
                                 <View style={styles.grid}>
                                     <View style={styles.gridHalf}>
-                                        <RenderInput label="Policy Form" value={editData.policy_form} onChange={(t) => setEditData(prev => ({ ...prev, policy_form: t }))} placeholder="HO3" />
+                                        <RenderInput label="Policy Form" value={editData.policy_form} onChange={(t) => setEditData(prev => ({ ...prev, policy_form: t }))} placeholder="e.g. HO3" />
                                     </View>
                                     <View style={styles.gridHalf}>
-                                        <RenderInput label="Cause" value={editData.loss_type} onChange={(t) => setEditData(prev => ({ ...prev, loss_type: t }))} placeholder="Wind" />
+                                        <RenderInput label="Loss Type" value={editData.loss_type} onChange={(t) => setEditData(prev => ({ ...prev, loss_type: t }))} placeholder="e.g. Fire" />
                                     </View>
                                 </View>
 
                                 <View style={styles.grid}>
                                     <View style={styles.gridHalf}>
-                                        <RenderInput label="Date Of Loss" value={editData.date_of_loss} onChange={(t) => setEditData(prev => ({ ...prev, date_of_loss: t }))} placeholder="YYYY-MM-DD" />
+                                        <RenderInput label="Loss Date" value={editData.date_of_loss} onChange={(t) => setEditData(prev => ({ ...prev, date_of_loss: t }))} placeholder="YYYY-MM-DD" />
                                     </View>
                                     <View style={styles.gridHalf}>
                                         <RenderInput label="Reported" value={editData.reported_date} onChange={(t) => setEditData(prev => ({ ...prev, reported_date: t }))} placeholder="YYYY-MM-DD" />
                                     </View>
                                 </View>
 
-                                <RenderInput label="Lines Of Business" value={editData.line_of_business} onChange={(t) => setEditData(prev => ({ ...prev, line_of_business: t }))} placeholder="Residential" />
-                                <RenderInput label="Workflow Stage" value={editData.claim_stage} onChange={(t) => setEditData(prev => ({ ...prev, claim_stage: t }))} placeholder="Inspection" />
+                                <RenderInput label="Business Line" value={editData.line_of_business} onChange={(t) => setEditData(prev => ({ ...prev, line_of_business: t }))} placeholder="Commercial/Residential" />
+                                <RenderInput label="Current Stage" value={editData.claim_stage} onChange={(t) => setEditData(prev => ({ ...prev, claim_stage: t }))} placeholder="e.g. Inspection" />
 
                                 <TouchableOpacity 
                                     activeOpacity={0.8}
@@ -275,7 +300,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                     onPress={handleSave} 
                                     disabled={isUpdating}
                                 >
-                                    {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Update File Metadata</Text>}
+                                    {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
                                 </TouchableOpacity>
                             </ScrollView>
                         </View>
@@ -287,57 +312,64 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
 }
 
 const styles = StyleSheet.create({
-    wrapper: { marginBottom: 16 },
+    wrapper: { marginBottom: 14, marginHorizontal: 4 },
     deleteAction: { 
-        position: 'absolute', right: 0, top: 0, bottom: 0, width: 110, 
-        backgroundColor: '#EF4444', borderRadius: 24, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 25 
+        position: 'absolute', right: 0, top: 0, bottom: 0, width: 120, 
+        backgroundColor: '#F87171', borderRadius: 24, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 20 
     },
-    deleteContent: { alignItems: 'center', gap: 4 },
-    deleteText: { color: '#FFF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+    deleteIconBg: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+    deleteContent: { alignItems: 'center' },
+    deleteText: { color: '#FFF', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+    
     fileCard: { 
         backgroundColor: "#FFFFFF", borderRadius: 24, 
         ...Platform.select({
-            ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
-            android: { elevation: 4 }
+            ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 16 },
+            android: { elevation: 3 }
         }),
-        borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden'
-    },
-    pressArea: { padding: 20 },
-    mainRow: { flexDirection: 'row', alignItems: 'center' },
-    statusLine: { position: 'absolute', left: -20, top: -20, bottom: -20, width: 6 },
-    iconContainer: { 
-        width: 56, height: 56, borderRadius: 18, backgroundColor: '#F8FAFC', 
-        alignItems: 'center', justifyContent: 'center', marginRight: 16,
         borderWidth: 1, borderColor: '#F1F5F9'
     },
+    pressArea: { padding: 18 },
+    mainRow: { flexDirection: 'row', alignItems: 'center' },
+    iconWrapper: { marginRight: 16 },
+    iconContainer: { 
+        width: 52, height: 52, borderRadius: 16, 
+        alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)'
+    },
     infoColumn: { flex: 1, justifyContent: 'center' },
-    headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    claimNoLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginRight: 6 },
-    claimNoText: { fontSize: 16, fontWeight: '900', color: '#1E293B' },
-    clientText: { fontSize: 14, color: '#64748B', fontWeight: '600', marginBottom: 8 },
-    badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    miniBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-    miniBadgeText: { fontSize: 10, fontWeight: '900' },
-    stageText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+    claimNoText: { fontSize: 15, fontWeight: '800', color: '#1E293B', letterSpacing: -0.3 },
+    clientText: { fontSize: 13, color: '#64748B', fontWeight: '500', marginBottom: 6 },
+    metaRow: { flexDirection: 'row', alignItems: 'center' },
+    miniBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+    statusDot: { width: 4, height: 4, borderRadius: 2, marginRight: 5 },
+    miniBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
+    metaDivider: { marginHorizontal: 6, color: '#CBD5E1', fontSize: 10 },
+    stageText: { fontSize: 11, color: '#4F46E5', fontWeight: '700' },
     dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
     
-    overlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.6)', justifyContent: 'flex-end' },
+    overlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'flex-end' },
     keyboardView: { width: '100%' },
-    sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 24, maxHeight: SCREEN_HEIGHT * 0.88 },
-    handle: { width: 40, height: 5, backgroundColor: '#E2E8F0', borderRadius: 10, alignSelf: 'center', marginTop: 14, marginBottom: 20 },
-    sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-    sheetTitle: { fontSize: 22, fontWeight: '900', color: '#0F172A', letterSpacing: -0.5 },
-    circleClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-    scrollContent: { paddingBottom: 50 },
+    sheet: { 
+        backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, 
+        paddingHorizontal: 24, maxHeight: SCREEN_HEIGHT * 0.9 
+    },
+    handle: { width: 36, height: 4, backgroundColor: '#E2E8F0', borderRadius: 10, alignSelf: 'center', marginTop: 12, marginBottom: 20 },
+    sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+    sheetTitle: { fontSize: 20, fontWeight: '900', color: '#0F172A' },
+    sheetSubtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+    circleClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
+    scrollContent: { paddingBottom: 60 },
     grid: { flexDirection: 'row', justifyContent: 'space-between' },
     gridHalf: { width: '48%' },
-    inputGroup: { marginBottom: 20 },
-    label: { fontSize: 12, fontWeight: '800', color: '#475569', marginBottom: 8, textTransform: 'uppercase', marginLeft: 4 },
+    inputGroup: { marginBottom: 18 },
+    label: { fontSize: 11, fontWeight: '800', color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 4 },
     modernInput: { 
-        backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#F1F5F9', 
-        borderRadius: 16, padding: 16, fontSize: 16, color: '#0F172A', fontWeight: '500'
+        backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', 
+        borderRadius: 14, padding: 14, fontSize: 15, color: '#1E293B', fontWeight: '500'
     },
-    saveBtn: { backgroundColor: '#4F46E5', padding: 20, borderRadius: 20, alignItems: 'center', marginTop: 10 },
-    saveBtnText: { color: '#FFF', fontWeight: '900', fontSize: 16, letterSpacing: 0.5 },
-    saveBtnDisabled: { backgroundColor: '#CBD5E1' }
+    saveBtn: { backgroundColor: '#0636a5', padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+    saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
+    saveBtnDisabled: { backgroundColor: '#94A3B8', shadowOpacity: 0 }
 });
