@@ -33,7 +33,7 @@ export default function SplashScreen() {
 
     const timeout = setTimeout(() => {
       router.replace(isAuthenticated ? '/(tabs)' : '/login');
-    }, 2000); // Increased slightly for a better "feel"
+    }, 2000); 
 
     return () => clearTimeout(timeout);
   }, [fadeAnim, isAuthenticated, isHydrated, scaleAnim]);
@@ -74,8 +74,8 @@ export default function SplashScreen() {
 
       {/* Footer Branding */}
       <View style={styles.footer}>
-        <Text style={styles.versionText}>V 1.0.8</Text>
-        <Text style={styles.powerText}>POWERED BY CLAIMSCOPE CLOUD</Text>
+        <Text style={styles.versionText}>V 1.1.0</Text>
+        <Text style={styles.powerText}>POWERED BY ADJUSTERASSIST</Text>
       </View>
     </LinearGradient>
   );
