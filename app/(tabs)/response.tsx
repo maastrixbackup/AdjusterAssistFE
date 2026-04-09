@@ -96,7 +96,7 @@ export default function ResponseScreen() {
 
     const result = await generateResponse(sanitizedToken, {
       fileId: params.fileId || "",
-      userInput: params.userInput || `Regenerate a new version of this draft ${editedText}. Must not same as previous version.`,
+      userInput: params.userInput || `Regenerate a new version of this draft using previous AI reponse: ${editedText}.`,
     });
 
     if (result && result.responseText) {
