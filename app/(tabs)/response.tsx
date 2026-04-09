@@ -30,6 +30,7 @@ type Params = {
   alreadySaved?: string;
   draftId?: string; // Added draftId to params
   created_at?: string; // Added created_at to params
+  userInput?: string; // Added userInput to params
 };
 
 const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
@@ -94,7 +95,7 @@ export default function ResponseScreen() {
 
       const result = await generateNextStep(sanitizedToken, {
         fileId: params.fileId || "",
-        userInput: "Generated from previous draft", // Fallback context
+        userInput: params.userInput || "Generated from previous draft", // Fallback context
         previousResponse: editedText,
         output_format: params.output_format || "",
         // nextPrompt: "Generate the mandatory follow-up documentation for this file." // Static prompt for now
