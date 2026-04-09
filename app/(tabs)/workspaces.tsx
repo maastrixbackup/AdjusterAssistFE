@@ -7,11 +7,11 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Platform,
   StyleSheet,
   Text,
   View,
-  Image,
 } from "react-native";
 import { RefreshControl } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -109,30 +109,40 @@ export default function WorkspacesScreen() {
     }
   };
 
-  const handleUpdateFile = async (id: number, updateData: Partial<ClaimFile>) => {
-    if (!token) return;
+ const handleUpdateFile = async (id: number, updateData: Partial<ClaimFile>) => {
+  if (!token) return;
 
-    const typedUpdate: Partial<ClaimFile> = { ...updateData };
-    if (updateData.status) {
-      typedUpdate.status = (updateData.status.toLowerCase() === 'closed' ? 'closed' : 'active') as "active" | "closed";
-    }
+  const previousFiles = [...files];
 
-    const previousFiles = [...files];
+  // 1. Create a safe copy of the update data for the API
+  const apiPayload = { ...updateData };
 
-    setFiles((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...typedUpdate } : f))
-    );
+  // 2. Fix the "status" incompatibility
+  if (apiPayload.status === "draft") {
+    // Option A: If it's a draft, tell the API it's now "active"
+    apiPayload.status = "active"; 
+    
+    // Option B: Or just remove it so the API doesn't update the status field
+    // delete apiPayload.status; 
+  }
 
-    try {
-      await updateFile(token, id, typedUpdate);
-      toast.success("Workspace updated");
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (err) {
-      setFiles(previousFiles);
-      toast.error("Update failed. Please try again.");
-      console.error("Update Error:", err);
-    }
-  };
+  // Optimistic UI Update
+  setFiles((prev) =>
+    prev.map((f) => (f.id === id ? { ...f, ...updateData } : f))
+  );
+
+  try {
+    // 3. Pass the sanitized apiPayload instead of updateData
+    await updateFile(token, id, apiPayload as any); 
+    
+    toast.success("Workspace updated");
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch (err) {
+    setFiles(previousFiles);
+    toast.error("Update failed.");
+    console.error("Update Error:", err);
+  }
+};
 
   if (isLoading && !refreshing) {
     return (
@@ -222,7 +232,6 @@ export default function WorkspacesScreen() {
                 params: { fileId: item.id },
               })
             }
-            // Logic fix: Closure handles ID, Item handles data
             onUpdate={(updateData) => handleUpdateFile(item.id, updateData)}
             onDelete={() => handleDeleteFile(item.id)}
             getStatusStyle={getStatusStyle}

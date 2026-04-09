@@ -42,6 +42,31 @@ interface Props {
     getStatusStyle: (status?: string) => any;
 }
 
+// --- MOVE THIS OUTSIDE TO PREVENT KEYBOARD DISMISSAL ---
+const RenderInput = ({ 
+    label, 
+    value, 
+    onChange, 
+    placeholder 
+}: { 
+    label: string, 
+    value?: string, 
+    onChange: (t: string) => void, 
+    placeholder: string 
+}) => (
+    <View style={styles.inputGroup}>
+        <Text style={styles.label}>{label}</Text>
+        <TextInput 
+            style={styles.modernInput} 
+            value={value} 
+            onChangeText={onChange}
+            placeholder={placeholder}
+            placeholderTextColor="#94A3B8"
+            autoCapitalize="sentences"
+        />
+    </View>
+);
+
 export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, getStatusStyle }: Props) {
     const translateX = useSharedValue(0);
     const scale = useSharedValue(1);
@@ -71,7 +96,6 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
 
     const handlePressIn = () => { scale.value = withTiming(0.97, { duration: 100 }); };
     const handlePressOut = () => { scale.value = withSpring(1); };
-
     const closeSwipe = () => { translateX.value = withSpring(0); };
 
     const handleSave = async () => {
@@ -117,18 +141,6 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
         transform: [{ scale: interpolate(translateX.value, [DELETE_WIDTH, 0], [1, 0.5]) }]
     }));
 
-    const RenderInput = ({ label, value, keyName, placeholder }: { label: string, value?: string, keyName: keyof ClaimFile, placeholder: string }) => (
-        <View style={styles.inputGroup}>
-            <Text style={styles.label}>{label}</Text>
-            <TextInput 
-                style={styles.modernInput} 
-                value={value} 
-                onChangeText={(t) => setEditData({ ...editData, [keyName]: t })}
-                placeholder={placeholder}
-                placeholderTextColor="#94A3B8"
-            />
-        </View>
-    );
 
     return (
         <View style={styles.wrapper}>
@@ -183,6 +195,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                     </View>
                                     <Text style={styles.stageText}>• {item.claim_stage || "Initial Intake"}</Text>
                                 </View>
+                                <Text style={styles.dateText}>{item.created_at || "Unknown"}</Text>
                             </View>
 
                             <Feather name="chevron-right" size={20} color="#E2E8F0" />
@@ -191,9 +204,17 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                 </Animated.View>
             </GestureDetector>
 
-            <Modal animationType="slide" transparent visible={editModalVisible} onRequestClose={() => setEditModalVisible(false)}>
+            <Modal 
+                animationType="slide" 
+                transparent 
+                visible={editModalVisible} 
+                onRequestClose={() => setEditModalVisible(false)}
+            >
                 <View style={styles.overlay}>
-                    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboardView}>
+                    <KeyboardAvoidingView 
+                        behavior={Platform.OS === "ios" ? "padding" : "height"} 
+                        style={styles.keyboardView}
+                    >
                         <View style={styles.sheet}>
                             <View style={styles.handle} />
                             <View style={styles.sheetHeader}>
@@ -203,23 +224,50 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                 </TouchableOpacity>
                             </View>
 
-                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-                                <RenderInput label="Claim ID" value={editData.claim_number} keyName="claim_number" placeholder="Assign Claim ID..." />
-                                <RenderInput label="Policyholder" value={editData.client_name} keyName="client_name" placeholder="John Doe..." />
-                                <RenderInput label="Loss Location" value={editData.address} keyName="address" placeholder="123 Maple St..." />
+                            <ScrollView 
+                                showsVerticalScrollIndicator={false} 
+                                contentContainerStyle={styles.scrollContent} 
+                                keyboardShouldPersistTaps="handled"
+                            >
+                                <RenderInput 
+                                    label="Claim ID" 
+                                    value={editData.claim_number} 
+                                    onChange={(t) => setEditData(prev => ({ ...prev, claim_number: t }))} 
+                                    placeholder="Assign Claim ID..." 
+                                />
+                                <RenderInput 
+                                    label="Policyholder" 
+                                    value={editData.client_name} 
+                                    onChange={(t) => setEditData(prev => ({ ...prev, client_name: t }))} 
+                                    placeholder="John Doe..." 
+                                />
+                                <RenderInput 
+                                    label="Loss Location" 
+                                    value={editData.address} 
+                                    onChange={(t) => setEditData(prev => ({ ...prev, address: t }))} 
+                                    placeholder="123 Maple St..." 
+                                />
                                 
                                 <View style={styles.grid}>
-                                    <View style={styles.gridHalf}><RenderInput label="Form" value={editData.policy_form} keyName="policy_form" placeholder="HO3" /></View>
-                                    <View style={styles.gridHalf}><RenderInput label="Cause" value={editData.loss_type} keyName="loss_type" placeholder="Wind" /></View>
+                                    <View style={styles.gridHalf}>
+                                        <RenderInput label="Policy Form" value={editData.policy_form} onChange={(t) => setEditData(prev => ({ ...prev, policy_form: t }))} placeholder="HO3" />
+                                    </View>
+                                    <View style={styles.gridHalf}>
+                                        <RenderInput label="Cause" value={editData.loss_type} onChange={(t) => setEditData(prev => ({ ...prev, loss_type: t }))} placeholder="Wind" />
+                                    </View>
                                 </View>
 
                                 <View style={styles.grid}>
-                                    <View style={styles.gridHalf}><RenderInput label="DOL" value={editData.date_of_loss} keyName="date_of_loss" placeholder="YYYY-MM-DD" /></View>
-                                    <View style={styles.gridHalf}><RenderInput label="Reported" value={editData.reported_date} keyName="reported_date" placeholder="YYYY-MM-DD" /></View>
+                                    <View style={styles.gridHalf}>
+                                        <RenderInput label="Date Of Loss" value={editData.date_of_loss} onChange={(t) => setEditData(prev => ({ ...prev, date_of_loss: t }))} placeholder="YYYY-MM-DD" />
+                                    </View>
+                                    <View style={styles.gridHalf}>
+                                        <RenderInput label="Reported" value={editData.reported_date} onChange={(t) => setEditData(prev => ({ ...prev, reported_date: t }))} placeholder="YYYY-MM-DD" />
+                                    </View>
                                 </View>
 
-                                <RenderInput label="LOB" value={editData.line_of_business} keyName="line_of_business" placeholder="Residential" />
-                                <RenderInput label="Workflow Stage" value={editData.claim_stage} keyName="claim_stage" placeholder="Inspection" />
+                                <RenderInput label="Lines Of Business" value={editData.line_of_business} onChange={(t) => setEditData(prev => ({ ...prev, line_of_business: t }))} placeholder="Residential" />
+                                <RenderInput label="Workflow Stage" value={editData.claim_stage} onChange={(t) => setEditData(prev => ({ ...prev, claim_stage: t }))} placeholder="Inspection" />
 
                                 <TouchableOpacity 
                                     activeOpacity={0.8}
@@ -262,7 +310,7 @@ const styles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center', marginRight: 16,
         borderWidth: 1, borderColor: '#F1F5F9'
     },
-    infoColumn: { flex: 1 },
+    infoColumn: { flex: 1, justifyContent: 'center' },
     headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
     claimNoLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginRight: 6 },
     claimNoText: { fontSize: 16, fontWeight: '900', color: '#1E293B' },
@@ -271,6 +319,7 @@ const styles = StyleSheet.create({
     miniBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
     miniBadgeText: { fontSize: 10, fontWeight: '900' },
     stageText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+    dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
     
     overlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.6)', justifyContent: 'flex-end' },
     keyboardView: { width: '100%' },
