@@ -2,9 +2,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useRef, useState } from "react";
+import { ReactElement, useCallback, useState } from "react";
 import {
-  Dimensions,
   Linking,
   Pressable,
   RefreshControl,
@@ -25,14 +24,19 @@ import {
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
-const { width } = Dimensions.get("window");
+type MenuLinkProps = {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  color: string;
+  isLast?: boolean;
+  onPress?: () => void;
+};
 
 export default function SettingsScreen() {
   const { token, email, logout } = useAuth();
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyCheckout, setBusyCheckout] = useState(false);
-  const prevPlanRef = useRef<string | null>(null);
 
   // Logout Modal State
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -45,7 +49,6 @@ export default function SettingsScreen() {
     if (showLoading) setLoading(true);
     try {
       const response = await getSubscriptionStatus(token);
-      prevPlanRef.current = response.subscription.plan_type;
       setStatus(response);
     } catch (error) {
       console.error("Sync Error:", error);
@@ -81,7 +84,7 @@ export default function SettingsScreen() {
     await logout(); // Perform the Supabase/Auth logout
   };
 
-  const usagePercentage = status?.subscription
+  const usagePercentage = status?.subscription?.usage_limit
     ? (status.subscription.current_usage / status.subscription.usage_limit) * 100
     : 0;
 
@@ -92,9 +95,9 @@ export default function SettingsScreen() {
       {/* Modern Glossy Header */}
       <View style={styles.headerContainer}>
         <LinearGradient
-                  colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                   colors={["#156bdb", "#123C78", "#0B2F5B"]}  
+          start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }} 
                   style={styles.headerGradient}
               >
           <SafeAreaView edges={["top"]}>
@@ -209,7 +212,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>BUILD 1.4.0 • PRODUCTION</Text>
+          <Text style={styles.versionText}>BUILD 1.4.0 | PRODUCTION</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence Engine</Text>
         </View>
       </ScrollView>
@@ -229,7 +232,7 @@ export default function SettingsScreen() {
 }
 
 // Sub-component for Menu Items
-function MenuLink({ icon, label, color, isLast, onPress }: any) {
+function MenuLink({ icon, label, color, isLast, onPress }: MenuLinkProps): ReactElement {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#F8FAFC' }]}>
       <View style={styles.menuLeft}>

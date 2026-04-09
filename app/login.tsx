@@ -6,7 +6,6 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -17,26 +16,27 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-const { width, height } = Dimensions.get("window");
-
 export default function LoginScreen() {
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768;
+
   const { isHydrated, isAuthenticated, login } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [focusedInput, setFocusedInput] = useState<"email" | "pass" | null>(
-    null,
-  );
+  const [showPassword, setShowPassword] = useState(false);
+  const [focused, setFocused] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
+  const scrollRef = useRef<ScrollView>(null);
+  const logoImg = require("../assets/images/AdjusterAssist1.png");
+
+ useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => {
       setKeyboardOpen(true);
     });
@@ -50,7 +50,7 @@ export default function LoginScreen() {
     };
   }, []);
 
-  const logoImg = require("../assets/images/AdjusterAssist1.png");
+  // const logoImg = require("../assets/images/AdjusterAssist1.png");
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
@@ -80,6 +80,7 @@ export default function LoginScreen() {
     if (!email.trim() || !password.trim()) {
       toast.error("Missing Credentials", {
         description: "Please enter both email and password.",
+        style: { borderRadius: 8, backgroundColor: "#1411be"},
       });
       return;
     }
@@ -94,159 +95,94 @@ export default function LoginScreen() {
       },
     });
   }
-
   return (
-    <View style={styles.mainContainer}>
+    <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#276bbd", "#0B3C7A"]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <View style={[styles.orb, styles.orbTop]} />
-      <View style={[styles.orb, styles.orbBottom]} />
+      <LinearGradient colors={["#1E63B6", "#052146"]} style={StyleSheet.absoluteFill} />
 
       <KeyboardAvoidingView
-       
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.flex1}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        style={{ flex: 1 }}
       >
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[
-            styles.scrollContent,
-            keyboardOpen && { paddingBottom: 300 }, // 👈 KEY FIX
+            styles.scroll,
+            // keyboardOpen && { paddingBottom: 200 },
           ]}
-          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          bounces={false}
-          scrollEnabled={height < 700 || focusedInput !== null}
         >
-          <SafeAreaView style={styles.safeArea}>
-            <View style={styles.headerSection}>
-              <View style={styles.logoBadge}>
-                <Image source={logoImg} style={styles.logo} />
-              </View>
-              <Text style={styles.welcomeText}>Welcome Back</Text>
-              <Text style={styles.brandSubtitle}>
-                Secure Access for Adjusters
-              </Text>
+          <SafeAreaView style={styles.safe}>
+  <View style={styles.contentWrapper}>
+            
+            {/* HEADER */}
+            <View style={styles.header}>
+              <Image
+                source={logoImg}
+                style={[
+                  styles.logo,
+                  { width: isTablet ? 240 : width * 0.5 },
+                ]}
+              />
+              <Text style={styles.title}>Welcome Back</Text>
+              <Text style={styles.subtitle}>Secure Login</Text>
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Sign In</Text>
-
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusedInput === "email" && styles.inputContainerActive,
-                ]}
-              >
-                <Feather
-                  name="mail"
-                  size={18}
-                  color={focusedInput === "email" ? "#276bbd" : "#94A3B8"}
-                />
-                <TextInput
-                  placeholder="Email Address"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={(v) => {
-                    setEmail(v);
-                    setErrorMessage(null);
-                  }}
-                  onFocus={() => {
-                    setFocusedInput("email");
-                  }}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
-
-              <View
-                style={[
-                  styles.inputContainer,
-                  focusedInput === "pass" && styles.inputContainerActive,
-                ]}
-              >
-                <Feather
-                  name="lock"
-                  size={18}
-                  color={focusedInput === "pass" ? "#276bbd" : "#94A3B8"}
-                />
-                <TextInput
-                  placeholder="Password"
-                  placeholderTextColor="#94A3B8"
-                  secureTextEntry={!showPassword}
-                  style={styles.input}
-                  value={password}
-                  onChangeText={(v) => {
-                    setPassword(v);
-                    setErrorMessage(null);
-                  }}
-                  onFocus={() => {
-                    setFocusedInput("email");
-                    setTimeout(() => {
-                      scrollRef.current?.scrollToEnd({ animated: true });
-                    }, 0);
-                  }}
-                  onBlur={() => setFocusedInput(null)}
-                />
-                <Pressable
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={10}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={20}
-                    color="#94A3B8"
+            {/* CARD */}
+            <View style={styles.center}>
+              <View style={[styles.card, isTablet && { padding: 32 }]}>
+                
+                {/* EMAIL */}
+                <View style={[styles.inputBox, focused === "email" && styles.active]}>
+                  <Feather name="mail" size={18} color="#94A3B8" />
+                  <TextInput
+                    placeholder="Email"
+                    style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
+                    onFocus={() => setFocused("email")}
+                    onBlur={() => setFocused(null)}
                   />
-                </Pressable>
-              </View>
-
-              <Pressable onPress={() => router.push("/forgot-password")}>
-                <Text style={styles.forgotLabel}>Forgot Password?</Text>
-              </Pressable>
-
-              {errorMessage && (
-                <View style={styles.errorBox}>
-                  <Ionicons name="alert-circle" size={16} color="#EF4444" />
-                  <Text style={styles.errorText}>{errorMessage}</Text>
                 </View>
-              )}
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.loginButton,
-                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                ]}
-                onPress={handleLogin}
-                disabled={loading}
-              >
-                <LinearGradient
-                  colors={["#276bbd", "#1E63B6"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.buttonGradient}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#FFF" />
-                  ) : (
-                    <Text style={styles.loginButtonText}>Continue</Text>
-                  )}
-                </LinearGradient>
-              </Pressable>
+                {/* PASSWORD */}
+                <View style={[styles.inputBox, focused === "pass" && styles.active]}>
+                  <Feather name="lock" size={18} color="#94A3B8" />
+                  <TextInput
+                    placeholder="Password"
+                    secureTextEntry={!showPassword}
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    onFocus={() => setFocused("pass")}
+                    onBlur={() => setFocused(null)}
+                  />
+                  <Pressable onPress={() => setShowPassword(!showPassword)}>
+                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} />
+                  </Pressable>
+                </View>
 
-              <View style={styles.footerRow}>
-                <Text style={styles.footerText}>New here?</Text>
-                <Pressable onPress={() => router.push("/signup")}>
-                  <Text style={styles.signupText}>Create Account</Text>
+                <Pressable onPress={() => router.push("/forgot-password")}>
+                  <Text style={styles.forgot}>Forgot Password?</Text>
                 </Pressable>
+
+                {/* BUTTON */}
+                <Pressable style={styles.button} onPress={handleLogin}>
+                  <LinearGradient colors={["#276bbd", "#1E63B6"]} style={styles.btnInner}>
+                    <Text style={styles.btnText}>Continue</Text>
+                  </LinearGradient>
+                </Pressable>
+
+                <View style={styles.footer}>
+                  <Text style={styles.footerText}>New here?</Text>
+                  <Pressable onPress={() => router.push("/signup")}>
+                    <Text style={styles.link}>Create Account</Text>
+                  </Pressable>
+                </View>
+
               </View>
             </View>
+</View>
           </SafeAreaView>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -255,113 +191,116 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#0B3C7A" },
-  flex1: { flex: 1 },
-  orb: {
-    position: "absolute",
-    width: width * 0.8,
-    height: width * 0.8,
-    borderRadius: (width * 0.8) / 2,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  container: { flex: 1 },
+contentWrapper: {
+  flex: 1,
+  justifyContent: "center",   // 🔥 vertical center
+},
+  loader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  orbTop: { top: -width * 0.2, right: -width * 0.2 },
-  orbBottom: { bottom: -width * 0.1, left: -width * 0.3 },
-  scrollContent: { flexGrow: 1, justifyContent: "flex-start" }, // FIX: Keeps card centered
-  safeArea: { paddingHorizontal: 24, paddingBottom: 20 },
-  headerSection: { alignItems: "center", marginBottom: 30 },
-  logoBadge: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    padding: 15,
-    borderRadius: 24,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 16,
   },
-  logo: { width: 180, height: 45, resizeMode: "contain" },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -0.5,
+
+  safe: { flex: 1 },
+
+  header: {
+    alignItems: "center",
+    marginBottom: 30,
   },
-  brandSubtitle: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 4,
-    fontWeight: "500",
+
+  logo: {
+    height: 50,
+    resizeMode: "contain",
+    marginBottom: 10,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 32,
-    padding: 28,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-  },
-  cardTitle: {
-    fontSize: 20,
+
+  title: {
+    fontSize: 24,
+    color: "#FFF",
     fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 24,
   },
-  inputContainer: {
+
+  subtitle: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+  },
+
+  center: {
+    width: "100%",
+    alignItems: "center",
+  },
+
+  card: {
+    width: "100%",
+    maxWidth: 420, // 🔥 KEY for responsiveness
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 20,
+  },
+
+  inputBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 58,
-    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 12,
+    height: 50,
+    marginBottom: 12,
   },
-  inputContainerActive: { borderColor: "#276bbd", backgroundColor: "#FFFFFF" },
+
+  active: {
+    borderWidth: 1,
+    borderColor: "#276bbd",
+    backgroundColor: "#FFF",
+  },
+
   input: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: "#0F172A",
-    fontWeight: "500",
+    marginLeft: 10,
   },
-  forgotLabel: {
-    textAlign: "right",
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 20,
-  },
-  loginButton: { borderRadius: 16, overflow: "hidden", marginTop: 10 },
-  buttonGradient: {
-    height: 58,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  errorBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FEF2F2",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 20,
-    gap: 8,
-  },
-  errorText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 24,
-    gap: 6,
-  },
-  footerText: { color: "#64748B", fontSize: 14, fontWeight: "500" },
-  signupText: { color: "#276bbd", fontSize: 14, fontWeight: "700" },
-});
 
+  forgot: {
+    textAlign: "right",
+    marginBottom: 16,
+    color: "#64748B",
+  },
+
+  button: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+
+  btnInner: {
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  btnText: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
+
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+
+  footerText: {
+    color: "#64748B",
+  },
+
+  link: {
+    color: "#276bbd",
+    marginLeft: 5,
+    fontWeight: "700",
+  },
+});

@@ -157,9 +157,9 @@ export default function WorkspacesScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={["#156bdb", "#123C78", "#0B2F5B"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={["#156bdb", "#123C78", "#0B2F5B"]}  
+          start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }} 
         style={styles.headerGradient}
       >
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
@@ -169,9 +169,6 @@ export default function WorkspacesScreen() {
                 <Image source={logo} style={styles.logo} />
 
               </View>
-            {/* <View style={styles.iconCircle}>
-              <Ionicons name="folder-open" size={20} color="#FFFFFF" />
-            </View> */}
           </View>
 
         </SafeAreaView>
@@ -264,7 +261,7 @@ const styles = StyleSheet.create({
   },
   headerContent: { paddingHorizontal: 20, },
   headerTitle: {
-    marginTop: 8,
+    // marginTop: 8,
     fontSize: 18,
     color: "#0B2F5B",
     letterSpacing: 0.3,
