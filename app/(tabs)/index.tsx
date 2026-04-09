@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BackHandler,
+  Dimensions,
   Image,
   Platform,
   Pressable,
@@ -13,8 +15,9 @@ import {
   ToastAndroid,
   View,
 } from "react-native";
+import { RefreshControl, ScrollView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Toast from "react-native-toast-message";
+import { toast } from "sonner-native";
 
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import {
@@ -24,14 +27,12 @@ import {
   getRecentDrafts,
   getSubscriptionStatus,
   RecentDraft,
-  SubscriptionStatus,
-  updateFile,
+  SubscriptionStatus
 } from "@/lib/api";
 import { logoutUser } from "@/lib/services/authService";
 import { useAuth } from "@/providers/auth-provider";
-import * as Haptics from "expo-haptics";
-import { RefreshControl, ScrollView } from "react-native-gesture-handler";
-import { toast } from "sonner-native";
+
+const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
   const { token } = useAuth();
@@ -39,31 +40,26 @@ export default function HomeScreen() {
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Delete modal
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
-
-  const logo = require("../../assets/images/AdjusterAssist1.png");
   const [lastDraft, setLastDraft] = useState<RecentDraft | null>(null);
 
+  const logo = require("../../assets/images/AdjusterAssist1.png");
+
   const activeFilesCount = useMemo(
-    () =>
-      files.filter((file) => file.status?.toLowerCase() === "active").length,
-    [files],
+    () => files.filter((file) => file.status?.toLowerCase() === "active").length,
+    [files]
   );
 
   const recentClaims = useMemo(() => {
-    // Get recent claims (active and draft), limit to 5
     return files
       .filter((file) => ["active", "draft"].includes(file.status?.toLowerCase() || ""))
       .slice(0, 5);
   }, [files]);
-// console.log("Recent Claims:", recentClaims);
+
   const loadData = React.useCallback(
     async (showLoading = true) => {
       if (!token) return;
-
       if (showLoading) setIsLoading(true);
       if (!showLoading) setRefreshing(true);
 
@@ -74,454 +70,239 @@ export default function HomeScreen() {
           getRecentDrafts(token),
         ]);
 
-        setFiles(filesResponse ? filesResponse : []);
+        setFiles(filesResponse || []);
         setStatus(statusResponse);
 
         const sortedDrafts = (recentDrafts || [])
           .slice()
-          .sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-          );
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setLastDraft(sortedDrafts[0] || null);
       } catch (err: any) {
-        console.error("Error loading data:", err);
         if (err.message.includes("401") || err.message.includes("Unauthorized")) {
           logoutUser();
         }
-        Toast.show({
-          type: "error",
-          text1: "Sync Failed",
-          text2: "Could not load your workspace data.",
-        });
-
+        toast.error("Sync Failed: Could not load data.");
       } finally {
         setIsLoading(false);
         setRefreshing(false);
       }
     },
-    [token],
+    [token]
   );
 
-  useEffect(() => {
-    loadData(true);
-  }, [loadData]);
+  useEffect(() => { loadData(true); }, [loadData]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadData(false);
-    }, [loadData]),
+    }, [loadData])
   );
 
   const backPressCount = useRef(0);
-
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
         if (backPressCount.current === 0) {
           backPressCount.current += 1;
-
           ToastAndroid.show("Press again to exit", ToastAndroid.SHORT);
-
-          setTimeout(() => {
-            backPressCount.current = 0;
-          }, 2000);
-
-          return true; // prevent default behavior
+          setTimeout(() => { backPressCount.current = 0; }, 2000);
+          return true;
         }
-
         BackHandler.exitApp();
         return true;
       };
-
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
       return () => subscription.remove();
-    }, []),
+    }, [])
   );
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadData(false);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token]),
-  );
   const getStatusStyle = (value?: string) => {
     const statusValue = value?.toLowerCase();
-
     switch (statusValue) {
       case "active":
-        return {
-          badge: styles.statusBadgeActive,
-          text: styles.statusTextActive,
-          icon: "checkmark-circle",
-        };
+        return { badge: styles.statusBadgeActive, text: styles.statusTextActive, icon: "ellipse" };
       case "draft":
-        return {
-          badge: styles.statusBadgeDraft,
-          text: styles.statusTextDraft,
-          icon: "document-text",
-        };
+        return { badge: styles.statusBadgeDraft, text: styles.statusTextDraft, icon: "time" };
       case "closed":
-        return {
-          badge: styles.statusBadgeClosed,
-          text: styles.statusTextClosed,
-          icon: "lock-closed",
-        };
+        return { badge: styles.statusBadgeClosed, text: styles.statusTextClosed, icon: "lock-closed" };
       default:
-        return {
-          badge: styles.statusBadgeNeutral,
-          text: styles.statusTextNeutral,
-          icon: "ellipse",
-        };
+        return { badge: styles.statusBadgeNeutral, text: styles.statusTextNeutral, icon: "help-circle" };
     }
   };
 
-  // const handleDeleteFile = (id: number) => {
-  //   Alert.alert(
-  //     "Delete File",
-  //     "Are you sure?",
-  //     [
-  //       { text: "Cancel", style: "cancel" },
-  //       {
-  //         text: "Delete",
-  //         style: "destructive",
-  //         onPress: async () => {
-  //           // 2. Ensure your filter logic matches the type
-  //           setFiles(prev => prev.filter(f => f.id !== id));
-  //           toast.success("File deleted");
-  //         }
-  //       },
-  //     ]
-  //   );
-  // };
-
-  const handleDeleteFile = (id: number) => {
-    setSelectedFileId(id);
-    setModalVisible(true);
-  };
   const confirmDelete = async () => {
-    // 1. Validation check
-    if (selectedFileId === null || !token) {
-      toast.error("Unable to identify workspace or session");
-      return;
-    }
-
+    if (selectedFileId === null || !token) return;
     try {
-      // 2. Perform the actual API deletion
-      // Assuming your api.ts export is: export const deleteFile = (token, id) => ...
       await deleteFile(token, selectedFileId);
-
-      // 3. Update local UI state only after successful API response
       setFiles((prev) => prev.filter((f) => f.id !== selectedFileId));
-
-      // 4. Success feedback with Haptics for premium feel
-      if (Platform.OS !== "web")
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      toast.success("Workspace deleted successfully");
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success("Workspace deleted");
     } catch (err) {
-      // 5. Handle errors (Network issues, 401 Unauthorized, etc.)
-      console.error("API Delete Error:", err);
-      if (Platform.OS !== "web")
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      toast.error("Failed to delete workspace. Please try again.");
+      toast.error("Failed to delete workspace.");
     } finally {
-      // 6. Clean up: Close modal and reset the ID tracker
       setModalVisible(false);
       setSelectedFileId(null);
     }
   };
 
-  const handleUpdateFile = async (id: number, updateData: any) => {
-    if (!token) {
-      toast.error("Session expired. Please login again.");
-      router.push("/login")
-      return;
-    }
-    try {
-      // Now TypeScript knows 'token' is a string here
-      await updateFile(token, id, updateData);
-      toast.success("Workspace updated");
-      loadData(false);
-    } catch (err) {
-      toast.error("Update failed");
-    }
-  };
-
-
-
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
 
+      {/* Modern Refined Header */}
       <LinearGradient
-        colors={["#0F4C9C", "#123C78", "#020617"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={["#165bb6", "#1E293B"]}
         style={styles.headerGradient}
       >
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
-          <View style={styles.headerRow}>
-            <View style={styles.brandBlock}>
-              <Image source={logo} style={styles.logo} />
+          <View style={styles.headerTopRow}>
+            <Image source={logo} style={styles.logo} />
+            <Pressable 
+                onPress={() => router.push("/settings")}
+                style={styles.profileButton}
+            >
+              <View style={styles.creditPill}>
+                <Ionicons name="sparkles" size={14} color="#FDE68A" />
+                <Text style={styles.creditText}>{status?.subscription?.remaining ?? 0}</Text>
+              </View>
+            </Pressable>
+          </View>
+          
+          <Text style={styles.welcomeText}>Claims Workspace</Text>
+          <Text style={styles.welcomeSub}>Manage your property assessments efficiently.</Text>
 
+          {/* Stats Section with Glassmorphism */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{files.length}</Text>
+              <Text style={styles.statLabel}>Total</Text>
             </View>
-
-            <View style={styles.creditPill}>
-              <Ionicons name="sparkles" size={13} color="#FDE68A" />
-              <Text style={styles.creditText}>
-                {status?.subscription?.remaining ?? 0} Credits
-              </Text>
+            <View style={[styles.statCard, styles.statCardActive]}>
+              <Text style={styles.statNumber}>{activeFilesCount}</Text>
+              <Text style={styles.statLabel}>Active</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{status?.subscription?.remaining ?? 0}</Text>
+              <Text style={styles.statLabel}>Credits</Text>
             </View>
           </View>
-
         </SafeAreaView>
-
       </LinearGradient>
-        <ScrollView
+
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => loadData(false)}
-            tintColor="#276bbd"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(false)} tintColor="#0F172A" />
         }
       >
-        <View style={styles.contentWrapper}>
-          <Text style={styles.brandSubtitle}>Premium claims workspace</Text>
-
-          <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{files.length}</Text>
-          <Text style={styles.statLabel}>Total Files</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{activeFilesCount}</Text>
-          <Text style={styles.statLabel}>Active</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {status?.subscription?.remaining ?? 0}
-          </Text>
-          <Text style={styles.statLabel}>Credits Left</Text>
-        </View>
-      </View>
-    
-        {/* Continue Last Claim - Primary Action */}
-        {lastDraft && (
-          <View style={styles.primaryActionCard}>
-            <View style={styles.primaryActionContent}>
-              <View style={styles.primaryActionIcon}>
-                <LinearGradient
-                  colors={["#0549a1", "#020617"]}
-                  style={styles.primaryActionGradient}
-                >
-                  <Ionicons name="create-outline" size={24} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
-              <View style={styles.primaryActionText}>
-                <Text style={styles.primaryActionTitle}>Continue Last Claim</Text>
-                {/* <Text style={styles.primaryActionSubtitle}>
-                  {lastDraft.claim_number || "Unnamed Draft"}
-                </Text> */}
-              </View>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.primaryActionButton,
-                  pressed && styles.fabPressed,
-                ]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/response",
-                    params: {
-                      output_format: lastDraft.draft_type,
-                      type: lastDraft.draft_type,
-                      text: lastDraft.content,
-                      fileId: String(lastDraft.file_id),
-                      alreadySaved: "true",
-                      draftId: String(lastDraft.id),
-                      created_at: lastDraft.created_at,
-                    },
-                  })
-                }
-              >
-                <Ionicons name="chevron-forward" size={20} color="#1E63B6" />
-              </Pressable>
-            </View>
-          </View>
-        )}
-
-        {/* Quick Actions Row */}
-        <View style={styles.quickActionsRow}>
+        <View style={styles.bodyWrapper}>
           
-          <Pressable
-            style={({ pressed }) => [
-              styles.quickActionCard,
-              pressed && styles.quickActionPressed,
-            ]}
-            onPress={() => router.push("/generate")}
-          >
-            <LinearGradient
-              colors={["#EFF6FF", "#DBEAFE"]}
-              style={styles.quickActionGradient}
-            >
-              <Ionicons name="add" size={20} color="#1D4ED8" />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>Start a New Claim</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.quickActionCard,
-              pressed && styles.quickActionPressed,
-            ]}
-            onPress={() => router.push("/file-draft-history")}
-          >
-            <LinearGradient
-              colors={["#FEF3C7", "#FDE68A"]}
-              style={styles.quickActionGradient}
-            >
-              <Ionicons name="document-text" size={20} color="#92400E" />
-            </LinearGradient>
-            <Text style={styles.quickActionText}>Quick Draft</Text>
-          </Pressable>
-        </View>
-
-        {/* Recent Claims Section */}
-        {recentClaims.length > 0 && (
-          <View style={styles.recentClaimsSection}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionEyebrow}>RECENT ACTIVITY</Text>
-                {/* <Text style={styles.sectionTitle}>Recent Claims</Text> */}
-              </View>
-              {/* <Pressable
-                style={({ pressed }) => [
-                  styles.sectionAction,
-                  pressed && { opacity: 0.7 },
-                ]}
-                onPress={() => router.push("/history")}
-              >
-                <Text style={styles.sectionActionText}>View All</Text>
-                <Ionicons name="chevron-forward" size={14} color="#276bbd" />
-              </Pressable> */}
-            </View>
-
-            <View style={styles.recentClaimsList}>
-              {recentClaims.map((file) => (
-                <Pressable
-                  key={file.id}
-                  style={({ pressed }) => [
-                    styles.recentClaimCard,
-                    pressed && styles.fileCardPressed,
-                  ]}
-                  onPress={() => router.push("/workspaces")}
-                >
-                  <View style={styles.fileIconWrap}>
-                    <LinearGradient
-                      colors={["#EFF6FF", "#DBEAFE"]}
-                      style={styles.fileIconGradient}
-                    >
-                      <Ionicons
-                        name={getStatusStyle(file.status).icon as any}
-                        size={20}
-                        color="#1D4ED8"
-                      />
-                    </LinearGradient>
-                  </View>
-
-                  <View style={styles.fileInfo}>
-                    <View style={styles.fileTopRow}>
-                      <Text style={styles.fileName} numberOfLines={1}>
-                        {file.claim_number || "Unnamed Claim"}
-                      </Text>
-                      <View style={[styles.statusBadgeBase, getStatusStyle(file.status).badge]}>
-                        <Ionicons
-                          name={getStatusStyle(file.status).icon as any}
-                          size={10}
-                          color={getStatusStyle(file.status).text.color}
-                        />
-                        <Text style={[styles.statusTextBase, getStatusStyle(file.status).text]}>
-                          {file.status || "Unknown"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {file.client_name && (
-                      <Text style={styles.clientName} numberOfLines={1}>
-                        {file.client_name}
-                      </Text>
-                    )}
-
-                    <View style={styles.fileMetaRow}>
-                      <View style={styles.metaItem}>
-                        <Ionicons name="time-outline" size={12} color="#94A3B8" />
-                        <Text style={styles.fileSubText}>
-                          {file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Recent"}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.chevronWrap}>
-                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Empty State when no recent claims */}
-        {/* {recentClaims.length === 0 && !isLoading && (
-          <View style={styles.centerCard}>
-            <View style={styles.iconWrap}>
-              <LinearGradient
-                colors={["#EFF6FF", "#DBEAFE"]}
-                style={styles.iconGradient}
-              >
-                <Ionicons
-                  name="document-text-outline"
-                  size={28}
-                  color="#1D4ED8"
-                />
-              </LinearGradient>
-            </View>
-            <Text style={styles.centerTitle}>Start a New Claim</Text>
-            <Text style={styles.centerSubtitle}>
-              Create and manage claims with speed and accuracy.
-            </Text>
+          {/* Action Hub */}
+          <View style={styles.quickActionsRow}>
             <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.fabPressed,
-              ]}
+              style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
               onPress={() => router.push("/generate")}
             >
-              <LinearGradient
-                colors={["#276bbd", "#1D4ED8"]}
-                style={styles.primaryGradient}
-              >
-                <Ionicons name="add" size={20} color="#FFF" />
-                <Text style={styles.primaryText}>New Claim</Text>
+              <LinearGradient colors={["#3B82F6", "#0a36b1"]} style={styles.actionIcon}>
+                <Ionicons name="add" size={24} color="#FFF" />
               </LinearGradient>
+              <Text style={styles.actionLabel}>New Claim</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
+              onPress={() => router.push("/history")}
+            >
+              <LinearGradient colors={["#F59E0B", "#D97706"]} style={styles.actionIcon}>
+                <Ionicons name="document-text" size={24} color="#FFF" />
+              </LinearGradient>
+              <Text style={styles.actionLabel}>History</Text>
             </Pressable>
           </View>
-        )} */}
+
+          {/* Continue Last Draft Card */}
+          {lastDraft && (
+            <Pressable
+              style={({ pressed }) => [styles.lastDraftCard, pressed && styles.pressed]}
+              onPress={() =>
+                router.push({
+                  pathname: "/response",
+                  params: {
+                    output_format: lastDraft.draft_type,
+                    type: lastDraft.draft_type,
+                    text: lastDraft.content,
+                    fileId: String(lastDraft.file_id),
+                    alreadySaved: "true",
+                    draftId: String(lastDraft.id),
+                    created_at: lastDraft.created_at,
+                  },
+                })
+              }
+            >
+              <View style={styles.lastDraftContent}>
+                <View style={styles.lastDraftInfo}>
+                  <Text style={styles.lastDraftLabel}>CONTINUE WORKING</Text>
+                  <Text style={styles.lastDraftTitle} numberOfLines={1}>
+                    {lastDraft.claim_number || "Recent Assessment"}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-forward" size={20} color="#3B82F6" />
+              </View>
+            </Pressable>
+          )}
+
+          {/* Recent Activity Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <Pressable onPress={() => router.push("/workspaces")}>
+                <Text style={styles.viewAllText}>See All</Text>
+            </Pressable>
+          </View>
+
+          {recentClaims.map((file) => (
+            <Pressable
+              key={file.id}
+              style={({ pressed }) => [styles.workspaceCard, pressed && styles.pressed]}
+              onPress={() => router.push("/workspaces")}
+            >
+              <View style={styles.workspaceIcon}>
+                 <Ionicons name="folder" size={22} color="#64748B" />
+              </View>
+              
+              <View style={styles.workspaceDetails}>
+                <View style={styles.workspaceTopRow}>
+                  <Text style={styles.workspaceTitle} numberOfLines={1}>
+                    {file.claim_number || "Draft Workspace"}
+                  </Text>
+                  <View style={[styles.miniBadge, getStatusStyle(file.status).badge]}>
+                     <Text style={[styles.miniBadgeText, getStatusStyle(file.status).text]}>
+                        {file.status}
+                     </Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.workspaceClient}>{file.client_name || "New Client Entry"}</Text>
+                
+                <View style={styles.workspaceFooter}>
+                  <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
+                  <Text style={styles.workspaceDate}>
+                    {file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Pending Sync"}
+                  </Text>
+                </View>
+              </View>
+              
+              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            </Pressable>
+          ))}
         </View>
       </ScrollView>
+
       <CustomConfirmModal
         isVisible={isModalVisible}
         title="Delete Workspace"
-        message="Are you sure you want to delete this workspace? This action cannot be undone."
-        onConfirm={confirmDelete} // Calls the logic we wrote in step 1
+        message="This action cannot be undone. All associated drafts will be removed."
+        onConfirm={confirmDelete}
         onCancel={() => {
           setModalVisible(false);
           setSelectedFileId(null);
@@ -534,609 +315,243 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  iconWrap: {
-    marginBottom: 14,
-  },
-
-  iconGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryButton: {
-    marginTop: 20,
-    width: "100%",
-    borderRadius: 999,
-    overflow: "hidden",
-
-    // shadow (iOS)
-    shadowColor: "#020617",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-
-    // shadow (Android)
-    elevation: 6,
-  },
-
-  primaryGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 16,
-    borderRadius: 999,
-  },
-
-  primaryText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
-
-  fabPressed: {
-    transform: [{ scale: 0.96 }],
-    opacity: 0.95,
-  },
-  centerTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#0F172A",
-    textAlign: "center",
-  },
-
-  centerSubtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: "#64748B",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  centerCard: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: "center",
-
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  // "#0549a1", "#1E63B6"
-  primaryActionCard: {
-    marginTop: 20,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#1E63B6",
-    borderLeftWidth: 4,
-
-    shadowColor: "#0549a1",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  primaryActionContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  primaryActionIcon: {
-    marginRight: 16,
-  },
-  primaryActionGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryActionText: {
-    flex: 1,
-  },
-  primaryActionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-  primaryActionSubtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  primaryActionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f1f0fd",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionsRow: {
-    flexDirection: "row",
-    marginTop: 20,
-    gap: 12,
-  },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EEF2F7",
-
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  quickActionPressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.9,
-  },
-  quickActionGradient: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  quickActionText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
-    textAlign: "center",
-  },
-  recentClaimsSection: {
-    marginTop: 24,
-  },
-  recentClaimsList: {
-  },
-  recentClaimCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#EEF2F7",
-
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  bottomFill: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-    marginTop: -20, // keeps overlap effect with header
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    backgroundColor: "#F1F5F9",
   },
   headerGradient: {
-    paddingBottom: 18,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingTop: 12,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
-
   headerContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
-
-  headerRow: {
-    marginTop: 8,
+  headerTopRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
     justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
   },
-
-  brandBlock: {
-    flex: 1,
-    paddingRight: 16,
-  },
-
   logo: {
     width: 160,
     height: 50,
     resizeMode: "contain",
   },
-
-  brandSubtitle: {
-    marginTop: 8,
-    fontSize: 18,
-    color: "#0B2F5B",
-    letterSpacing: 0.3,
-    fontFamily: "Inter-Regular",
-    fontWeight: "bold",
+  profileButton: {
+    padding: 4,
   },
-
   creditPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-
-  creditText: {
-    color: "#F8E7A1",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-
-  heroCard: {
-    marginTop: 22,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 24,
-    padding: 18,
+    paddingVertical: 6,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
   },
-
-  heroTextWrap: {
-    paddingRight: 10,
+  creditText: {
+    color: "#FDE68A",
+    fontSize: 13,
+    fontWeight: "700",
+    marginLeft: 6,
   },
-
-  heroTitle: {
-    color: "#FFFFFF",
+  welcomeText: {
     fontSize: 24,
     fontWeight: "800",
-    letterSpacing: 0.2,
+    color: "#F8FAFC",
   },
-
-  heroSubtitle: {
-    marginTop: 8,
-    color: "rgba(255,255,255,0.78)",
-    fontSize: 13,
-    lineHeight: 20,
+  welcomeSub: {
+    fontSize: 14,
+    color: "#94A3B8",
+    marginTop: 4,
+    marginBottom: 24,
   },
-
-  heroBadge: {
-    marginTop: 14,
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-  },
-
-  heroBadgeText: {
-    color: "#0F4C9C",
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "capitalize",
-  },
-
   statsRow: {
     flexDirection: "row",
-    marginTop: 18,
     gap: 12,
   },
-  // colors={["#0549a1", "#1E63B6"]}
   statCard: {
     flex: 1,
-    backgroundColor: "#0549a1",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    padding: 16,
     borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
-
+  statCardActive: {
+    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    borderColor: "rgba(59, 130, 246, 0.3)",
+  },
   statNumber: {
-    color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
+    color: "#dacd16",
   },
-
   statLabel: {
-    marginTop: 4,
-    color: "rgba(255,255,255,0.68)",
     fontSize: 11,
+    color: "#ececec",
+    marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  bodyWrapper: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  quickActionsRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 24,
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    padding: 16,
+    borderRadius: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  actionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  actionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  lastDraftCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 32,
+    borderLeftWidth: 5,
+    borderLeftColor: "#3B82F6",
+    shadowColor: "#3B82F6",
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 3,
+  },
+  lastDraftContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  lastDraftInfo: {
+    flex: 1,
+  },
+  lastDraftLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#3B82F6",
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  lastDraftTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#3B82F6",
     fontWeight: "600",
   },
-
-  contentContainer: {
-    flex: 1,
-    marginTop: 18,
-  },
-
-  sectionHeader: {
-    marginBottom: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  sectionEyebrow: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#494f57",
-    letterSpacing: 1.1,
-  },
-
-  sectionTitle: {
-    marginTop: 2,
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  sectionAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
-  sectionActionText: {
-    color: "#276bbd",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 100,
-  },
-
-  contentWrapper: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-
-  fileCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+  workspaceCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "#EEF2F7",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 18,
-    elevation: 3,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
-
-  fileCardPressed: {
-    transform: [{ scale: 0.985 }],
-    opacity: 0.96,
-  },
-
-  fileIconWrap: {
-    marginRight: 14,
-  },
-
-  fileIconGradient: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    alignItems: "center",
+  workspaceIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#F1F5F9",
     justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
-
-  fileInfo: {
+  workspaceDetails: {
     flex: 1,
   },
-
-  fileTopRow: {
+  workspaceTopRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 10,
+    alignItems: "center",
+    marginBottom: 4,
   },
-
-  fileName: {
-    flex: 1,
+  workspaceTitle: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontWeight: "700",
+    color: "#334155",
+    maxWidth: width * 0.4,
   },
-
-  clientName: {
-    marginTop: 4,
+  workspaceClient: {
     fontSize: 13,
     color: "#64748B",
-    fontWeight: "500",
+    marginBottom: 8,
   },
-
-  fileMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 12,
-    marginTop: 10,
-  },
-
-  metaItem: {
+  workspaceFooter: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-
-  fileSubText: {
+  workspaceDate: {
     fontSize: 11,
     color: "#94A3B8",
     fontWeight: "500",
   },
-
-  statusBadgeBase: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  miniBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 999,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-
-  statusTextBase: {
+  miniBadgeText: {
     fontSize: 10,
     fontWeight: "800",
+    textTransform: "uppercase",
   },
-
-  statusBadgeActive: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  statusTextActive: {
-    color: "#166534",
-  },
-
-  statusBadgeDraft: {
-    backgroundColor: "#FEF3C7",
-  },
-
-  statusTextDraft: {
-    color: "#92400E",
-  },
-
-  statusBadgeClosed: {
-    backgroundColor: "#E2E8F0",
-  },
-
-  statusTextClosed: {
-    color: "#475569",
-  },
-
-  statusBadgeNeutral: {
-    backgroundColor: "#EEF2F7",
-  },
-
-  statusTextNeutral: {
-    color: "#64748B",
-  },
-
-  chevronWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#F8FAFC",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 12,
-  },
-
-  loaderContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-
-  loaderCard: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EEF2F7",
-  },
-
-  loaderTitle: {
-    marginTop: 14,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  loaderSubtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#64748B",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-
-  emptyState: {
-    alignItems: "center",
-    marginTop: 55,
-    paddingHorizontal: 24,
-  },
-
-  emptyIconWrap: {
-    width: 110,
-    height: 110,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  emptyTitle: {
-    marginTop: 18,
-    color: "#0F172A",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-
-  emptySubtitle: {
-    marginTop: 8,
-    color: "#64748B",
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: "center",
-  },
-
-  fab: {
-    position: "absolute",
-    bottom: 28,
-    alignSelf: "center",
-    borderRadius: 999,
-    shadowColor: "#1D4ED8",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-
-  // fabPressed: {
-  //   transform: [{ scale: 0.98 }],
-  // },
-
-  fabGradient: {
-    height: 58,
-    borderRadius: 999,
-    paddingHorizontal: 22,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  fabText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: 0.2,
+  statusBadgeActive: { backgroundColor: "#DCFCE7" },
+  statusTextActive: { color: "#15803d" },
+  statusBadgeDraft: { backgroundColor: "#FEF3C7" },
+  statusTextDraft: { color: "#b45309" },
+  statusBadgeClosed: { backgroundColor: "#F1F5F9" },
+  statusTextClosed: { color: "#475569" },
+  statusBadgeNeutral: { backgroundColor: "#F1F5F9" },
+  statusTextNeutral: { color: "#64748B" },
+  pressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
 });
