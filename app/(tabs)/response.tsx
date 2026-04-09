@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AllDraftsofUser, generateNextStep, saveDraft, updateDraft } from "@/lib/api";
+import { AllDraftsofUser, generateNextStep, generateResponse, saveDraft, updateDraft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner-native";
 
@@ -26,11 +26,11 @@ type Params = {
   text?: string;
   type?: string;
   output_format?: string;
-  fileId?: string;
+  fileId?: string ;
   alreadySaved?: string;
   draftId?: string; // Added draftId to params
   created_at?: string; // Added created_at to params
-  userInput?: string; // Added userInput to params
+  userInput?: string; 
 };
 
 const SESSION_HISTORY_KEY = "@session_saved_drafts_data";
@@ -53,6 +53,7 @@ export default function ResponseScreen() {
   const [editedText, setEditedText] = useState(params.text || "");
 
   const [isGeneratingNext, setIsGeneratingNext] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
     const loadDraftById = async () => {
@@ -85,6 +86,31 @@ export default function ResponseScreen() {
 
     loadDraftById();
   }, [params.draftId, params.text, token]);
+
+  const handleRegenerate = async () => {
+  if (!token || isRegenerating || isEditing) return;
+
+  try {
+    setIsRegenerating(true);
+    const sanitizedToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
+
+    const result = await generateResponse(sanitizedToken, {
+      fileId: params.fileId || "",
+      userInput: params.userInput || `Regenerate a new version of this draft ${editedText}. Must not same as previous version.`,
+    });
+
+    if (result && result.responseText) {
+      // Smoothly update the text
+      setEditedText(result.responseText);
+      setIsSaved(false);
+      toast.success("New draft generated");
+    }
+  } catch (error: any) {
+    toast.error("Regeneration Failed", { description: error.message });
+  } finally {
+    setIsRegenerating(false);
+  }
+};
 
   const handleWorkflowChain = async () => {
     if (!token || isGeneratingNext) return;
@@ -274,6 +300,15 @@ export default function ResponseScreen() {
             <MaterialCommunityIcons name="robot" size={16} color="#1469C9" />
             <Text style={styles.typeText}>{responseTypeLabel}</Text>
           </View>
+          {!isEditing && (
+            <Pressable
+              onPress={handleRegenerate}
+              style={({ pressed }) => [styles.metaAction, pressed && { opacity: 0.7 }]}
+            >
+              <MaterialCommunityIcons name="refresh" size={16} color="#475569" />
+              <Text style={styles.metaActionText}>Regenerate</Text>
+            </Pressable>
+          )}
           <Text style={styles.timestamp}>
             {draftCreatedAt && draftCreatedAt.trim() !== ""
               ? new Date(draftCreatedAt).toLocaleString()
@@ -311,8 +346,8 @@ export default function ResponseScreen() {
         </View>
 
         {!isEditing && (
-          <Pressable 
-            onPress={handleWorkflowChain} 
+          <Pressable
+            onPress={handleWorkflowChain}
             disabled={isGeneratingNext}
             style={({ pressed }) => [styles.nextStepBar, pressed && { opacity: 0.8 }]}
           >
@@ -387,22 +422,29 @@ const styles = StyleSheet.create({
   textInput: { color: "#334155", fontSize: 16, lineHeight: 28, minHeight: 200, padding: 0 }, // Style for editable text
   cardFooter: { marginTop: 30, paddingTop: 20, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
   footerNote: { fontSize: 12, color: "#94A3B8", textAlign: "center" },
-  // floatingFooter: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#FFF", paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#E2E8F0" },
-  // buttonRow: { flexDirection: "row", gap: 12 },
-  // secondaryButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#276bbd", borderRadius: 16, height: 56, gap: 8 },
-  // secondaryButtonText: { color: "#0B3C7A", fontWeight: "700", fontSize: 15 },
-  // primaryButton: { flex: 2, borderRadius: 16, overflow: "hidden" },
-  // buttonGradient: { flexDirection: "row", alignItems: "center", justifyContent: "center", height: 56, gap: 10 },
-  // buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
-  nextStepBar: { 
-    marginTop: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  metaAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F1F5F9", // Very light grey
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  metaActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569", // Slate color
+  },
+  nextStepBar: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFF', 
-    borderRadius: 16, 
-    padding: 16, 
-    borderWidth: 1, 
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     borderLeftWidth: 4,
     borderLeftColor: '#F59E0B'

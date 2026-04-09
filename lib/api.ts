@@ -83,7 +83,7 @@ export interface RecentDraft {
 
 export interface Draft {
   id: number;
-  file_id: number;
+  file_id: number | string;
   draft_type: string;
   content: string;
   created_at: string;
@@ -92,7 +92,7 @@ export interface Draft {
 }
 
 export type GenerateResponseRequest = {
-  fileId: number;
+  fileId: number | string;
   userInput: string;
   image?: string | null;
 };
@@ -101,14 +101,14 @@ export type GenerateResponseResult = {
   output_format: string;
   responseTypeLabel: string;
   responseText: string;
-  fileId: number;
+  fileId: number | string;
   nextStep?: string;
   logId?: number;
   createdAt?: string;
 };
 
 export type GenerateNextStepRequest = {
-  fileId: number | string;
+  fileId: number;
   userInput: string;
   previousResponse: string;
   output_format: string;
@@ -320,7 +320,7 @@ export async function generateResponse(
 export async function generateNextStep(
   token: string,
   payload: {
-    fileId: string | number;
+    fileId: string;
     userInput: string | undefined;
     previousResponse: string;
     output_format: string;
