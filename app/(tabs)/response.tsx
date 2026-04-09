@@ -14,7 +14,9 @@ import {
   Text,
   TextInput,
   View,
+
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AllDraftsofUser, generateNextStep, saveDraft, updateDraft } from "@/lib/api";
@@ -242,8 +244,13 @@ export default function ResponseScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerContent}>
+    <LinearGradient
+            colors={["#156bdb", "#123C78", "#0B2F5B"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
+          >
+        <SafeAreaView edges={["top"]} style={styles.headerContent}>
           <Pressable onPress={() => router.back()} style={styles.iconButton}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </Pressable>
@@ -261,7 +268,7 @@ export default function ResponseScreen() {
               <Ionicons name="share-outline" size={24} color="#FFFFFF" />
             </Pressable>
           </View>
-        </View>
+        </SafeAreaView>
       </LinearGradient>
 
       <ScrollView
@@ -368,9 +375,26 @@ export default function ResponseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
-  header: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  headerContent: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, height: 64 },
-  headerTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
+  
+   headerGradient: {
+    paddingBottom: 18,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+
+headerContent: {
+  paddingHorizontal: 20,
+  paddingTop: 10,
+  flexDirection: "row",          // 🔥 THIS IS KEY
+  alignItems: "center",
+  justifyContent: "space-between",
+},
+headerTitle: {
+  color: "#FFFFFF",
+  fontSize: 18,
+  fontWeight: "700",
+},
+
   iconButton: { padding: 8 },
   scroll: { flex: 1 },
   scrollContent: { padding: 20 },

@@ -201,7 +201,9 @@ export default function FileHistoryScreen() {
         <StatusBar style="light" />
         
         <View style={styles.headerContainer}>
-          <LinearGradient colors={["#0F172A", "#1E293B"]} style={styles.headerGradient}>
+          <LinearGradient  colors={["#156bdb", "#123C78", "#0B2F5B"]}  
+          start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }} style={styles.headerGradient}>
             <SafeAreaView edges={["top"]}>
               <View style={styles.navBar}>
                 <Pressable onPress={() => router.back()} style={styles.glassButton}>

@@ -6,7 +6,6 @@ import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,15 +14,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-const { width } = Dimensions.get("window");
 type RoleType = "pa" | "ca";
 
 export default function SignupScreen() {
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768;
+
   const { signup } = useAuth();
 
   const [name, setName] = useState("");
@@ -33,191 +35,177 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
+  const [focused, setFocused] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
-  // --- Password Validation Helper ---
-  const validatePassword = (pass: string) => {
-    if (pass.length < 6) return "Password must be at least 6 characters.";
-    if (!/[a-zA-Z]/.test(pass)) return "Include at least one letter.";
-    if (!/\d/.test(pass)) return "Include at least one number.";
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pass)) return "Include a special character (!@#$).";
-    return null;
-  };
-
   async function handleSignup() {
-    // 1. Basic Field Validation
-    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      toast.error("Missing Fields", {
-        description: "Please fill in all fields to create your account.",
-      });
+    if (!name || !email || !password || !confirmPassword) {
+      toast.error("Fill all fields");
       return;
     }
 
-    // 2. Password Complexity Validation
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-      setErrorMessage(passwordError);
-      // toast.error("Weak Password", { description: passwordError });
-      return;
-    }
-
-    // 3. Match Validation
     if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.");
-      toast.error("Password Mismatch", {
-        description: "The passwords you entered do not match.",
-      });
+      setError("Passwords do not match");
       return;
     }
 
-    setErrorMessage(null);
+    setError(null);
 
-    // 4. The "Awesome" Promise Flow
-    toast.promise(signup(name.trim(), email.trim(), role, password), {
-      loading: 'Creating your profile...',
-      success: () => {
-        setTimeout(() => router.replace("/login"), 1500);
-        return 'Account Created! Redirecting to login...';
-      },
-      error: (err) => {
-        return err instanceof Error ? err.message : "Signup failed";
-      },
+    toast.promise(signup(name, email, role, password), {
+      loading: "Creating account...",
+      success: "Account created!",
+      error: "Signup failed",
     });
   }
 
   return (
-    <View style={styles.mainContainer}>
+    <View style={styles.container}>
       <StatusBar style="light" />
 
-      <LinearGradient colors={["#276bbd", "#0B3C7A"]} style={StyleSheet.absoluteFill} />
-
-      <View style={[styles.orb, styles.orbTop]} />
-      <View style={[styles.orb, styles.orbBottom]} />
+      {/* SAME BACKGROUND AS LOGIN */}
+      <LinearGradient
+        colors={["#1E63B6", "#052146"]}
+        style={StyleSheet.absoluteFill}
+      />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <SafeAreaView style={styles.safeArea}>
+          <SafeAreaView style={styles.safe}>
+            <View style={styles.contentWrapper}>
 
-            <View style={styles.headerSection}>
-              <View style={styles.logoBadge}>
-                <Image source={logoImg} style={styles.logo} />
-              </View>
-              <Text style={styles.welcomeText}>Create Account</Text>
-              <Text style={styles.brandSubtitle}>Join the next generation of adjusting</Text>
-            </View>
-
-            <View style={styles.card}>
-              <View style={[styles.inputContainer, focusedInput === "name" && styles.inputActive]}>
-                <Feather name="user" size={18} color={focusedInput === "name" ? "#276bbd" : "#94A3B8"} />
-                <TextInput
-                  placeholder="Full Name"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                  value={name}
-                  onChangeText={(t) => { setName(t); setErrorMessage(null); }}
-                  onFocus={() => setFocusedInput("name")}
-                  onBlur={() => setFocusedInput(null)}
+              {/* HEADER (MATCH LOGIN) */}
+              <View style={styles.header}>
+                <Image
+                  source={logoImg}
+                  style={[
+                    styles.logo,
+                    { width: isTablet ? 240 : width * 0.5 },
+                  ]}
                 />
+                <Text style={styles.title}>Create Account</Text>
+                <Text style={styles.subtitle}>Get Started Securely</Text>
               </View>
 
-              <View style={[styles.inputContainer, focusedInput === "email" && styles.inputActive]}>
-                <Feather name="mail" size={18} color={focusedInput === "email" ? "#276bbd" : "#94A3B8"} />
-                <TextInput
-                  placeholder="Email Address"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={(t) => { setEmail(t); setErrorMessage(null); }}
-                  onFocus={() => setFocusedInput("email")}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+              {/* CARD */}
+              <View style={styles.center}>
+                <View style={[styles.card, isTablet && { padding: 32 }]}>
 
-              <Text style={styles.label}>Select Your Role</Text>
-              <View style={styles.roleRow}>
-                <Pressable
-                  style={[styles.roleButton, role === "ca" && styles.roleButtonActive]}
-                  onPress={() => setRole("ca")}
-                >
-                  <Ionicons name="business" size={16} color={role === "ca" ? "#FFF" : "#64748B"} />
-                  <Text style={[styles.roleButtonText, role === "ca" && styles.roleButtonTextActive]}>Licenced Adjuster</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.roleButton, role === "pa" && styles.roleButtonActive]}
-                  onPress={() => setRole("pa")}
-                >
-                  <Ionicons name="shield-checkmark" size={16} color={role === "pa" ? "#FFF" : "#64748B"} />
-                  <Text style={[styles.roleButtonText, role === "pa" && styles.roleButtonTextActive]}>Public Adjuster</Text>
-                </Pressable>
-              </View>
+                  {/* NAME */}
+                  <View style={[styles.inputBox, focused === "name" && styles.active]}>
+                    <Feather name="user" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Full Name"
+                      style={styles.input}
+                      value={name}
+                      onChangeText={setName}
+                      onFocus={() => setFocused("name")}
+                      onBlur={() => setFocused(null)}
+                    />
+                  </View>
 
-              <View style={[styles.inputContainer, focusedInput === "pass" && styles.inputActive]}>
-                <Feather name="lock" size={18} color={focusedInput === "pass" ? "#276bbd" : "#94A3B8"} />
-                <TextInput
-                  placeholder="Password"
-                  placeholderTextColor="#94A3B8"
-                  secureTextEntry={!showPassword}
-                  style={styles.input}
-                  value={password}
-                  onChangeText={(t) => { setPassword(t); setErrorMessage(null); }}
-                  onFocus={() => setFocusedInput("pass")}
-                  onBlur={() => setFocusedInput(null)}
-                />
-                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
-                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} color="#94A3B8" />
-                </Pressable>
-              </View>
+                  {/* EMAIL */}
+                  <View style={[styles.inputBox, focused === "email" && styles.active]}>
+                    <Feather name="mail" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Email"
+                      style={styles.input}
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      onFocus={() => setFocused("email")}
+                      onBlur={() => setFocused(null)}
+                    />
+                  </View>
 
-              <View style={[styles.inputContainer, focusedInput === "confirm" && styles.inputActive]}>
-                <Feather name="shield" size={18} color={focusedInput === "confirm" ? "#276bbd" : "#94A3B8"} />
-                <TextInput
-                  placeholder="Confirm Password"
-                  placeholderTextColor="#94A3B8"
-                  secureTextEntry={!showPassword}
-                  style={styles.input}
-                  value={confirmPassword}
-                  onChangeText={(t) => { setConfirmPassword(t); setErrorMessage(null); }}
-                  onFocus={() => setFocusedInput("confirm")}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+                  {/* ROLE */}
+                  <View style={styles.roleRow}>
+                    {["ca", "pa"].map((r) => (
+                      <Pressable
+                        key={r}
+                        style={[
+                          styles.roleButton,
+                          role === r && styles.roleActive,
+                        ]}
+                        onPress={() => setRole(r as RoleType)}
+                      >
+                        <Text style={[
+                          styles.roleText,
+                          role === r && styles.roleTextActive,
+                        ]}>
+                          {r === "ca" ? "Licensed Adjuster" : "Public Adjuster"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
 
-              {errorMessage && (
-                <View style={styles.errorBox}>
-                  <Ionicons name="alert-circle" size={16} color="#EF4444" />
-                  <Text style={styles.errorText}>{errorMessage}</Text>
+                  {/* PASSWORD */}
+                  <View style={[styles.inputBox, focused === "pass" && styles.active]}>
+                    <Feather name="lock" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Password"
+                      secureTextEntry={!showPassword}
+                      style={styles.input}
+                      value={password}
+                      onChangeText={setPassword}
+                      onFocus={() => setFocused("pass")}
+                      onBlur={() => setFocused(null)}
+                    />
+                    <Pressable onPress={() => setShowPassword(!showPassword)}>
+                      <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} />
+                    </Pressable>
+                  </View>
+
+                  {/* CONFIRM */}
+                  <View style={[styles.inputBox, focused === "confirm" && styles.active]}>
+                    <Feather name="shield" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Confirm Password"
+                      secureTextEntry={!showPassword}
+                      style={styles.input}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      onFocus={() => setFocused("confirm")}
+                      onBlur={() => setFocused(null)}
+                    />
+                  </View>
+
+                  {error && <Text style={styles.error}>{error}</Text>}
+
+                  {/* BUTTON */}
+                  <Pressable style={styles.button} onPress={handleSignup}>
+                    <LinearGradient
+                      colors={["#276bbd", "#1E63B6"]}
+                      style={styles.btnInner}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.btnText}>Create Account</Text>
+                      )}
+                    </LinearGradient>
+                  </Pressable>
+
+                  {/* FOOTER */}
+                  <View style={styles.footer}>
+                    <Text style={styles.footerText}>Already have account?</Text>
+                    <Pressable onPress={() => router.push("/login")}>
+                      <Text style={styles.link}>Login</Text>
+                    </Pressable>
+                  </View>
+
                 </View>
-              )}
-
-              <Pressable
-                style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
-                onPress={handleSignup}
-                disabled={loading}
-              >
-                <LinearGradient colors={["#276bbd", "#1E63B6"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnGradient}>
-                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>Create Account</Text>}
-                </LinearGradient>
-              </Pressable>
-
-              <View style={styles.footer}>
-                <Text style={styles.footerText}>Already have an account?</Text>
-                <Pressable onPress={() => router.push("/login")}>
-                  <Text style={styles.loginLink}>Log In</Text>
-                </Pressable>
               </View>
+
             </View>
           </SafeAreaView>
         </ScrollView>
@@ -227,46 +215,138 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#0B3C7A" },
-  orb: {
-    position: 'absolute',
-    width: width * 0.8,
-    height: width * 0.8,
-    borderRadius: (width * 0.8) / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  orbTop: {
-    top: -width * 0.2,
-    right: -width * 0.2,
-  },
-  orbBottom: {
-    bottom: -width * 0.1,
-    left: -width * 0.3,
-  },
-  scrollContent: { flexGrow: 1, paddingBottom: 40 },
-  safeArea: { flex: 1, paddingHorizontal: 24 },
-  headerSection: { alignItems: "center", marginBottom: 30, marginTop: 20 },
-  logoBadge: { backgroundColor: "rgba(255,255,255,0.1)", padding: 12, borderRadius: 20, marginBottom: 15, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
-  logo: { width: 180, height: 40, resizeMode: "contain" },
-  welcomeText: { fontSize: 26, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
-  brandSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.6)", marginTop: 4, fontWeight: "500" },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 30, padding: 24, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-  label: { fontSize: 13, fontWeight: "700", color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  roleRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  roleButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 45, borderRadius: 12, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
-  roleButtonActive: { backgroundColor: "#276bbd", borderColor: "#276bbd" },
-  roleButtonText: { fontSize: 13, fontWeight: "600", color: "#64748B" },
-  roleButtonTextActive: { color: "#FFFFFF" },
-  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 14, paddingHorizontal: 15, height: 54, marginBottom: 14 },
-  inputActive: { borderColor: "#276bbd", backgroundColor: "#FFF" },
-  input: { flex: 1, marginLeft: 10, fontSize: 15, color: "#1E293B", fontWeight: "500" },
-  errorBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEF2F2", padding: 12, borderRadius: 12, marginBottom: 15, gap: 8 },
-  errorText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
-  submitBtn: { borderRadius: 14, overflow: "hidden", marginTop: 10, elevation: 3 },
-  btnGradient: { height: 56, justifyContent: "center", alignItems: "center" },
-  btnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-  footer: { flexDirection: "row", justifyContent: "center", marginTop: 20, gap: 5 },
-  footerText: { color: "#64748B", fontSize: 14, fontWeight: "500" },
-  loginLink: { color: "#276bbd", fontSize: 14, fontWeight: "700" },
-});
+  container: { flex: 1 },
 
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+
+  safe: { flex: 1 },
+
+  contentWrapper: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  header: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+
+  logo: {
+    height: 50,
+    resizeMode: "contain",
+    marginBottom: 10,
+  },
+
+  title: {
+    fontSize: 24,
+    color: "#FFF",
+    fontWeight: "700",
+  },
+
+  subtitle: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+  },
+
+  center: {
+    width: "100%",
+    alignItems: "center",
+  },
+
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 20,
+  },
+
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 12,
+    height: 50,
+    marginBottom: 12,
+  },
+
+  active: {
+    borderWidth: 1,
+    borderColor: "#276bbd",
+    backgroundColor: "#FFF",
+  },
+
+  input: {
+    flex: 1,
+    marginLeft: 10,
+  },
+
+  roleRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  roleButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E2E8F0",
+  },
+
+  roleActive: {
+    backgroundColor: "#276bbd",
+  },
+
+  roleText: {
+    fontSize: 12,
+  },
+
+  roleTextActive: {
+    color: "#fff",
+  },
+
+  error: {
+    color: "red",
+    marginBottom: 10,
+  },
+
+  button: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+
+  btnInner: {
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  btnText: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
+
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+
+  footerText: {
+    color: "#64748B",
+  },
+
+  link: {
+    color: "#276bbd",
+    marginLeft: 5,
+    fontWeight: "700",
+  },
+});

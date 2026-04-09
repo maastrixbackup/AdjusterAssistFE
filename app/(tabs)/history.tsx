@@ -166,7 +166,7 @@ export default function DraftsListScreen() {
       
       <View style={styles.headerContainer}>
         <LinearGradient
-            colors={["#0F4C9C", "#123C78", "#0B2F5B"]}
+            colors={["#156bdb", "#123C78", "#0B2F5B"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
@@ -239,10 +239,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   headerGradient: {
-    paddingBottom: 20,
+     paddingBottom: 18,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   navBar: {
-    height: 70,
+    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
