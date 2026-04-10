@@ -27,7 +27,7 @@ import {
   getRecentDrafts,
   getSubscriptionStatus,
   RecentDraft,
-  SubscriptionStatus
+  SubscriptionStatus,
 } from "@/lib/api";
 import { logoutUser } from "@/lib/services/authService";
 import { useAuth } from "@/providers/auth-provider";
@@ -47,13 +47,16 @@ export default function HomeScreen() {
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
   const activeFilesCount = useMemo(
-    () => files.filter((file) => file.status?.toLowerCase() === "active").length,
-    [files]
+    () =>
+      files.filter((file) => file.status?.toLowerCase() === "active").length,
+    [files],
   );
 
   const recentClaims = useMemo(() => {
     return files
-      .filter((file) => ["active", "draft"].includes(file.status?.toLowerCase() || ""))
+      .filter((file) =>
+        ["active", "draft"].includes(file.status?.toLowerCase() || ""),
+      )
       .slice(0, 5);
   }, [files]);
 
@@ -64,21 +67,30 @@ export default function HomeScreen() {
       if (!showLoading) setRefreshing(true);
 
       try {
-        const [filesResponse, statusResponse, recentDrafts] = await Promise.all([
-          getMyFiles(token),
-          getSubscriptionStatus(token),
-          getRecentDrafts(token),
-        ]);
+        const [filesResponse, statusResponse, recentDrafts] = await Promise.all(
+          [
+            getMyFiles(token),
+            getSubscriptionStatus(token),
+            getRecentDrafts(token),
+          ],
+        );
 
         setFiles(filesResponse || []);
         setStatus(statusResponse);
 
         const sortedDrafts = (recentDrafts || [])
           .slice()
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime(),
+          );
         setLastDraft(sortedDrafts[0] || null);
       } catch (err: any) {
-        if (err.message.includes("401") || err.message.includes("Unauthorized")) {
+        if (
+          err.message.includes("401") ||
+          err.message.includes("Unauthorized")
+        ) {
           logoutUser();
         }
         toast.error("Sync Failed: Could not load data.");
@@ -87,15 +99,17 @@ export default function HomeScreen() {
         setRefreshing(false);
       }
     },
-    [token]
+    [token],
   );
 
-  useEffect(() => { loadData(true); }, [loadData]);
+  useEffect(() => {
+    loadData(true);
+  }, [loadData]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadData(false);
-    }, [loadData])
+    }, [loadData]),
   );
 
   const backPressCount = useRef(0);
@@ -105,28 +119,49 @@ export default function HomeScreen() {
         if (backPressCount.current === 0) {
           backPressCount.current += 1;
           ToastAndroid.show("Press again to exit", ToastAndroid.SHORT);
-          setTimeout(() => { backPressCount.current = 0; }, 2000);
+          setTimeout(() => {
+            backPressCount.current = 0;
+          }, 2000);
           return true;
         }
         BackHandler.exitApp();
         return true;
       };
-      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
       return () => subscription.remove();
-    }, [])
+    }, []),
   );
 
   const getStatusStyle = (value?: string) => {
     const statusValue = value?.toLowerCase();
     switch (statusValue) {
       case "active":
-        return { badge: styles.statusBadgeActive, text: styles.statusTextActive, icon: "ellipse" };
+        return {
+          badge: styles.statusBadgeActive,
+          text: styles.statusTextActive,
+          icon: "ellipse",
+        };
       case "draft":
-        return { badge: styles.statusBadgeDraft, text: styles.statusTextDraft, icon: "time" };
+        return {
+          badge: styles.statusBadgeDraft,
+          text: styles.statusTextDraft,
+          icon: "time",
+        };
       case "closed":
-        return { badge: styles.statusBadgeClosed, text: styles.statusTextClosed, icon: "lock-closed" };
+        return {
+          badge: styles.statusBadgeClosed,
+          text: styles.statusTextClosed,
+          icon: "lock-closed",
+        };
       default:
-        return { badge: styles.statusBadgeNeutral, text: styles.statusTextNeutral, icon: "help-circle" };
+        return {
+          badge: styles.statusBadgeNeutral,
+          text: styles.statusTextNeutral,
+          icon: "help-circle",
+        };
     }
   };
 
@@ -135,7 +170,8 @@ export default function HomeScreen() {
     try {
       await deleteFile(token, selectedFileId);
       setFiles((prev) => prev.filter((f) => f.id !== selectedFileId));
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== "web")
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toast.success("Workspace deleted");
     } catch (err) {
       toast.error("Failed to delete workspace.");
@@ -157,19 +193,23 @@ export default function HomeScreen() {
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
           <View style={styles.headerTopRow}>
             <Image source={logo} style={styles.logo} />
-            <Pressable 
-                onPress={() => router.push("/settings")}
-                style={styles.profileButton}
+            <Pressable
+              onPress={() => router.push("/settings")}
+              style={styles.profileButton}
             >
               <View style={styles.creditPill}>
                 <Ionicons name="sparkles" size={14} color="#FDE68A" />
-                <Text style={styles.creditText}>{status?.subscription?.remaining ?? 0}</Text>
+                <Text style={styles.creditText}>
+                  {status?.subscription?.remaining ?? 0}
+                </Text>
               </View>
             </Pressable>
           </View>
-          
+
           <Text style={styles.welcomeText}>Claims Workspace</Text>
-          <Text style={styles.welcomeSub}>Manage your property assessments efficiently.</Text>
+          <Text style={styles.welcomeSub}>
+            Manage your property assessments efficiently.
+          </Text>
 
           {/* Stats Section with Glassmorphism */}
           <View style={styles.statsRow}>
@@ -182,7 +222,9 @@ export default function HomeScreen() {
               <Text style={styles.statLabel}>Active</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{status?.subscription?.remaining ?? 0}</Text>
+              <Text style={styles.statNumber}>
+                {status?.subscription?.remaining ?? 0}
+              </Text>
               <Text style={styles.statLabel}>Credits</Text>
             </View>
           </View>
@@ -193,28 +235,43 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(false)} tintColor="#0F172A" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadData(false)}
+            tintColor="#0F172A"
+          />
         }
       >
         <View style={styles.bodyWrapper}>
-          
           {/* Action Hub */}
           <View style={styles.quickActionsRow}>
             <Pressable
-              style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && styles.pressed,
+              ]}
               onPress={() => router.push("/generate")}
             >
-              <LinearGradient colors={["#3B82F6", "#0a36b1"]} style={styles.actionIcon}>
+              <LinearGradient
+                colors={["#3B82F6", "#0a36b1"]}
+                style={styles.actionIcon}
+              >
                 <Ionicons name="add" size={24} color="#FFF" />
               </LinearGradient>
               <Text style={styles.actionLabel}>New Claim</Text>
             </Pressable>
 
             <Pressable
-              style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && styles.pressed,
+              ]}
               onPress={() => router.push("/history")}
             >
-              <LinearGradient colors={["#F59E0B", "#D97706"]} style={styles.actionIcon}>
+              <LinearGradient
+                colors={["#F59E0B", "#D97706"]}
+                style={styles.actionIcon}
+              >
                 <Ionicons name="document-text" size={24} color="#FFF" />
               </LinearGradient>
               <Text style={styles.actionLabel}>History</Text>
@@ -224,7 +281,10 @@ export default function HomeScreen() {
           {/* Continue Last Draft Card */}
           {lastDraft && (
             <Pressable
-              style={({ pressed }) => [styles.lastDraftCard, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.lastDraftCard,
+                pressed && styles.pressed,
+              ]}
               onPress={() =>
                 router.push({
                   pathname: "/response",
@@ -256,42 +316,59 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
             <Pressable onPress={() => router.push("/workspaces")}>
-                <Text style={styles.viewAllText}>See All</Text>
+              <Text style={styles.viewAllText}>See All</Text>
             </Pressable>
           </View>
 
           {recentClaims.map((file) => (
             <Pressable
               key={file.id}
-              style={({ pressed }) => [styles.workspaceCard, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.workspaceCard,
+                pressed && styles.pressed,
+              ]}
               onPress={() => router.push("/workspaces")}
             >
               <View style={styles.workspaceIcon}>
-                 <Ionicons name="folder" size={22} color="#64748B" />
+                <Ionicons name="folder" size={22} color="#64748B" />
               </View>
-              
+
               <View style={styles.workspaceDetails}>
                 <View style={styles.workspaceTopRow}>
                   <Text style={styles.workspaceTitle} numberOfLines={1}>
                     {file.claim_number || "Draft Workspace"}
                   </Text>
-                  <View style={[styles.miniBadge, getStatusStyle(file.status).badge]}>
-                     <Text style={[styles.miniBadgeText, getStatusStyle(file.status).text]}>
-                        {file.status}
-                     </Text>
+                  <View
+                    style={[
+                      styles.miniBadge,
+                      getStatusStyle(file.status).badge,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.miniBadgeText,
+                        getStatusStyle(file.status).text,
+                      ]}
+                    >
+                      {file.status}
+                    </Text>
                   </View>
                 </View>
-                
-                <Text style={styles.workspaceClient}>{file.client_name || "New Client Entry"}</Text>
-                
+
+                <Text style={styles.workspaceClient}>
+                  {file.client_name || "New Client Entry"}
+                </Text>
+
                 <View style={styles.workspaceFooter}>
                   <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
                   <Text style={styles.workspaceDate}>
-                    {file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Pending Sync"}
+                    {file.updated_at
+                      ? new Date(file.updated_at).toLocaleDateString()
+                      : "Pending Sync"}
                   </Text>
                 </View>
               </View>
-              
+
               <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
             </Pressable>
           ))}
