@@ -4,10 +4,10 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Notifications from "expo-notifications"; // Import Expo Notifications
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react"; // Added useRef
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -18,14 +18,11 @@ import { registerForPushNotifications } from "@/lib/notification";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-// --- GLOBAL NOTIFICATION CONFIGURATION ---
-// This ensures notifications show up even when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-    // Add these two properties to fix the TypeScript error:
     shouldShowBanner: true,
     shouldShowList: true,
   }),
