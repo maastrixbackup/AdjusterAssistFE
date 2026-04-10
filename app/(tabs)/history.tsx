@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router"; // Added useFocusEffect
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -83,8 +83,8 @@ export default function DraftsListScreen() {
   };
 
   const renderDraft = ({ item }: { item: EnhancedDraft }) => {
-    const isEmail = item.draft_type === 'email';
-    const isEscalation = item.draft_type === 'escalation';
+    const isExternal = item.draft_type === 'email_insured' || item.draft_type ==="email_contractor" || item.draft_type === "xactanalysis_response" || item.draft_type === "supplement_response";
+    const isInternal = item.draft_type === 'file_note' || item.draft_type === 'escalation_response' || item.draft_type === 'coverage_analysis' || item.draft_type === 'denial_support' || item.draft_type === "claim_summary" || item.draft_type === "damage_evaluation";
     const isSynced = item.source === 'db';
     
     return (
@@ -110,7 +110,7 @@ export default function DraftsListScreen() {
       >
         <View style={[
           styles.typeIndicator, 
-          { backgroundColor: isEmail ? '#0F4C9C' : isEscalation ? '#E11D48' : '#fdfa2d' }
+          { backgroundColor: isExternal ? '#0F4C9C' : isInternal ? '#E11D48' : '#fdfa2d' }
         ]} />
         
         <View style={styles.cardMain}>
