@@ -1,7 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -16,7 +17,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { toast } from "sonner-native";
 
 import { useAuth } from "@/providers/auth-provider";
@@ -63,7 +63,6 @@ export default function VerifyOtpScreen() {
       setStatusMessage("OTP verified successfully.");
       toast.success("OTP verified", {
         description: "Now set your new password.",
-         style: { borderRadius: 8, backgroundColor: "#D1FAE5",  },
       });
       router.push({
         pathname: "/reset-password",
@@ -78,7 +77,6 @@ export default function VerifyOtpScreen() {
       setStatusMessage(message);
       toast.error("Verification failed", {
         description: message,
-         style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
     } finally {
       setLoading(false);

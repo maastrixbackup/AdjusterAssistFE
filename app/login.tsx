@@ -272,6 +272,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 10,
+    color: "#000000",
   },
 
   forgot: {
