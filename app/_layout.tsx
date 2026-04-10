@@ -4,7 +4,6 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
@@ -14,19 +13,18 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Toaster } from "sonner-native";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { registerForPushNotifications } from "@/lib/notification";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Notifications.setNotificationHandler({
+//   handleNotification: async () => ({
+//     shouldShowAlert: true,
+//     shouldPlaySound: true,
+//     shouldSetBadge: false,
+//     shouldShowBanner: true,
+//     shouldShowList: true,
+//   }),
+// });
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -54,28 +52,28 @@ function NavigationGuard() {
     }
   }, [isAuthenticated, isHydrated, segments]);
 
-  useEffect(() => {
-    if (isHydrated && isAuthenticated && token) {
-      const timeout = setTimeout(() => {
-        registerForPushNotifications(token);
-      }, 1000);
+  // useEffect(() => {
+  //   if (isHydrated && isAuthenticated && token) {
+  //     const timeout = setTimeout(() => {
+  //       registerForPushNotifications(token);
+  //     }, 1000);
 
-      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-        console.log("Notification Received:", notification);
-      });
+  //     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+  //       console.log("Notification Received:", notification);
+  //     });
 
-      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-        router.push("/(tabs)");
-      });
+  //     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+  //       router.push("/(tabs)");
+  //     });
 
-      return () => {
-        clearTimeout(timeout);
-        // Change these lines here:
-        if (notificationListener.current) notificationListener.current.remove();
-        if (responseListener.current) responseListener.current.remove();
-      };
-    }
-  }, [isAuthenticated, isHydrated, token]);
+  //     return () => {
+  //       clearTimeout(timeout);
+  //       // Change these lines here:
+  //       if (notificationListener.current) notificationListener.current.remove();
+  //       if (responseListener.current) responseListener.current.remove();
+  //     };
+  //   }
+  // }, [isAuthenticated, isHydrated, token]);
 
   if (!isHydrated) {
     return (
