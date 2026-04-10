@@ -1,24 +1,24 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 import { useAuth } from "@/providers/auth-provider";
+import { StatusBar } from "expo-status-bar";
 
 export default function ResetPasswordScreen() {
   const { resetPassword } = useAuth();
@@ -58,7 +58,6 @@ export default function ResetPasswordScreen() {
     if (!verified || !normalizedEmail || !normalizedOtp) {
       toast.error("Session Expired", {
         description: "Please verify OTP again before resetting your password.",
-        style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
       router.replace({
         pathname: "/verify-otp",
@@ -70,7 +69,6 @@ export default function ResetPasswordScreen() {
     if (!newPassword.trim() || !confirmPassword.trim()) {
       toast.error("Required Fields", {
         description: "Please enter and confirm your new password.",
-        style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
       return;
     }
@@ -78,7 +76,6 @@ export default function ResetPasswordScreen() {
     if (newPassword !== confirmPassword) {
       toast.error("Password Mismatch", {
         description: "New Password and Re-enter Password must match.",
-        style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
       return;
     }
@@ -104,7 +101,7 @@ export default function ResetPasswordScreen() {
 
 return (
   <View style={styles.container}>
-    <StatusBar style="light" />
+    <StatusBar style="light"/>
 
     <LinearGradient
       colors={["#1E63B6", "#052146"]}
@@ -309,6 +306,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 10,
+    color: "#000000",
   },
 
   button: {

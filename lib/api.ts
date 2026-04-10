@@ -558,3 +558,21 @@ export const AllDraftsofUser = async (token: string): Promise<Draft[]> => {
 
   return response.data || []; // Return the .data array
 };
+
+/**
+ * Sends the Expo Push Token to the backend.
+ * The backend handles user identification via the JWT in the Authorization header.
+ */
+export async function savePushToken(
+  pushToken: string,
+  token: string,
+): Promise<{ success: boolean; message: string }> {
+  return apiRequest<{ success: boolean; message: string }>(
+    "/notifications/save-token",
+    {
+      method: "POST",
+      body: JSON.stringify({ pushToken }),
+    },
+    token,
+  );
+}

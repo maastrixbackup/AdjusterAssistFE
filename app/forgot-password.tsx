@@ -1,14 +1,13 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 import { useAuth } from "@/providers/auth-provider";
+import { StatusBar } from "expo-status-bar";
 
 export default function ForgotPasswordScreen() {
   const { width } = useWindowDimensions();
@@ -46,7 +46,6 @@ export default function ForgotPasswordScreen() {
       await sendPasswordReset(normalizedEmail);
       toast.success("OTP sent to your email", {
         description: "Use the OTP to verify and set a new password.",
-          style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
 
       router.push({
@@ -56,7 +55,6 @@ export default function ForgotPasswordScreen() {
     } catch {
       toast.error("Unable to send OTP", {
         description: "Please try again later.",
-          style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
     } finally {
       setLoading(false);
@@ -91,7 +89,7 @@ export default function ForgotPasswordScreen() {
                     { width: isTablet ? 240 : width * 0.5 },
                   ]}
                 />
-             
+
               </View>
               <View style={styles.center}>
                 <View style={[styles.card, isTablet && { padding: 32 }]}>
@@ -104,12 +102,12 @@ export default function ForgotPasswordScreen() {
                       color="#1E63B6"
                     />
                   </View>
-                <View>
-                     <Text style={styles.title}>Password Recovery</Text>
-                <Text style={styles.subtitle}>
-                 Enter your email to receive OTP for password reset.
-                </Text>
-                </View>
+                  <View>
+                    <Text style={styles.title}>Password Recovery</Text>
+                    <Text style={styles.subtitle}>
+                      Enter your email to receive OTP for password reset.
+                    </Text>
+                  </View>
                   {/* EMAIL */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Registered Email</Text>
@@ -164,26 +162,9 @@ export default function ForgotPasswordScreen() {
                     <TouchableOpacity onPress={() => router.replace("/login")}>
                       <Text style={styles.backText}>Back to Login</Text>
                     </TouchableOpacity>
+                    
+                    
 
-                    <View style={styles.dividerContainer}>
-                      <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>OR</Text>
-                      <View style={styles.dividerLine} />
-                    </View>
-
-                    <TouchableOpacity
-                      onPress={() => router.push("/verify-otp")}
-                      style={styles.tokenButton}
-                    >
-                      <Text style={styles.tokenText}>
-                        I already have an OTP
-                      </Text>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={16}
-                        color="#1E63B6"
-                      />
-                    </TouchableOpacity>
                   </View>
 
                 </View>
@@ -287,6 +268,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 10,
+    color: "#000000",
   },
 
   button: {

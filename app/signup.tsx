@@ -3,7 +3,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -55,9 +55,13 @@ export default function SignupScreen() {
     setError(null);
 
     toast.promise(signup(name, email, role, password), {
-      loading: "Creating account...",
-      success: "Account created!",
-      error: "Signup failed",
+      loading: "Creating your account...",
+      success: (data) => {
+        return "Welcome! Account created successfully.";
+      },
+      error: (err) => {
+        return "Signup failed. Please try again.";
+      },
     });
   }
 
@@ -284,6 +288,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 10,
+    color: "#000000",
   },
 
   roleRow: {
