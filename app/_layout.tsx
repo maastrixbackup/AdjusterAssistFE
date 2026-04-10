@@ -4,18 +4,32 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Notifications from "expo-notifications"; // Import Expo Notifications
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import { useEffect, useRef } from "react"; // Added useRef
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Toaster } from "sonner-native";
 
-// import PushNotificationManager from "@/components/PushNotification";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { registerForPushNotifications } from "@/lib/notification";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+
+// --- GLOBAL NOTIFICATION CONFIGURATION ---
+// This ensures notifications show up even when the app is in the foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    // Add these two properties to fix the TypeScript error:
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -23,24 +37,48 @@ export const unstable_settings = {
 
 // --- THIS COMPONENT HANDLES THE REDIRECT LOGIC ---
 function NavigationGuard() {
-  const { isAuthenticated, isHydrated } = useAuth();
+  const { isAuthenticated, isHydrated, token } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // References for notification listeners
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
 
   useEffect(() => {
     if (!isHydrated) return;
 
-    // Segments tells us which folder/file we are in
     const inAuthGroup = segments[0] === "(tabs)" || segments[0] === "workspaces" || segments[0] === "generate";
 
     if (!isAuthenticated && inAuthGroup) {
-      // Not logged in -> Go to Login
       router.replace("/login");
     } else if (isAuthenticated && (segments[0] === "login" || segments[0] === "signup")) {
-      // Logged in -> Go to Home
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, isHydrated, segments]);
+
+  useEffect(() => {
+    if (isHydrated && isAuthenticated && token) {
+      const timeout = setTimeout(() => {
+        registerForPushNotifications(token);
+      }, 1000);
+
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        console.log("Notification Received:", notification);
+      });
+
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        router.push("/(tabs)");
+      });
+
+      return () => {
+        clearTimeout(timeout);
+        // Change these lines here:
+        if (notificationListener.current) notificationListener.current.remove();
+        if (responseListener.current) responseListener.current.remove();
+      };
+    }
+  }, [isAuthenticated, isHydrated, token]);
 
   if (!isHydrated) {
     return (
@@ -70,7 +108,6 @@ function NavigationGuard() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="notification" options={{ title: "Notifications" }} />
       <Stack.Screen name="reset-password" options={{ headerShown: false }} />
       <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
       <Stack.Screen name="verify-otp" options={{ headerShown: false }} />
@@ -95,14 +132,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <ThemeProvider value={AppTheme}>
-            {/* Expo notifications temporarily disabled. Re-enable by restoring PushNotificationManager wrapper. */}
-            {/* <PushNotificationManager> */}
             <View style={{ flex: 1, backgroundColor: "#020617" }}>
               <NavigationGuard />
               <Toaster />
             </View>
             <StatusBar style="light" />
-            {/* </PushNotificationManager> */}
           </ThemeProvider>
         </AuthProvider>
       </SafeAreaProvider>
