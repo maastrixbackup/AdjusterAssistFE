@@ -87,7 +87,6 @@ export default function GenerateScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
-  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -167,7 +166,7 @@ export default function GenerateScreen() {
         );
 
         setImageBase64(manipulatedImage.base64 ?? null);
-        // console.log("Selected image base64 length:", manipulatedImage.base64?.length);
+        console.log("Selected image base64 length:", manipulatedImage.base64?.length);
       }
     } catch (error) {
       console.error("Image picker error:", error);
@@ -290,6 +289,7 @@ export default function GenerateScreen() {
     if (!request || request.trim().length < 5)
       return toast.warning("Describe the scenario.");
 
+    console.log("Current image base64 in onGenerate:", imageBase64?.length);
     setIsGenerating(true);
     try {
       const payload: GenerateResponseRequest = {
@@ -317,9 +317,10 @@ export default function GenerateScreen() {
       toast.error(error?.message || "Generation failed");
     } finally {
       setImageBase64(null);
+      setSelectedImage(null);
       setIsGenerating(false);
     }
-  }, [token, request, claimDetails, selectedWorkspace]);
+  }, [token, request, claimDetails, selectedWorkspace, imageBase64]);
 
   if (isLoading && !refreshing) {
     return (
