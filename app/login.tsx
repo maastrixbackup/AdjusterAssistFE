@@ -3,7 +3,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -36,7 +36,7 @@ export default function LoginScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
- useEffect(() => {
+  useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => {
       setKeyboardOpen(true);
     });
@@ -60,12 +60,7 @@ export default function LoginScreen() {
 
   if (!isHydrated || isAuthenticated) {
     return (
-      <View
-        style={[
-          styles.mainContainer,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
+      <View style={[{ justifyContent: "center", alignItems: "center" }]}>
         <LinearGradient
           colors={["#276bbd", "#0B3C7A"]}
           style={StyleSheet.absoluteFill}
@@ -80,7 +75,7 @@ export default function LoginScreen() {
     if (!email.trim() || !password.trim()) {
       toast.error("Missing Credentials", {
         description: "Please enter both email and password.",
-        style: { borderRadius: 8, backgroundColor: "#1411be"},
+        style: { borderRadius: 8, backgroundColor: "#1411be" },
       });
       return;
     }
@@ -98,7 +93,10 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient colors={["#1E63B6", "#052146"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={["#1E63B6", "#052146"]}
+        style={StyleSheet.absoluteFill}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -113,76 +111,86 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <SafeAreaView style={styles.safe}>
-  <View style={styles.contentWrapper}>
-            
-            {/* HEADER */}
-            <View style={styles.header}>
-              <Image
-                source={logoImg}
-                style={[
-                  styles.logo,
-                  { width: isTablet ? 240 : width * 0.5 },
-                ]}
-              />
-              <Text style={styles.title}>Welcome Back</Text>
-              <Text style={styles.subtitle}>Secure Login</Text>
-            </View>
+            <View style={styles.contentWrapper}>
+              {/* HEADER */}
+              <View style={styles.header}>
+                <Image
+                  source={logoImg}
+                  style={[styles.logo, { width: isTablet ? 240 : width * 0.5 }]}
+                />
+                <Text style={styles.title}>Welcome Back</Text>
+                <Text style={styles.subtitle}>Secure Login</Text>
+              </View>
 
-            {/* CARD */}
-            <View style={styles.center}>
-              <View style={[styles.card, isTablet && { padding: 32 }]}>
-                
-                {/* EMAIL */}
-                <View style={[styles.inputBox, focused === "email" && styles.active]}>
-                  <Feather name="mail" size={18} color="#94A3B8" />
-                  <TextInput
-                    placeholder="Email"
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    onFocus={() => setFocused("email")}
-                    onBlur={() => setFocused(null)}
-                  />
-                </View>
+              {/* CARD */}
+              <View style={styles.center}>
+                <View style={[styles.card, isTablet && { padding: 32 }]}>
+                  {/* EMAIL */}
+                  <View
+                    style={[
+                      styles.inputBox,
+                      focused === "email" && styles.active,
+                    ]}
+                  >
+                    <Feather name="mail" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Email"
+                      style={styles.input}
+                      value={email}
+                      onChangeText={setEmail}
+                      onFocus={() => setFocused("email")}
+                      onBlur={() => setFocused(null)}
+                    />
+                  </View>
 
-                {/* PASSWORD */}
-                <View style={[styles.inputBox, focused === "pass" && styles.active]}>
-                  <Feather name="lock" size={18} color="#94A3B8" />
-                  <TextInput
-                    placeholder="Password"
-                    secureTextEntry={!showPassword}
-                    style={styles.input}
-                    value={password}
-                    onChangeText={setPassword}
-                    onFocus={() => setFocused("pass")}
-                    onBlur={() => setFocused(null)}
-                  />
-                  <Pressable onPress={() => setShowPassword(!showPassword)}>
-                    <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} />
+                  {/* PASSWORD */}
+                  <View
+                    style={[
+                      styles.inputBox,
+                      focused === "pass" && styles.active,
+                    ]}
+                  >
+                    <Feather name="lock" size={18} color="#94A3B8" />
+                    <TextInput
+                      placeholder="Password"
+                      secureTextEntry={!showPassword}
+                      style={styles.input}
+                      value={password}
+                      onChangeText={setPassword}
+                      onFocus={() => setFocused("pass")}
+                      onBlur={() => setFocused(null)}
+                    />
+                    <Pressable onPress={() => setShowPassword(!showPassword)}>
+                      <Ionicons
+                        name={showPassword ? "eye-off" : "eye"}
+                        size={18}
+                      />
+                    </Pressable>
+                  </View>
+
+                  <Pressable onPress={() => router.push("/forgot-password")}>
+                    <Text style={styles.forgot}>Forgot Password?</Text>
                   </Pressable>
-                </View>
 
-                <Pressable onPress={() => router.push("/forgot-password")}>
-                  <Text style={styles.forgot}>Forgot Password?</Text>
-                </Pressable>
-
-                {/* BUTTON */}
-                <Pressable style={styles.button} onPress={handleLogin}>
-                  <LinearGradient colors={["#276bbd", "#1E63B6"]} style={styles.btnInner}>
-                    <Text style={styles.btnText}>Continue</Text>
-                  </LinearGradient>
-                </Pressable>
-
-                <View style={styles.footer}>
-                  <Text style={styles.footerText}>New here?</Text>
-                  <Pressable onPress={() => router.push("/signup")}>
-                    <Text style={styles.link}>Create Account</Text>
+                  {/* BUTTON */}
+                  <Pressable style={styles.button} onPress={handleLogin}>
+                    <LinearGradient
+                      colors={["#276bbd", "#1E63B6"]}
+                      style={styles.btnInner}
+                    >
+                      <Text style={styles.btnText}>Continue</Text>
+                    </LinearGradient>
                   </Pressable>
-                </View>
 
+                  <View style={styles.footer}>
+                    <Text style={styles.footerText}>New here?</Text>
+                    <Pressable onPress={() => router.push("/signup")}>
+                      <Text style={styles.link}>Create Account</Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
             </View>
-</View>
           </SafeAreaView>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -192,10 +200,10 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-contentWrapper: {
-  flex: 1,
-  justifyContent: "center",   // 🔥 vertical center
-},
+  contentWrapper: {
+    flex: 1,
+    justifyContent: "center",
+  },
   loader: {
     flex: 1,
     justifyContent: "center",
