@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -37,8 +37,7 @@ function NavigationGuard() {
   const router = useRouter();
 
   // References for notification listeners
-  const notificationListener = useRef<any>(null);
-  const responseListener = useRef<any>(null);
+
 
   useEffect(() => {
     if (!isHydrated) return;

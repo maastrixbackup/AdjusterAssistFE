@@ -41,9 +41,29 @@ export default function SignupScreen() {
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
+  // --- PASSWORD VALIDATION LOGIC ---
+  const validatePassword = (pass: string) => {
+    const hasNumber = /\d/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const hasMinLength = pass.length >= 8;
+
+    if (!hasMinLength) return "Password must be at least 8 characters long.";
+    if (!hasNumber) return "Password must contain at least one number.";
+    if (!hasSpecial) return "Password must contain at least one special character.";
+    
+    return null;
+  };
+
   async function handleSignup() {
     if (!name || !email || !password || !confirmPassword) {
       toast.error("Fill all fields");
+      return;
+    }
+
+    // Check Password Strength
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -53,13 +73,17 @@ export default function SignupScreen() {
     }
 
     setError(null);
+    setLoading(true);
 
     toast.promise(signup(name, email, role, password), {
       loading: "Creating your account...",
       success: (data) => {
+        // Redirect to login after successful creation
+        setTimeout(() => router.push("/login"), 1500);
         return "Welcome! Account created successfully.";
       },
       error: (err) => {
+        setLoading(false);
         return "Signup failed. Please try again.";
       },
     });
@@ -69,7 +93,6 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* SAME BACKGROUND AS LOGIN */}
       <LinearGradient
         colors={["#1E63B6", "#052146"]}
         style={StyleSheet.absoluteFill}
@@ -86,7 +109,6 @@ export default function SignupScreen() {
           <SafeAreaView style={styles.safe}>
             <View style={styles.contentWrapper}>
 
-              {/* HEADER (MATCH LOGIN) */}
               <View style={styles.header}>
                 <Image
                   source={logoImg}
@@ -99,7 +121,6 @@ export default function SignupScreen() {
                 <Text style={styles.subtitle}>Get Started Securely</Text>
               </View>
 
-              {/* CARD */}
               <View style={styles.center}>
                 <View style={[styles.card, isTablet && { padding: 32 }]}>
 
@@ -108,6 +129,7 @@ export default function SignupScreen() {
                     <Feather name="user" size={18} color="#94A3B8" />
                     <TextInput
                       placeholder="Full Name"
+                      placeholderTextColor="#CBD5E1"
                       style={styles.input}
                       value={name}
                       onChangeText={setName}
@@ -121,6 +143,7 @@ export default function SignupScreen() {
                     <Feather name="mail" size={18} color="#94A3B8" />
                     <TextInput
                       placeholder="Email"
+                      placeholderTextColor="#CBD5E1"
                       style={styles.input}
                       value={email}
                       onChangeText={setEmail}
@@ -157,6 +180,7 @@ export default function SignupScreen() {
                     <Feather name="lock" size={18} color="#94A3B8" />
                     <TextInput
                       placeholder="Password"
+                      placeholderTextColor="#CBD5E1"
                       secureTextEntry={!showPassword}
                       style={styles.input}
                       value={password}
@@ -174,6 +198,7 @@ export default function SignupScreen() {
                     <Feather name="shield" size={18} color="#94A3B8" />
                     <TextInput
                       placeholder="Confirm Password"
+                      placeholderTextColor="#CBD5E1"
                       secureTextEntry={!showPassword}
                       style={styles.input}
                       value={confirmPassword}
@@ -185,8 +210,7 @@ export default function SignupScreen() {
 
                   {error && <Text style={styles.error}>{error}</Text>}
 
-                  {/* BUTTON */}
-                  <Pressable style={styles.button} onPress={handleSignup}>
+                  <Pressable style={styles.button} onPress={handleSignup} disabled={loading}>
                     <LinearGradient
                       colors={["#276bbd", "#1E63B6"]}
                       style={styles.btnInner}
@@ -199,7 +223,6 @@ export default function SignupScreen() {
                     </LinearGradient>
                   </Pressable>
 
-                  {/* FOOTER */}
                   <View style={styles.footer}>
                     <Text style={styles.footerText}>Already have account?</Text>
                     <Pressable onPress={() => router.push("/login")}>
@@ -220,47 +243,38 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   scroll: {
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 16,
   },
-
   safe: { flex: 1 },
-
   contentWrapper: {
     flex: 1,
     justifyContent: "center",
   },
-
   header: {
     alignItems: "center",
     marginBottom: 30,
   },
-
   logo: {
     height: 50,
     resizeMode: "contain",
     marginBottom: 10,
   },
-
   title: {
     fontSize: 24,
     color: "#FFF",
     fontWeight: "700",
   },
-
   subtitle: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 14,
   },
-
   center: {
     width: "100%",
     alignItems: "center",
   },
-
   card: {
     width: "100%",
     maxWidth: 420,
@@ -268,7 +282,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
   },
-
   inputBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -278,25 +291,21 @@ const styles = StyleSheet.create({
     height: 50,
     marginBottom: 12,
   },
-
   active: {
     borderWidth: 1,
     borderColor: "#276bbd",
     backgroundColor: "#FFF",
   },
-
   input: {
     flex: 1,
     marginLeft: 10,
     color: "#000000",
   },
-
   roleRow: {
     flexDirection: "row",
     gap: 8,
     marginBottom: 12,
   },
-
   roleButton: {
     flex: 1,
     height: 40,
@@ -305,50 +314,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#E2E8F0",
   },
-
   roleActive: {
     backgroundColor: "#276bbd",
   },
-
   roleText: {
     fontSize: 12,
   },
-
   roleTextActive: {
     color: "#fff",
   },
-
   error: {
     color: "red",
     marginBottom: 10,
+    fontSize: 12,
+    textAlign: 'center'
   },
-
   button: {
     borderRadius: 12,
     overflow: "hidden",
   },
-
   btnInner: {
     height: 50,
     justifyContent: "center",
     alignItems: "center",
   },
-
   btnText: {
     color: "#FFF",
     fontWeight: "700",
   },
-
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 16,
   },
-
   footerText: {
     color: "#64748B",
   },
-
   link: {
     color: "#276bbd",
     marginLeft: 5,
