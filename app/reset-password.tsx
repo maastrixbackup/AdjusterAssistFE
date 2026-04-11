@@ -51,6 +51,19 @@ export default function ResetPasswordScreen() {
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
+  // --- PASSWORD VALIDATION LOGIC ---
+  const validatePassword = (pass: string) => {
+    const hasNumber = /\d/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const hasMinLength = pass.length >= 8;
+
+    if (!hasMinLength) return "Password must be at least 8 characters long.";
+    if (!hasNumber) return "Password must contain at least one number.";
+    if (!hasSpecial) return "Password must contain at least one special character.";
+    
+    return null; // No errors
+  };
+
   async function handleResetPassword() {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOtp = otp.trim();
@@ -69,6 +82,15 @@ export default function ResetPasswordScreen() {
     if (!newPassword.trim() || !confirmPassword.trim()) {
       toast.error("Required Fields", {
         description: "Please enter and confirm your new password.",
+      });
+      return;
+    }
+
+    // --- NEW VALIDATION CHECK ---
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      toast.error("Weak Password", {
+        description: passwordError,
       });
       return;
     }
@@ -99,155 +121,136 @@ export default function ResetPasswordScreen() {
     }
   }
 
-return (
-  <View style={styles.container}>
-    <StatusBar style="light"/>
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
 
-    <LinearGradient
-      colors={["#1E63B6", "#052146"]}
-      style={StyleSheet.absoluteFill}
-    />
+      <LinearGradient
+        colors={["#1E63B6", "#052146"]}
+        style={StyleSheet.absoluteFill}
+      />
 
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
-    >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <SafeAreaView style={styles.safe}>
-          <View style={styles.contentWrapper}>
-            <View style={styles.header}>
-              <Image source={logoImg} style={styles.logo} />
-           
-            </View>
-            <View style={styles.center}>
-              <View style={styles.card}>
-                <View style={styles.iconCircle}>
-                  <MaterialCommunityIcons
-                    name="shield-lock-outline"
-                    size={28}
-                    color="#1E63B6"
-                  />
-                </View>
-                <Text style={styles.title}>Set New Password</Text>
-                <Text style={styles.subtitle}>
-                  OTP is verified internally. Set your new password to complete reset.
-                </Text>
-
-                {/* PASSWORD */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>New Password</Text>
-                  <View style={styles.inputBox}>
-                    <Feather name="lock" size={18} color="#94A3B8" />
-                    <TextInput
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      secureTextEntry={!showPassword}
-                      style={styles.input}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <SafeAreaView style={styles.safe}>
+            <View style={styles.contentWrapper}>
+              <View style={styles.header}>
+                <Image source={logoImg} style={styles.logo} />
+              </View>
+              <View style={styles.center}>
+                <View style={styles.card}>
+                  <View style={styles.iconCircle}>
+                    <MaterialCommunityIcons
+                      name="shield-lock-outline"
+                      size={28}
+                      color="#1E63B6"
                     />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                      <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} />
-                    </TouchableOpacity>
                   </View>
-                </View>
+                  <Text style={styles.title}>Set New Password</Text>
+                  <Text style={styles.subtitle}>
+                    OTP is verified internally. Set your new password to complete reset.
+                  </Text>
 
-                {/* CONFIRM */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Re-enter Password</Text>
-                  <View style={styles.inputBox}>
-                    <Feather name="lock" size={18} color="#94A3B8" />
-                    <TextInput
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showConfirmPassword}
-                      style={styles.input}
-                    />
-                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                      <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={18} />
-                    </TouchableOpacity>
+                  {/* PASSWORD */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>New Password</Text>
+                    <View style={styles.inputBox}>
+                      <Feather name="lock" size={18} color="#94A3B8" />
+                      <TextInput
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        secureTextEntry={!showPassword}
+                        style={styles.input}
+                        placeholder="Min. 8 chars, 1 num, 1 special"
+                        placeholderTextColor="#94A3B8"
+                      />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={18} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
 
-                {/* BUTTON */}
-                <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
-                  <LinearGradient
-                    colors={["#276bbd", "#0B3C7A"]}
-                    style={styles.btnInner}
+                  {/* CONFIRM */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Re-enter Password</Text>
+                    <View style={styles.inputBox}>
+                      <Feather name="lock" size={18} color="#94A3B8" />
+                      <TextInput
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry={!showConfirmPassword}
+                        style={styles.input}
+                      />
+                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                        <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={18} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* BUTTON */}
+                  <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+                    <LinearGradient
+                      colors={["#276bbd", "#0B3C7A"]}
+                      style={styles.btnInner}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#FFF" />
+                      ) : (
+                        <Text style={styles.btnText}>Update Password</Text>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* BACK */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.replace({
+                        pathname: "/verify-otp",
+                        params: email ? { email } : undefined,
+                      })
+                    }
+                    style={styles.footer}
                   >
-                    {loading ? (
-                      <ActivityIndicator color="#FFF" />
-                    ) : (
-                      <Text style={styles.btnText}>Update Password</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                {/* BACK */}
-                <TouchableOpacity
-                  onPress={() =>
-                    router.replace({
-                      pathname: "/verify-otp",
-                      params: email ? { email } : undefined,
-                    })
-                  }
-                  style={styles.footer}
-                >
-                  <Text style={styles.link}>Back to OTP Verification</Text>
-                </TouchableOpacity>
-
+                    <Text style={styles.link}>Back to OTP Verification</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-
-          </View>
-        </SafeAreaView>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  </View>
-);
+          </SafeAreaView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   scroll: {
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 16,
   },
-
   safe: { flex: 1 },
-
   contentWrapper: {
     flex: 1,
     justifyContent: "center",
   },
-
   header: {
     alignItems: "center",
     marginBottom: 30,
   },
-
   logo: {
     height: 50,
     resizeMode: "contain",
     marginBottom: 10,
   },
-
-  headerTitle: {
-    fontSize: 24,
-    color: "#FFF",
-    fontWeight: "700",
-  },
-
-  headerSubtitle: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 14,
-  },
-
   center: {
     width: "100%",
     alignItems: "center",
   },
-
   card: {
     width: "100%",
     maxWidth: 420,
@@ -255,7 +258,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
   },
-
   iconCircle: {
     position: "absolute",
     top: -30,
@@ -269,31 +271,26 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: "#F8FAFC",
   },
-
   title: {
     fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
     marginTop: 10,
   },
-
   subtitle: {
     textAlign: "center",
     color: "#64748B",
     fontSize: 13,
     marginBottom: 16,
   },
-
   inputContainer: {
     marginBottom: 14,
   },
-
   inputLabel: {
     fontSize: 11,
     fontWeight: "800",
     marginBottom: 6,
   },
-
   inputBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -302,38 +299,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 50,
   },
-
   input: {
     flex: 1,
     marginLeft: 10,
     color: "#000000",
   },
-
   button: {
     marginTop: 12,
     borderRadius: 12,
     overflow: "hidden",
   },
-
   btnInner: {
     height: 50,
     justifyContent: "center",
     alignItems: "center",
   },
-
   btnText: {
     color: "#FFF",
     fontWeight: "700",
   },
-
   footer: {
     marginTop: 16,
     alignItems: "center",
   },
-
   link: {
     color: "#276bbd",
     fontWeight: "700",
   },
 });
-
