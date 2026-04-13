@@ -14,10 +14,9 @@ import {
   Text,
   TextInput,
   View,
-
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
 
 import { AllDraftsofUser, generateNextStep, generateResponse, saveDraft, updateDraft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";

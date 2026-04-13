@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,19 +11,21 @@ import {
   Platform,
   StyleSheet,
   Text,
-  View,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { RefreshControl } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
+import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
   ClaimFile,
   deleteFile,
   getMyFiles,
-  updateFile,
+  updateFile
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -36,7 +38,11 @@ export default function WorkspacesScreen() {
   // Modal state for deletion
   const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+
+  const [isCreateModalVisible, setCreateModalVisible] = useState(false);
+
   const logo = require("../../assets/images/AdjusterAssist1.png");
+
 
   const loadFiles = useCallback(
     async (showLoading = true) => {
@@ -109,40 +115,35 @@ export default function WorkspacesScreen() {
     }
   };
 
- const handleUpdateFile = async (id: number, updateData: Partial<ClaimFile>) => {
-  if (!token) return;
+  const handleUpdateFile = async (id: number, updateData: Partial<ClaimFile>) => {
+    if (!token) return;
 
-  const previousFiles = [...files];
+    const previousFiles = [...files];
 
-  // 1. Create a safe copy of the update data for the API
-  const apiPayload = { ...updateData };
+    const apiPayload = { ...updateData };
 
-  // 2. Fix the "status" incompatibility
-  if (apiPayload.status === "draft") {
-    // Option A: If it's a draft, tell the API it's now "active"
-    apiPayload.status = "active"; 
-    
-    // Option B: Or just remove it so the API doesn't update the status field
-    // delete apiPayload.status; 
-  }
+    // 2. Fix the "status" incompatibility
+    if (apiPayload.status === "draft") {
+      apiPayload.status = "active";
+    }
 
-  // Optimistic UI Update
-  setFiles((prev) =>
-    prev.map((f) => (f.id === id ? { ...f, ...updateData } : f))
-  );
+    // Optimistic UI Update
+    setFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updateData } : f))
+    );
 
-  try {
-    // 3. Pass the sanitized apiPayload instead of updateData
-    await updateFile(token, id, apiPayload as any); 
-    
-    toast.success("Workspace updated");
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  } catch (err) {
-    setFiles(previousFiles);
-    toast.error("Update failed.");
-    console.error("Update Error:", err);
-  }
-};
+    try {
+      // 3. Pass the sanitized apiPayload instead of updateData
+      await updateFile(token, id, apiPayload as any);
+
+      toast.success("Workspace updated");
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      setFiles(previousFiles);
+      toast.error("Update failed.");
+      console.error("Update Error:", err);
+    }
+  };
 
   if (isLoading && !refreshing) {
     return (
@@ -157,18 +158,33 @@ export default function WorkspacesScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={["#156bdb", "#123C78", "#0B2F5B"]}  
-          start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} 
+        colors={["#156bdb", "#123C78", "#0B2F5B"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
           <View style={styles.topRow}>
-      
-              <View style={styles.brandBlock}>
-                <Image source={logo} style={styles.logo} />
 
-              </View>
+            <View style={styles.brandBlock}>
+              <Image source={logo} style={styles.logo} />
+            </View>
+            {/* Creating new workspace */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setCreateModalVisible(true)} 
+              style={styles.newWorkspaceBtn}
+            >
+              <LinearGradient
+                colors={["#3358a7", "#0a2a81"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.btnGradient}
+              >
+                <Text style={styles.newBtnText}>New</Text>
+                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
 
         </SafeAreaView>
@@ -243,6 +259,17 @@ export default function WorkspacesScreen() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteModalVisible(false)}
       />
+      <CreateWorkspaceModal 
+        isVisible={isCreateModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        token={token}
+        onSuccess={(newFile) => {
+          // Add the new file to the top of your list
+          setFiles((prev) => [newFile, ...prev]);
+          setCreateModalVisible(false);
+        }}
+      />
+    {/* <Toaster/> */}
     </View>
   );
 }
@@ -355,5 +382,28 @@ const styles = StyleSheet.create({
     width: 160,
     height: 50,
     resizeMode: "contain",
+  },
+  newWorkspaceBtn: {
+    // Drop shadow for a "floating" effect
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  btnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 100, // Capsule shape
+    gap: 6, // Space between text and icon
+  },
+  newBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    textTransform: 'uppercase', // Professional look
   },
 });

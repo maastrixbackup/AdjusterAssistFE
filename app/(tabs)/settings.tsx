@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -81,7 +82,15 @@ export default function SettingsScreen() {
 
   const handleLogoutConfirm = async () => {
     setLogoutModalVisible(false); // Close modal first
-    await logout(); // Perform the Supabase/Auth logout
+    // Perform the Supabase/Auth logout
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await logout();
+    } catch (error) {
+      toast.error("Error logging out. Please try again.");
+      console.error("Logout Error:", error);
+      return;
+    }
   };
 
   const usagePercentage = status?.subscription?.usage_limit
@@ -95,11 +104,11 @@ export default function SettingsScreen() {
       {/* Modern Glossy Header */}
       <View style={styles.headerContainer}>
         <LinearGradient
-                   colors={["#156bdb", "#123C78", "#0B2F5B"]}  
+          colors={["#156bdb", "#123C78", "#0B2F5B"]}
           start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} 
-                  style={styles.headerGradient}
-              >
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
           <SafeAreaView edges={["top"]}>
             <View style={styles.headerTopRow}>
               <View style={styles.userInfo}>

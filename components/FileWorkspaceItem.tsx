@@ -35,18 +35,29 @@ const SWIPE_THRESHOLD = -75;
 const DELETE_WIDTH = -110;
 
 // Date Formatter Utility
-const formatDate = (dateString?: string) => {
-    if (!dateString) return "No date set";
-    try {
-        const date = new Date(dateString);
-        return new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        }).format(date);
-    } catch {
-        return dateString;
-    }
+const getRelativeTime = (dateString?: string) => {
+    if (!dateString) return "Just now";
+    
+    const now = new Date();
+    const then = new Date(dateString);
+    const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+
+    let interval = Math.floor(seconds / 31536000);
+    if (interval >= 1) return `${interval}y ago`;
+
+    interval = Math.floor(seconds / 2592000);
+    if (interval >= 1) return `${interval}mo ago`;
+
+    interval = Math.floor(seconds / 86400);
+    if (interval >= 1) return `${interval}d ago`;
+
+    interval = Math.floor(seconds / 3600);
+    if (interval >= 1) return `${interval}h ago`;
+
+    interval = Math.floor(seconds / 60);
+    if (interval >= 1) return `${interval}m ago`;
+
+    return "Just now";
 };
 
 interface Props {
@@ -200,7 +211,7 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
 
                             <View style={styles.infoColumn}>
                                 <View style={styles.headerRow}>
-                                    <Text style={styles.claimNoText}>{item.claim_number || "NO-ID"}</Text>
+                                    <Text style={styles.claimNoText}>Claim: {item.claim_number || "NO-ID"}</Text>
                                     <View style={[styles.miniBadge, { backgroundColor: statusStyle.badge.backgroundColor }]}>
                                         <View style={[styles.statusDot, { backgroundColor: statusStyle.text.color }]} />
                                         <Text style={[styles.miniBadgeText, { color: statusStyle.text.color }]}>
@@ -210,13 +221,13 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                 </View>
                                 
                                 <Text style={styles.clientText} numberOfLines={1}>
-                                    {item.client_name || "Untitled Workspace"}
+                                    Insured: {item.client_name || "Untitled Workspace"}
                                 </Text>
                                 
                                 <View style={styles.metaRow}>
-                                    <Text style={styles.stageText}>{item.claim_stage || "Intake"}</Text>
-                                    <Text style={styles.metaDivider}>•</Text>
-                                    <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
+                                    <Text style={styles.stageText}>Open Issue: {item.claim_stage.replace('_'," ").toLocaleUpperCase() || "Intake"}</Text>
+                                    <Text style={styles.metaDivider}>|</Text>
+                                    <Text style={styles.dateText}>{getRelativeTime(item.updated_at)}</Text>
                                 </View>
                             </View>
 
@@ -341,13 +352,13 @@ const styles = StyleSheet.create({
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
     claimNoText: { fontSize: 15, fontWeight: '800', color: '#1E293B', letterSpacing: -0.3 },
     clientText: { fontSize: 13, color: '#64748B', fontWeight: '500', marginBottom: 6 },
-    metaRow: { flexDirection: 'row', alignItems: 'center' },
+    metaRow: { flexDirection: 'row', alignItems: "center", justifyContent: 'space-between' },
     miniBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
     statusDot: { width: 4, height: 4, borderRadius: 2, marginRight: 5 },
     miniBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
     metaDivider: { marginHorizontal: 6, color: '#CBD5E1', fontSize: 10 },
     stageText: { fontSize: 11, color: '#4F46E5', fontWeight: '700' },
-    dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+    dateText: { fontSize: 11, color: '#7f8c9e', fontWeight: '500' },
     
     overlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'flex-end' },
     keyboardView: { width: '100%' },

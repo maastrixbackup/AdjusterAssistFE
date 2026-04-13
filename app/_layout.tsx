@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -14,17 +14,8 @@ import { Toaster } from "sonner-native";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-
-// Notifications.setNotificationHandler({
-//   handleNotification: async () => ({
-//     shouldShowAlert: true,
-//     shouldPlaySound: true,
-//     shouldSetBadge: false,
-//     shouldShowBanner: true,
-//     shouldShowList: true,
-//   }),
-// });
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -32,49 +23,57 @@ export const unstable_settings = {
 
 // --- THIS COMPONENT HANDLES THE REDIRECT LOGIC ---
 function NavigationGuard() {
-  const { isAuthenticated, isHydrated, token } = useAuth();
+  const { isAuthenticated, isHydrated } = useAuth();
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
   const segments = useSegments();
   const router = useRouter();
 
-  // References for notification listeners
-
-
+  // 1. Fetch the onboarding status from storage on mount
   useEffect(() => {
-    if (!isHydrated) return;
+    async function checkOnboarding() {
+      try {
+        const value = await AsyncStorage.getItem("@has_seen_onboarding");
+        setHasSeenOnboarding(value === "true");
+      } catch (e) {
+        setHasSeenOnboarding(false);
+      }
+    }
+    checkOnboarding();
+  }, []);
 
-    const inAuthGroup = segments[0] === "(tabs)" || segments[0] === "workspaces" || segments[0] === "generate";
+  // 2. Optimized Navigation Logic
+  useEffect(() => {
+    // If auth state isn't loaded from storage yet, or we don't know onboarding status, wait.
+    if (!isHydrated || hasSeenOnboarding === null) return;
 
-    if (!isAuthenticated && inAuthGroup) {
-      router.replace("/login");
-    } else if (isAuthenticated && (segments[0] === "login" || segments[0] === "signup")) {
+    const rootSegment = segments[0];
+    
+    // Define the groups for easier logic
+    const inAuthGroup = rootSegment === "(auth)" || rootSegment === "login";
+    const inProtectedGroup = rootSegment === "(tabs)" || rootSegment === "workspaces" || rootSegment === "generate";
+    const inOnboardingGroup = rootSegment === "onboarding";
+
+    // A. If they haven't seen onboarding, force them there
+    if (!hasSeenOnboarding && !inOnboardingGroup) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    // B. If logged out and trying to access protected areas, redirect to login
+    if (!isAuthenticated && inProtectedGroup) {
+      // Using replace ensures the transition is a clean swap
+      router.replace("/(auth)/login");
+      return;
+    }
+
+    // C. If logged in and trying to access auth/onboarding screens, send to home
+    if (isAuthenticated && (inAuthGroup || inOnboardingGroup)) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, isHydrated, segments]);
+  }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments]);
 
-  // useEffect(() => {
-  //   if (isHydrated && isAuthenticated && token) {
-  //     const timeout = setTimeout(() => {
-  //       registerForPushNotifications(token);
-  //     }, 1000);
-
-  //     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-  //       console.log("Notification Received:", notification);
-  //     });
-
-  //     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-  //       router.push("/(tabs)");
-  //     });
-
-  //     return () => {
-  //       clearTimeout(timeout);
-  //       // Change these lines here:
-  //       if (notificationListener.current) notificationListener.current.remove();
-  //       if (responseListener.current) responseListener.current.remove();
-  //     };
-  //   }
-  // }, [isAuthenticated, isHydrated, token]);
-
-  if (!isHydrated) {
+  // Premium Loading state while checking storage/auth
+  if (!isHydrated || hasSeenOnboarding === null) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B3C7A" }}>
         <ActivityIndicator size="large" color="#FFFFFF" />
@@ -88,7 +87,8 @@ function NavigationGuard() {
         headerTintColor: "#FFFFFF",
         contentStyle: { backgroundColor: "#0B3C7A" },
         headerTitleStyle: { fontSize: 15, fontWeight: "600" },
-        animation: "fade",
+        // Use 'fade' for a premium, non-jarring transition between auth and app
+        animation: "fade", 
         headerBackground: () => (
           <LinearGradient
             colors={["#276bbd", "#0B3C7A"]}
@@ -99,12 +99,13 @@ function NavigationGuard() {
         ),
       }}
     >
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="reset-password" options={{ headerShown: false }} />
-      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
-      <Stack.Screen name="verify-otp" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/verify-otp" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -126,7 +127,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <ThemeProvider value={AppTheme}>
-            <View style={{ flex: 1, backgroundColor: "#020617" }}>
+            <View style={{ flex: 1, backgroundColor: "#263369" }}>
               <NavigationGuard />
               <Toaster />
             </View>
