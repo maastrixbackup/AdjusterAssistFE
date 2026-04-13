@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, Tabs } from "expo-router";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { Platform, StyleSheet } from "react-native";
  
 import { HapticTab } from "@/components/haptic-tab";

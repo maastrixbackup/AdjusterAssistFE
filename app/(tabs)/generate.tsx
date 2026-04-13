@@ -130,51 +130,59 @@ export default function GenerateScreen() {
     setShowScenarioScrollButton(text.length > 100);
   };
 
-  const handlePickImage = async () => {
-    try {
-      setIsPickingImage(true);
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+const handlePickImage = async () => {
+  try {
+    setIsPickingImage(true);
+    
+    // Check current permission status first
+    const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
+    let finalStatus = status;
 
-      if (!permission.granted) {
-        Alert.alert("Permission required", "Media library access is required.");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets?.[0]) {
-        const imageAsset = result.assets[0];
-
-        // Use a fallback for the URI to avoid 'undefined'
-        const uri = imageAsset.uri;
-        setSelectedImage(uri);
-
-        // 2. Process for Backend (Base64)
-        const manipulatedImage = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 1024 } }],
-          {
-            compress: 0.7,
-            format: ImageManipulator.SaveFormat.JPEG,
-            base64: true,
-          },
-        );
-
-        setImageBase64(manipulatedImage.base64 ?? null);
-        console.log("Selected image base64 length:", manipulatedImage.base64?.length);
-      }
-    } catch (error) {
-      console.error("Image picker error:", error);
-      // Use your toast or alert here
-    } finally {
-      setIsPickingImage(false);
+    if (finalStatus !== 'granted') {
+      const { status: newStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      finalStatus = newStatus;
     }
-  };
+
+    if (finalStatus !== 'granted') {
+      Alert.alert("Permission required", "Please enable media library access in settings.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false, 
+      quality: 1,
+      // On some Android builds, selection fails if the aspect ratio is set 
+      // but allowsEditing is false. Added a check here.
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const uri = result.assets[0].uri;
+      setSelectedImage(uri);
+
+      // IMPORTANT: In APKs, sometimes the URI needs to be cleaned 
+      // or verified before ImageManipulator touches it.
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1024 } }],
+        {
+          compress: 0.7,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+
+      setImageBase64(manipulatedImage.base64 ?? null);
+    }
+  } catch (error) {
+    console.error("Image picker error:", error);
+    // On 8GB RAM devices, the app might restart if memory is low during picking.
+    // Ensure you handle the error visually for the user.
+    Alert.alert("Error", "Could not process image. Please try again.");
+  } finally {
+    setIsPickingImage(false);
+  }
+};
 
   // const handleTakePhoto = async () => {
   //   try {

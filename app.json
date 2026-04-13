@@ -20,6 +20,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
         "NOTIFICATIONS"
       ],
       "adaptiveIcon": {
@@ -37,6 +39,7 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
+      "expo-image-picker",
       [
         "expo-splash-screen",
         {
