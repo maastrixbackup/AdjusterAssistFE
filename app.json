@@ -16,6 +16,7 @@
       }
     },
     "android": {
+      "newArchEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -59,7 +60,8 @@
             "targetSdkVersion": 36
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

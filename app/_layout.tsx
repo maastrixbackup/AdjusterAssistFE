@@ -127,7 +127,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <ThemeProvider value={AppTheme}>
-            <View style={{ flex: 1, backgroundColor: "#020617" }}>
+            <View style={{ flex: 1, backgroundColor: "#263369" }}>
               <NavigationGuard />
               <Toaster />
             </View>
