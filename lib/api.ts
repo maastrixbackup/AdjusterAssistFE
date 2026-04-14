@@ -85,7 +85,12 @@ export interface Draft {
   id: number;
   file_id: number | string;
   draft_type: string;
-  content: string;
+  content_type: string;
+  next_step_suggestion?: string;
+  user_input?: string;
+  claim_state?: string;
+  ai_response: string;
+  quick_actions?: string[];
   created_at: string;
   claim_number?: string;
   client_name?: string;

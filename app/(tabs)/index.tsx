@@ -250,7 +250,7 @@ export default function HomeScreen() {
                 styles.actionCard,
                 pressed && styles.pressed,
               ]}
-              onPress={() => router.push("/generate")}
+              onPress={() => router.push("/aiChat")}
             >
               <LinearGradient
                 colors={["#3B82F6", "#0a36b1"]}
@@ -323,11 +323,18 @@ export default function HomeScreen() {
           {recentClaims.map((file) => (
             <Pressable
               key={file.id}
-              style={({ pressed }) => [
-                styles.workspaceCard,
-                pressed && styles.pressed,
-              ]}
-              onPress={() => router.push("/workspaces")}
+              style={({ pressed }) => [styles.workspaceCard, pressed && styles.pressed]}
+              onPress={() =>
+                router.push({
+                  pathname: "/aiChat",
+                  params: {
+                    fileId: file.id,
+                    claimNumber: file.claim_number,
+                    clientName: file.client_name,
+                    credits: status?.subscription?.remaining ?? 0,
+                  }
+                })
+              }
             >
               <View style={styles.workspaceIcon}>
                 <Ionicons name="folder" size={22} color="#64748B" />

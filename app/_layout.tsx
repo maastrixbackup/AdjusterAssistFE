@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -21,58 +21,61 @@ export const unstable_settings = {
   initialRouteName: "login",
 };
 
-// --- THIS COMPONENT HANDLES THE REDIRECT LOGIC ---
 function NavigationGuard() {
   const { isAuthenticated, isHydrated } = useAuth();
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
   const segments = useSegments();
   const router = useRouter();
 
-  // 1. Fetch the onboarding status from storage on mount
-  useEffect(() => {
-    async function checkOnboarding() {
-      try {
-        const value = await AsyncStorage.getItem("@has_seen_onboarding");
-        setHasSeenOnboarding(value === "true");
-      } catch (e) {
-        setHasSeenOnboarding(false);
-      }
+  // 1. Memoized check function to allow re-triggering
+  const checkOnboardingStatus = useCallback(async () => {
+    try {
+      const value = await AsyncStorage.getItem("@has_seen_onboarding");
+      setHasSeenOnboarding(value === "true");
+    } catch (e) {
+      setHasSeenOnboarding(false);
     }
-    checkOnboarding();
   }, []);
+
+  useEffect(() => {
+    checkOnboardingStatus();
+  }, [checkOnboardingStatus]);
 
   // 2. Optimized Navigation Logic
   useEffect(() => {
-    // If auth state isn't loaded from storage yet, or we don't know onboarding status, wait.
+    // If auth state isn't loaded or onboarding status is unknown, wait.
     if (!isHydrated || hasSeenOnboarding === null) return;
 
     const rootSegment = segments[0];
     
-    // Define the groups for easier logic
     const inAuthGroup = rootSegment === "(auth)" || rootSegment === "login";
     const inProtectedGroup = rootSegment === "(tabs)" || rootSegment === "workspaces" || rootSegment === "generate";
     const inOnboardingGroup = rootSegment === "onboarding";
 
-    // A. If they haven't seen onboarding, force them there
+    // A. Re-check storage if we are currently in the auth group but the guard thinks we haven't seen onboarding
+    // This handles the transition immediately after router.replace('/login') is called in onboarding
+    if (inAuthGroup && hasSeenOnboarding === false) {
+        checkOnboardingStatus();
+    }
+
+    // B. Logic Gate: Force Onboarding if never seen
     if (!hasSeenOnboarding && !inOnboardingGroup) {
       router.replace("/onboarding");
       return;
     }
 
-    // B. If logged out and trying to access protected areas, redirect to login
-    if (!isAuthenticated && inProtectedGroup) {
-      // Using replace ensures the transition is a clean swap
+    // C. Logic Gate: Redirect to login if unauthorized
+    if (hasSeenOnboarding && !isAuthenticated && inProtectedGroup) {
       router.replace("/(auth)/login");
       return;
     }
 
-    // C. If logged in and trying to access auth/onboarding screens, send to home
+    // D. Logic Gate: Redirect to app if already authenticated
     if (isAuthenticated && (inAuthGroup || inOnboardingGroup)) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments]);
+  }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments, checkOnboardingStatus]);
 
-  // Premium Loading state while checking storage/auth
   if (!isHydrated || hasSeenOnboarding === null) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B3C7A" }}>
@@ -87,7 +90,6 @@ function NavigationGuard() {
         headerTintColor: "#FFFFFF",
         contentStyle: { backgroundColor: "#0B3C7A" },
         headerTitleStyle: { fontSize: 15, fontWeight: "600" },
-        // Use 'fade' for a premium, non-jarring transition between auth and app
         animation: "fade", 
         headerBackground: () => (
           <LinearGradient
@@ -100,6 +102,7 @@ function NavigationGuard() {
       }}
     >
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="aiChat" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -110,7 +113,6 @@ function NavigationGuard() {
   );
 }
 
-// --- MAIN ROOT LAYOUT ---
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -129,6 +131,7 @@ export default function RootLayout() {
           <ThemeProvider value={AppTheme}>
             <View style={{ flex: 1, backgroundColor: "#263369" }}>
               <NavigationGuard />
+              {/* Toaster is placed at the bottom of the View to be on top of everything except Native Modals */}
               <Toaster />
             </View>
             <StatusBar style="light" />
