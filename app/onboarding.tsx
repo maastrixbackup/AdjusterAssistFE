@@ -135,11 +135,16 @@ export default function OnboardingScreen() {
             <Feather name={isLast ? "arrow-right" : "chevron-right"} size={20} color="#1e40af" />
           </Pressable>
 
-          {!isLast && (
+          {/* {!isLast && (
             <Pressable onPress={completeOnboarding} style={styles.skipWrap}>
               <Text style={styles.skip}>Skip for now</Text>
             </Pressable>
-          )}
+          )} */}
+       
+            <Pressable onPress={completeOnboarding} style={styles.skipWrap}>
+              <Text style={styles.skip}>Skip for now</Text>
+            </Pressable>
+          
         </View>
       </SafeAreaView>
     </View>

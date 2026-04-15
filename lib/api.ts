@@ -50,11 +50,9 @@ export interface ClaimFile {
 
 // Data structure for creating a new file from the frontend
 export interface CreateFileRequest {
-  // Required Claim Identifiers
   claim_number: string; // Unique ID for the claim
   client_name: string; // Insured party's name
 
-  // Mandatory Insurance Metadata
   address: string; // Property location
   policy_form: string; // e.g., 'HO-3', 'HO-5'
   loss_type: string; // e.g., 'water', 'fire', 'wind'
@@ -142,7 +140,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 const responseTypeLabels: Record<string, string> = {
   file_note: "File",
@@ -537,6 +535,24 @@ export const deleteFile = async (
     return response;
   } catch (error) {
     console.error(`Error deleting file ${fileId}:`, error);
+    throw error;
+  }
+};
+
+export const getFileById = async (
+  token: string,
+  fileId: number,
+): Promise<ClaimFile> => {
+  try {
+    const response = await apiRequest<{ success: boolean; file: ClaimFile }>(
+      `/files/${fileId}`,
+      { method: "GET" },
+      token,
+    );
+
+    return response.file; // Changed from .data to .file
+  } catch (error) {
+    console.error("Error in getFileById:", error);
     throw error;
   }
 };

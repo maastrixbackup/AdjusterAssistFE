@@ -1,5 +1,6 @@
-import { useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useRef, useState } from 'react';
+import { Animated, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ChatTimelineCardProps {
   title: string;
@@ -9,8 +10,9 @@ interface ChatTimelineCardProps {
   timeAgo: string;
   quickActions?: string[];
   outputFormat?: string;
-  // NEW: Callback for specific action clicks
+  refinementOptions?: string[];
   onActionPress?: (action: string) => void;
+  onRefinementPress?: (option: string) => void;
 }
 
 export const ChatTimelineCard = ({
@@ -21,8 +23,12 @@ export const ChatTimelineCard = ({
   color,
   timeAgo,
   quickActions = [],
-  onActionPress
+  refinementOptions = [],
+  onActionPress,
+  onRefinementPress,
 }: ChatTimelineCardProps) => {
+
+  const [showRefinements, setShowRefinements] = useState(false);
 
   const animatedValue = useRef(new Animated.Value(1)).current;
 
@@ -43,6 +49,8 @@ export const ChatTimelineCard = ({
     }).start();
   };
 
+  const isAI = category.toUpperCase() === 'AI RESPONSE';
+
   return (
     <Pressable
       onPressIn={handlePressIn}
@@ -53,7 +61,11 @@ export const ChatTimelineCard = ({
         styles.card,
         { transform: [{ scale: animatedValue }] }
       ]}>
-        <View style={[styles.accentBar, { backgroundColor: color }]} />
+        <View style={[
+          styles.accentBar,
+          { backgroundColor: color },
+          category.toUpperCase() === 'USER INPUT' ? { right: 0, width:6 } : { left: 0 }
+        ]} />
 
         <View style={styles.contentContainer}>
           <View style={styles.cardHeader}>
@@ -71,14 +83,29 @@ export const ChatTimelineCard = ({
                   {outputFormat.replace('_', ' ')}
                 </Text>
               )}
+
               <View style={styles.arrowIcon}>
                 <View style={[styles.dot, { backgroundColor: '#CBD5E1' }]} />
               </View>
+
+              {isAI && refinementOptions.length > 0 && (
+                <TouchableOpacity 
+                  onPress={() => setShowRefinements(true)}
+                  style={styles.refineTrigger}
+                >
+                  <Feather name="sliders" size={12} color="#4F46E5" />
+                  <Text style={styles.refineText}>Refine</Text>
+                </TouchableOpacity>
+              )}
+
+
             </View>
           </View>
 
-          <Text style={styles.cardTitle}>{title}</Text>
-          <Text style={styles.cardDescription} numberOfLines={2}>
+          {title && (
+            <Text style={styles.cardTitle}>{title}</Text>
+          )}
+          <Text style={styles.cardDescription}>
             {content}
           </Text>
 
@@ -106,6 +133,62 @@ export const ChatTimelineCard = ({
           </View>
         </View>
       </Animated.View>
+
+      {/* Refinement modal  */}
+     <Modal
+  visible={showRefinements}
+  transparent
+  animationType="slide" // Slide feels more organic for bottom sheets
+  onRequestClose={() => setShowRefinements(false)}
+>
+  <Pressable style={styles.modalOverlay} onPress={() => setShowRefinements(false)}>
+    {/* Inner container to keep the sheet at the bottom */}
+    <View style={styles.sheetContainer}>
+      <Animated.View style={styles.refinementSheet}>
+        {/* Modern "Grabber" handle */}
+        <View style={styles.dragHandle} />
+        
+        <View style={styles.sheetHeader}>
+          <Text style={styles.menuTitle}>Refine Response</Text>
+          <Text style={styles.menuSubtitle}>Adjust the tone or length of the AI output</Text>
+        </View>
+
+        <View style={styles.optionsList}>
+          {refinementOptions.map((option, idx) => (
+            <TouchableOpacity
+              key={idx}
+              activeOpacity={0.7}
+              style={[
+                styles.menuItem,
+                idx === refinementOptions.length - 1 && { borderBottomWidth: 0 }
+              ]}
+              onPress={() => {
+                onRefinementPress?.(option);
+                setShowRefinements(false);
+              }}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={styles.iconCircle}>
+                  <Feather name="zap" size={14} color="#4F46E5" />
+                </View>
+                <Text style={styles.menuItemText}>{option}</Text>
+              </View>
+              <Feather name="arrow-right" size={16} color="#CBD5E1" />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Cancel Button - Optional but good for UX */}
+        <TouchableOpacity 
+          style={styles.cancelButton} 
+          onPress={() => setShowRefinements(false)}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  </Pressable>
+</Modal>
     </Pressable>
   );
 };
@@ -132,6 +215,8 @@ const styles = StyleSheet.create({
   accentBar: {
     width: 4,
     height: '100%',
+    position: 'absolute',
+    zIndex: 10,
   },
   contentContainer: {
     flex: 1,
@@ -221,5 +306,148 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
+  },
+  refineTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  refineText: { fontSize: 13, color: '#4F46E5', fontWeight: '700' },
+  
+  // modalOverlay: {
+  //   flex: 1,
+  //   backgroundColor: 'rgba(15, 23, 42, 0.4)',
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   padding: 20
+  // },
+  refinementMenu: {
+    backgroundColor: '#FFF',
+    width: '80%',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10
+  },
+  // menuTitle: {
+  //   fontSize: 14,
+  //   fontWeight: '800',
+  //   color: '#64748B',
+  //   marginBottom: 12,
+  //   textTransform: 'uppercase',
+  //   textAlign: 'center'
+  // },
+  // menuItem: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   paddingVertical: 12,
+  //   borderBottomWidth: 1,
+  //   borderBottomColor: '#F1F5F9'
+  // },
+  // menuItemText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  // cancelButton: {
+  //   marginTop: 16,
+  //   paddingVertical: 16,
+  //   alignItems: 'center',
+  //   justifyContent: 'center',
+  // },
+  cancelButton: {
+    marginTop: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  sheetContainer: {
+    width: '100%',
+  },
+  refinementSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24, // Account for safe areas
+    paddingTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -20 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 25,
+  },
+  dragHandle: {
+    width: 38,
+    height: 4,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 24,
+  },
+  sheetHeader: {
+    marginBottom: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)', // Deeper, more sophisticated slate blue alpha
+    justifyContent: 'flex-end', // Aligns to bottom
+  },
+  menuTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  menuSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  optionsList: {
+    backgroundColor: '#F8FAFC', // Subtle contrast background
+    borderRadius: 20,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
   },
 });

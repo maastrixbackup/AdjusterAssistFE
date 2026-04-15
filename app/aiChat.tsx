@@ -1,7 +1,7 @@
 import { ChatInputSection } from '@/components/ChatInputSection';
 import { ChatTimelineCard } from '@/components/ChatTimelineCard';
 import { WorkspaceMetaModal } from '@/components/WorkspaceMetaModal';
-import { ClaimFile, getDraftsByFile } from '@/lib/api'; // Ensure this path matches your project structure
+import { ClaimFile, getDraftsByFile, getFileById, updateFile } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +23,7 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 const { width } = Dimensions.get('window');
 
@@ -100,14 +101,11 @@ export default function AiChatScreen() {
     const [isMetaModalVisible, setIsMetaModalVisible] = useState(false);
     const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(null);
 
-    const handleUpdateWorkspace = async (data: Partial<ClaimFile>) => {
-        // Your API call logic here (e.g., to your CSC-backend pricing/meta APIs)
-        console.log("Updating workspace with:", data);
-    };
-
 
     const flatListRef = useRef<FlatList>(null);
     const keyboardOffset = useKeyboardOffset();
+
+
 
     // ─── Fetch Thread History ────────────────────────────────────────────────
     const loadThreadHistory = useCallback(async () => {
@@ -124,7 +122,9 @@ export default function AiChatScreen() {
                 ai_response: draft.ai_response,
                 output_format: draft.content_type,
                 next_step_suggestion: draft.next_step_suggestion,
-                quick_actions: draft.quick_actions || [],
+                // quick_actions: draft.quick_actions || [],
+                quick_actions:  ["Copy", "Convert to File note", "Mark as used"],
+                refinement: draft.refinement || ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
             }));
 
@@ -136,9 +136,29 @@ export default function AiChatScreen() {
         }
     }, [fileId, token]);
 
+    const loadFileDetails = useCallback(async () => {
+        if (!fileId || !token) {
+            console.warn("Missing fileId or token in loadFileDetails");
+            return;
+        }
+        try {
+            const fileData = await getFileById(token, Number(fileId));
+            // console.log("API Response for file:", fileData); // Check if this is undefined
+
+            if (fileData) {
+                setCurrentWorkspace(fileData);
+            } else {
+                console.error("API returned empty data for fileId:", fileId);
+            }
+        } catch (error) {
+            console.error("Error loading file metadata:", error);
+        }
+    }, [fileId, token]);
+
     useEffect(() => {
         loadThreadHistory();
-    }, [loadThreadHistory]);
+        loadFileDetails();
+    }, [loadThreadHistory, loadFileDetails]);
 
     const scrollToBottom = useCallback((animated = true) => {
         requestAnimationFrame(() => {
@@ -154,23 +174,44 @@ export default function AiChatScreen() {
         setInputText('');
     };
 
+    const handleUpdateWorkspace = async (updatedData: Partial<ClaimFile>) => {
+        if (!fileId || !token) return;
+
+        try {
+            // Optimistic UI update
+            setCurrentWorkspace(prev => prev ? { ...prev, ...updatedData } : null);
+
+            await updateFile(token, Number(fileId), updatedData);
+            console.log("Workspace updated successfully");
+            toast.success("Workspace updated successfully");
+
+            // Refresh data from server to ensure sync
+            await loadFileDetails();
+        } catch (error) {
+            console.error("Failed to update workspace:", error);
+            toast.error("Failed to update workspace");
+            // Rollback on error if necessary
+        }
+    };
+
     const renderItem = useCallback(({ item }: { item: any }) => (
         <View style={styles.turnGroup}>
             <ChatTimelineCard
                 category="USER INPUT"
-                title="Input"
+                title=""
                 content={item.user_input}
                 color="#94A3B8"
                 timeAgo={getFormattedTime(item.created_at)}
             />
             <ChatTimelineCard
                 category="AI RESPONSE"
-                title="Response"
+                title=""
                 content={item.ai_response}
                 color="#3B82F6"
                 timeAgo="Generated"
                 quickActions={item.quick_actions}
                 outputFormat={item.output_format}
+                refinementOptions={item.refinement}
             />
             <ChatTimelineCard
                 category="Recommended Next Step"
@@ -204,11 +245,12 @@ export default function AiChatScreen() {
                             <Pressable
                                 onPress={() => router.push("/settings")}
                             >
-                                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                <View style={{ flexDirection: "row", alignItems: "center" ,backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12}}>
                                     <Ionicons name="sparkles" size={14} color="#FDE68A" />
                                     <Text style={styles.creditText}>
                                         {credits ?? 0}
                                     </Text>
+                                    {/* <Text style={{ color: "#FDE68A", fontSize: 11, marginLeft: 4 }}>Credits</Text> */}
                                 </View>
                             </Pressable>
                         </TouchableOpacity>
@@ -220,7 +262,7 @@ export default function AiChatScreen() {
                                 <View style={styles.pulseDot} />
                                 <Text style={styles.claimNoText}>{claimNumber || 'New Workspace'}</Text>
                             </View>
-                            <Text style={styles.clientText}>{clientName || 'Unassigned'}</Text>
+                            <Text style={styles.clientText}>{clientName || currentWorkspace?.client_name}</Text>
                         </View>
                         <TouchableOpacity
                             style={styles.workspaceBtn}
@@ -298,7 +340,7 @@ const styles = StyleSheet.create({
     topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     logoTextMain: { color: '#FFF', fontSize: 20, fontWeight: '800' },
     logoTextAccent: { color: '#3B82F6' },
-    navCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    navCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.04)', justifyContent: 'center', alignItems: 'center' },
     workspaceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     infoBlock: { flex: 1 },
     claimBadge: { backgroundColor: 'rgba(59, 130, 246, 0.2)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },

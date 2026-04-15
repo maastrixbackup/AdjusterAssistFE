@@ -69,12 +69,37 @@ export default function LoginScreen() {
       return;
     }
 
+    // Initial soft feedback for button press
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-    toast.promise(login(email.trim(), password), {
-      loading: "Verifying credentials...",
-      success: () => "Welcome back!",
-      error: (err) => err instanceof Error ? err.message : "Invalid credentials",
-    });
+
+    if (Platform.OS === "android") {
+      Keyboard.dismiss();
+    }
+
+    try {
+      // We wrap the login call in toast.promise for the UI, 
+      // but we await it to trigger Haptics based on the result.
+      await toast.promise(login(email.trim(), password), {
+        loading: "Verifying credentials...",
+        success: (data) => {
+          // SUCCESS HAPTIC
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          return "Welcome back!";
+        },
+        error: (err) => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          return err instanceof Error ? err.message : "Invalid credentials";
+        },
+      });
+
+      // iOS Keyboard dismissal often feels smoother after the transition starts
+      if (Platform.OS === "ios") {
+        setTimeout(() => Keyboard.dismiss(), 500);
+      }
+
+    } catch (error) {
+      console.error("Login attempt failed", error);
+    }
   }
 
   // Responsive Logo Settings
@@ -103,7 +128,7 @@ export default function LoginScreen() {
               colors={["#276bbd", "#1e40af", "#172554"]}
               style={StyleSheet.absoluteFill}
             />
-            
+
             {/* Ambient Background Circles */}
             <View style={[styles.bubble, { top: -40, right: -40, width: 200, height: 200 }]} />
             <View style={[styles.bubble, { bottom: -20, left: -20, width: 120, height: 120, opacity: 0.03 }]} />
@@ -112,7 +137,7 @@ export default function LoginScreen() {
               <View style={styles.logoContainer}>
                 <Image source={logoImg} style={logoStyle} />
               </View>
-              
+
               <View style={styles.welcomeTextSection}>
                 <Text style={styles.arcTitle}>Welcome Back</Text>
                 <Text style={styles.arcSub}>Enter your details to access your claims</Text>
@@ -123,7 +148,7 @@ export default function LoginScreen() {
           {/* ══ FORM BODY ════════════════════════════════════════════════ */}
           <View style={[styles.body, { marginTop: -40 }]}>
             <View style={[styles.card, isTablet && { maxWidth: 480, alignSelf: 'center' }]}>
-              
+
               {/* EMAIL FIELD */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.fieldLabel}>WORK EMAIL</Text>
@@ -209,7 +234,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   loaderWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
   scroll: { flexGrow: 1 },
-  
+
   // Header Styles
   arcHeader: {
     borderBottomLeftRadius: 40,

@@ -187,7 +187,7 @@ export default function HomeScreen() {
 
       {/* Modern Refined Header */}
       <LinearGradient
-        colors={["#165bb6", "#1E293B"]}
+        colors={["#165bb6", "#003366"]}
         style={styles.headerGradient}
       >
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
@@ -337,7 +337,7 @@ export default function HomeScreen() {
               }
             >
               <View style={styles.workspaceIcon}>
-                <Ionicons name="folder" size={22} color="#64748B" />
+                <Ionicons name="folder" size={22} color="#3070c9" />
               </View>
 
               <View style={styles.workspaceDetails}>
