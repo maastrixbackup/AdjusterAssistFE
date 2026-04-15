@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Animated,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface ChatInputProps {
@@ -19,6 +20,7 @@ interface ChatInputProps {
   onFocus: () => void;
   keyboardOffset: Animated.Value;
   dynamicBottomPadding: Animated.AnimatedAddition<number> | Animated.AnimatedInterpolation<number>;
+  disabled?: boolean;
 }
 
 export const ChatInputSection = ({
@@ -28,6 +30,7 @@ export const ChatInputSection = ({
   onFocus,
   keyboardOffset,
   dynamicBottomPadding,
+  disabled,
 }: ChatInputProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const sendScale = React.useRef(new Animated.Value(1)).current;
@@ -49,9 +52,9 @@ export const ChatInputSection = ({
         ]}
       >
         <View style={styles.inputCard}>
-          <TouchableOpacity 
-            style={styles.attachBtn} 
-            onPress={() => setMenuVisible(true)} 
+          <TouchableOpacity
+            style={styles.attachBtn}
+            onPress={() => setMenuVisible(true)}
             activeOpacity={0.7}
           >
             <Ionicons name="add" size={28} color="#004B93" />
@@ -62,6 +65,7 @@ export const ChatInputSection = ({
             placeholder="Update claim thread..."
             placeholderTextColor="#94A3B8"
             multiline
+            editable={!disabled}
             value={inputText}
             onChangeText={setInputText}
             onFocus={onFocus}
@@ -80,7 +84,11 @@ export const ChatInputSection = ({
                 onPress={handleSendPress}
                 activeOpacity={0.8}
               >
-                <Ionicons name="arrow-up" size={20} color="#FFF" />
+                {disabled ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Ionicons name="arrow-up" size={18} color="#FFF" />
+                )}
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -129,7 +137,7 @@ const styles = StyleSheet.create({
   micBtn: { padding: 8 },
   sendBtn: { backgroundColor: '#003366', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#CBD5E1' },
-  
+
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-end', paddingBottom: 110, paddingHorizontal: 25 },
   menuContainer: { backgroundColor: '#FFF', borderRadius: 20, padding: 8, width: 200, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },

@@ -14,6 +14,7 @@ interface ChatTimelineCardProps {
   responseUsed?: boolean;
   onActionPress?: (action: string) => void;
   onRefinementPress?: (option: string) => void;
+  onSharePress?: () => void;
 }
 
 export const ChatTimelineCard = ({
@@ -28,6 +29,7 @@ export const ChatTimelineCard = ({
   responseUsed,
   onActionPress,
   onRefinementPress,
+  onSharePress,
 }: ChatTimelineCardProps) => {
 
   const [showRefinements, setShowRefinements] = useState(false);
@@ -95,7 +97,7 @@ export const ChatTimelineCard = ({
                   onPress={() => setShowRefinements(true)}
                   style={styles.refineTrigger}
                 >
-                  <Feather name="sliders" size={12} color="#4F46E5" />
+                  <Feather name="sliders" size={12} color="#4056d1" />
                   <Text style={styles.refineText}>Refine</Text>
                 </TouchableOpacity>
               )}
@@ -107,17 +109,24 @@ export const ChatTimelineCard = ({
           {title && (
             <Text style={styles.cardTitle}>{title}</Text>
           )}
-          <Text style={styles.cardDescription}>
+
+          <Text
+            style={[
+              styles.cardDescription,
+              {
+                fontStyle: isAI ? 'italic' : 'normal', 
+                color: '#0a2447'
+              }
+            ]}
+          >
             {content}
           </Text>
 
           <View style={styles.footer}>
             <View style={styles.actionsRow}>
               {quickActions.slice(0, 3).map((action, index) => {
-                // Check if this specific button should be highlighted green
                 const isMarkUsedAction = action === "Mark as used";
                 const isActuallyUsed = isMarkUsedAction && responseUsed;
-
                 return (
                   <Pressable
                     key={index}
@@ -127,7 +136,6 @@ export const ChatTimelineCard = ({
                     }}
                     style={({ pressed }) => [
                       styles.actionBadge,
-                      // Apply green background if used
                       isActuallyUsed && styles.actionBadgeUsed,
                       pressed && styles.actionBadgePressed
                     ]}
@@ -143,8 +151,19 @@ export const ChatTimelineCard = ({
                 );
               })}
             </View>
+            <View style={styles.rightFooterGroup}>
+              {isAI && (
+                <TouchableOpacity
+                  onPress={onSharePress}
+                  style={styles.shareBtn}
+                  activeOpacity={0.6}
+                >
+                  <Feather name="share-2" size={18} color="#3B82F6" />
+                </TouchableOpacity>
+              )}
+              <Text style={styles.timeText}>{timeAgo}</Text>
+            </View>
 
-            <Text style={styles.timeText}>{timeAgo}</Text>
           </View>
         </View>
       </Animated.View>
@@ -266,8 +285,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   cardDescription: {
-    fontSize: 15,
-    color: '#475569',
+    fontSize: 16,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    fontStyle: 'italic',
+    color: '#0a2447',
     lineHeight: 18,
     marginBottom: 6,
   },
@@ -312,9 +333,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
+  rightFooterGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  shareBtn: {
+    padding: 4,
+    backgroundColor: '#eff6fff3',
+    borderRadius: 8,
+  },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Pushes items to opposite corners
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
   },
@@ -324,7 +355,7 @@ const styles = StyleSheet.create({
     gap: 8, // Spacing between text and the dot
   },
   formatText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -340,7 +371,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#C7D2FE',
   },
-  refineText: { fontSize: 13, color: '#4F46E5', fontWeight: '700' },
+  refineText: { fontSize: 13, color: '#3048b3', fontWeight: '700' },
 
   // modalOverlay: {
   //   flex: 1,
