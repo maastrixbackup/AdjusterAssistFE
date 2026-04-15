@@ -19,6 +19,7 @@ import { RefreshControl, ScrollView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
+import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import {
   ClaimFile,
@@ -43,6 +44,24 @@ export default function HomeScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [lastDraft, setLastDraft] = useState<RecentDraft | null>(null);
+
+  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
+  const handleWorkspaceCreated = (newFile: ClaimFile) => {
+    // 1. Close the modal
+    setIsCreateModalVisible(false);
+
+    // 2. Navigate immediately to the AI Chat screen with the new params
+    router.push({
+      pathname: "/aiChat",
+      params: {
+        fileId: newFile.id,
+        claimNumber: newFile.claim_number,
+        clientName: newFile.client_name,
+        credits: status?.subscription?.remaining ?? 0,
+        initialData: JSON.stringify(newFile)
+      }
+    });
+  };
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
@@ -250,7 +269,7 @@ export default function HomeScreen() {
                 styles.actionCard,
                 pressed && styles.pressed,
               ]}
-              onPress={() => router.push("/aiChat")}
+              onPress={() => setIsCreateModalVisible(true)}
             >
               <LinearGradient
                 colors={["#3B82F6", "#0a36b1"]}
@@ -381,6 +400,13 @@ export default function HomeScreen() {
           ))}
         </View>
       </ScrollView>
+
+      <CreateWorkspaceModal
+        isVisible={isCreateModalVisible}
+        onClose={() => setIsCreateModalVisible(false)}
+        onSuccess={handleWorkspaceCreated}
+        token={token}
+      />
 
       <CustomConfirmModal
         isVisible={isModalVisible}

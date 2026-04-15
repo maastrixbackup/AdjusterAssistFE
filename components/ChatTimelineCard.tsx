@@ -11,6 +11,7 @@ interface ChatTimelineCardProps {
   quickActions?: string[];
   outputFormat?: string;
   refinementOptions?: string[];
+  responseUsed?: boolean;
   onActionPress?: (action: string) => void;
   onRefinementPress?: (option: string) => void;
 }
@@ -24,6 +25,7 @@ export const ChatTimelineCard = ({
   timeAgo,
   quickActions = [],
   refinementOptions = [],
+  responseUsed,
   onActionPress,
   onRefinementPress,
 }: ChatTimelineCardProps) => {
@@ -64,7 +66,7 @@ export const ChatTimelineCard = ({
         <View style={[
           styles.accentBar,
           { backgroundColor: color },
-          category.toUpperCase() === 'USER INPUT' ? { right: 0, width:6 } : { left: 0 }
+          category.toUpperCase() === 'USER INPUT' ? { right: 0, width: 6 } : { left: 0 }
         ]} />
 
         <View style={styles.contentContainer}>
@@ -89,7 +91,7 @@ export const ChatTimelineCard = ({
               </View>
 
               {isAI && refinementOptions.length > 0 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setShowRefinements(true)}
                   style={styles.refineTrigger}
                 >
@@ -111,22 +113,35 @@ export const ChatTimelineCard = ({
 
           <View style={styles.footer}>
             <View style={styles.actionsRow}>
-              {quickActions.slice(0, 3).map((action, index) => (
-                <Pressable
-                  key={index}
-                  // Logic to handle specific button click without triggering card click
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    onActionPress?.(action);
-                  }}
-                  style={({ pressed }) => [
-                    styles.actionBadge,
-                    pressed && styles.actionBadgePressed
-                  ]}
-                >
-                  <Text style={styles.actionBadgeText}>{action}</Text>
-                </Pressable>
-              ))}
+              {quickActions.slice(0, 3).map((action, index) => {
+                // Check if this specific button should be highlighted green
+                const isMarkUsedAction = action === "Mark as used";
+                const isActuallyUsed = isMarkUsedAction && responseUsed;
+
+                return (
+                  <Pressable
+                    key={index}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      onActionPress?.(action);
+                    }}
+                    style={({ pressed }) => [
+                      styles.actionBadge,
+                      // Apply green background if used
+                      isActuallyUsed && styles.actionBadgeUsed,
+                      pressed && styles.actionBadgePressed
+                    ]}
+                  >
+                    <Text style={[
+                      styles.actionBadgeText,
+                      // Apply white or darker green text if used
+                      isActuallyUsed && styles.actionBadgeTextUsed
+                    ]}>
+                      {isActuallyUsed ? "Used" : action}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             <Text style={styles.timeText}>{timeAgo}</Text>
@@ -135,60 +150,60 @@ export const ChatTimelineCard = ({
       </Animated.View>
 
       {/* Refinement modal  */}
-     <Modal
-  visible={showRefinements}
-  transparent
-  animationType="slide" // Slide feels more organic for bottom sheets
-  onRequestClose={() => setShowRefinements(false)}
->
-  <Pressable style={styles.modalOverlay} onPress={() => setShowRefinements(false)}>
-    {/* Inner container to keep the sheet at the bottom */}
-    <View style={styles.sheetContainer}>
-      <Animated.View style={styles.refinementSheet}>
-        {/* Modern "Grabber" handle */}
-        <View style={styles.dragHandle} />
-        
-        <View style={styles.sheetHeader}>
-          <Text style={styles.menuTitle}>Refine Response</Text>
-          <Text style={styles.menuSubtitle}>Adjust the tone or length of the AI output</Text>
-        </View>
+      <Modal
+        visible={showRefinements}
+        transparent
+        animationType="slide" // Slide feels more organic for bottom sheets
+        onRequestClose={() => setShowRefinements(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowRefinements(false)}>
+          {/* Inner container to keep the sheet at the bottom */}
+          <View style={styles.sheetContainer}>
+            <Animated.View style={styles.refinementSheet}>
+              {/* Modern "Grabber" handle */}
+              <View style={styles.dragHandle} />
 
-        <View style={styles.optionsList}>
-          {refinementOptions.map((option, idx) => (
-            <TouchableOpacity
-              key={idx}
-              activeOpacity={0.7}
-              style={[
-                styles.menuItem,
-                idx === refinementOptions.length - 1 && { borderBottomWidth: 0 }
-              ]}
-              onPress={() => {
-                onRefinementPress?.(option);
-                setShowRefinements(false);
-              }}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconCircle}>
-                  <Feather name="zap" size={14} color="#4F46E5" />
-                </View>
-                <Text style={styles.menuItemText}>{option}</Text>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.menuTitle}>Refine Response</Text>
+                <Text style={styles.menuSubtitle}>Adjust the tone or length of the AI output</Text>
               </View>
-              <Feather name="arrow-right" size={16} color="#CBD5E1" />
-            </TouchableOpacity>
-          ))}
-        </View>
 
-        {/* Cancel Button - Optional but good for UX */}
-        <TouchableOpacity 
-          style={styles.cancelButton} 
-          onPress={() => setShowRefinements(false)}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
-  </Pressable>
-</Modal>
+              <View style={styles.optionsList}>
+                {refinementOptions.map((option, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.menuItem,
+                      idx === refinementOptions.length - 1 && { borderBottomWidth: 0 }
+                    ]}
+                    onPress={() => {
+                      onRefinementPress?.(option);
+                      setShowRefinements(false);
+                    }}
+                  >
+                    <View style={styles.menuItemLeft}>
+                      <View style={styles.iconCircle}>
+                        <Feather name="zap" size={14} color="#4F46E5" />
+                      </View>
+                      <Text style={styles.menuItemText}>{option}</Text>
+                    </View>
+                    <Feather name="arrow-right" size={16} color="#CBD5E1" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Cancel Button - Optional but good for UX */}
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowRefinements(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </Pressable>
+      </Modal>
     </Pressable>
   );
 };
@@ -275,6 +290,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  actionBadgeUsed: {
+    backgroundColor: '#DCFCE7', // Light green background
+    borderColor: '#86EFAC',     // Soft green border
+  },
+  actionBadgeTextUsed: {
+    color: '#166534', // Deep green text
+  },
   actionBadgePressed: {
     backgroundColor: '#cfd9e6',
     borderColor: '#7aa0ce',
@@ -319,7 +341,7 @@ const styles = StyleSheet.create({
     borderColor: '#C7D2FE',
   },
   refineText: { fontSize: 13, color: '#4F46E5', fontWeight: '700' },
-  
+
   // modalOverlay: {
   //   flex: 1,
   //   backgroundColor: 'rgba(15, 23, 42, 0.4)',

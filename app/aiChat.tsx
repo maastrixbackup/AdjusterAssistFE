@@ -90,7 +90,7 @@ function useKeyboardOffset() {
 }
 
 export default function AiChatScreen() {
-    const { fileId, claimNumber, clientName, credits } = useLocalSearchParams();
+    const { fileId, claimNumber, clientName, credits, initialData } = useLocalSearchParams();
     const { token } = useAuth();
     const insets = useSafeAreaInsets();
 
@@ -99,7 +99,9 @@ export default function AiChatScreen() {
     const [isLoading, setIsLoading] = useState(false);
 
     const [isMetaModalVisible, setIsMetaModalVisible] = useState(false);
-    const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(null);
+    const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(
+        initialData ? JSON.parse(initialData as string) : null
+    );
 
 
     const flatListRef = useRef<FlatList>(null);
@@ -122,8 +124,9 @@ export default function AiChatScreen() {
                 ai_response: draft.ai_response,
                 output_format: draft.content_type,
                 next_step_suggestion: draft.next_step_suggestion,
+                responseUsed: draft.response_used || false,
                 // quick_actions: draft.quick_actions || [],
-                quick_actions:  ["Copy", "Convert to File note", "Mark as used"],
+                quick_actions: ["Copy", "Convert to File note", "Mark as used"],
                 refinement: draft.refinement || ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
             }));
@@ -212,6 +215,13 @@ export default function AiChatScreen() {
                 quickActions={item.quick_actions}
                 outputFormat={item.output_format}
                 refinementOptions={item.refinement}
+                responseUsed={item.responseUsed}
+                onActionPress={(action) => {
+                    console.log(`Action "${action}" pressed for item ${item.id}`);
+                }}
+                onRefinementPress={(option) => {
+                    console.log(`Refinement "${option}" pressed for item ${item.id}`);
+                }} 
             />
             <ChatTimelineCard
                 category="Recommended Next Step"
@@ -245,7 +255,7 @@ export default function AiChatScreen() {
                             <Pressable
                                 onPress={() => router.push("/settings")}
                             >
-                                <View style={{ flexDirection: "row", alignItems: "center" ,backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12}}>
+                                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}>
                                     <Ionicons name="sparkles" size={14} color="#FDE68A" />
                                     <Text style={styles.creditText}>
                                         {credits ?? 0}
