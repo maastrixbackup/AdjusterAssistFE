@@ -1,9 +1,8 @@
 import { AllDraftsofUser, Draft } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect } from "expo-router"; // Added useFocusEffect
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import {
@@ -20,72 +19,68 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get('window');
-const SAVED_DATA_KEY = "@session_saved_drafts_data";
 
-type EnhancedDraft = Draft & { source: 'db' | 'session' };
+// ─── Small Utility for Relative Time ──────────────────────────────────────
+const getFormattedTime = (timestamp: string | number | Date) => {
+  if (!timestamp) return 'Just now';
+  const seconds = Math.floor((new Date().getTime() - new Date(timestamp).getTime()) / 1000);
+  if (seconds < 60) return 'Just now';
+  const intervals = [
+    { label: 'year', s: 31536000 },
+    { label: 'month', s: 2592000 },
+    { label: 'day', s: 86400 },
+    { label: 'hour', s: 3600 },
+    { label: 'min', s: 60 },
+  ];
+  for (const i of intervals) {
+    const count = Math.floor(seconds / i.s);
+    if (count >= 1) return `${count} ${i.label}${count > 1 ? 's' : ''} ago`;
+  }
+  return 'Just now';
+};
 
 export default function DraftsListScreen() {
   const { token } = useAuth();
-  const [drafts, setDrafts] = useState<EnhancedDraft[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Core data fetching logic
-  const fetchMergedHistory = useCallback(async (showLoading = true) => {
+  const fetchHistory = useCallback(async (showLoading = true) => {
     if (!token) return;
     try {
       if (showLoading) setLoading(true);
 
-      // 1. Fetch from DB
       const dbData = await AllDraftsofUser(token);
       const dbList: Draft[] = Array.isArray(dbData) ? dbData : (dbData as any).drafts || [];
-      const dbDrafts: EnhancedDraft[] = dbList.map(d => ({ ...d, source: 'db' }));
 
-      // 2. Fetch from Session Storage
-      const sessionRaw = await AsyncStorage.getItem(SAVED_DATA_KEY);
-      const sessionList: Draft[] = sessionRaw ? JSON.parse(sessionRaw) : [];
-      const sessionDrafts: EnhancedDraft[] = sessionList.map(d => ({ ...d, source: 'session' }));
-
-      // 3. Merge and De-duplicate
-      const combined = [...dbDrafts, ...sessionDrafts];
-      const uniqueMap = new Map<string, EnhancedDraft>();
-      
-      combined.forEach(item => {
-        const existing = uniqueMap.get(item.content);
-        if (!existing || (existing.source === 'session' && item.source === 'db')) {
-          uniqueMap.set(item.content, item);
-        }
-      });
-
-      const sorted = Array.from(uniqueMap.values()).sort((a, b) => 
+      // Sort by creation date descending
+      const sorted = dbList.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
       setDrafts(sorted);
     } catch (err) {
-      console.error("Error fetching merged history.", err);
+      console.error("Error fetching history from DB:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [token]);
 
-  // AUTO-REFRESH LOGIC: Fires whenever screen comes into view
   useFocusEffect(
     useCallback(() => {
-      fetchMergedHistory(drafts.length === 0); // Only show full-screen loader on first load
-    }, [fetchMergedHistory])
+      fetchHistory(drafts.length === 0);
+    }, [fetchHistory])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMergedHistory(false);
+    fetchHistory(false);
   };
 
-  const renderDraft = ({ item }: { item: EnhancedDraft }) => {
-    const isExternal = item.draft_type === 'email_insured' || item.draft_type ==="email_contractor" || item.draft_type === "xactanalysis_response" || item.draft_type === "supplement_response";
-    const isInternal = item.draft_type === 'file_note' || item.draft_type === 'escalation_response' || item.draft_type === 'coverage_analysis' || item.draft_type === 'denial_support' || item.draft_type === "claim_summary" || item.draft_type === "damage_evaluation";
-    const isSynced = item.source === 'db';
+  const renderDraft = ({ item }: { item: Draft }) => {
+    const isExternal = ['email_insured', 'email_contractor', 'xactanalysis_response', 'supplement_response'].includes(item.draft_type);
+    const isInternal = ['file_note', 'escalation_response', 'coverage_analysis', 'denial_support', 'claim_summary', 'damage_evaluation'].includes(item.draft_type);
     
     return (
       <Pressable 
@@ -98,11 +93,11 @@ export default function DraftsListScreen() {
             pathname: "/response",
             params: { 
               draftId: item.id?.toString(),
-              output_format: item.draft_type,
+              output_format: item.content_type,
               type: item.draft_type,
-              text: item.content,
+              text: item.ai_response,
               fileId: item.file_id?.toString(),
-              alreadySaved: isSynced ? "true" : "false",
+              alreadySaved: "true",
               created_at: item.created_at,
             }
           });
@@ -117,21 +112,15 @@ export default function DraftsListScreen() {
           <View style={styles.cardHeader}>
             <View style={styles.badgeRow}>
                 <View style={styles.typeBadge}>
-                    <Text style={styles.typeBadgeText}>{item.draft_type?.toUpperCase() || "DRAFT"}</Text>
+                    <Text style={styles.typeBadgeText}>{item.draft_type?.toUpperCase().replace('_', ' ') || "DRAFT"}</Text>
                 </View>
-                <View style={[styles.sourceTag, isSynced ? styles.syncedTag : styles.sessionTag]}>
-                    <Ionicons 
-                        name={isSynced ? "cloud-done" : "time-outline"} 
-                        size={8} 
-                        color={isSynced ? "#059669" : "#D97706"} 
-                    />
-                    <Text style={[styles.sourceTagText, { color: isSynced ? "#059669" : "#D97706" }]}>
-                        {isSynced ? "SYNCED" : "SESSION"}
-                    </Text>
+                <View style={[styles.sourceTag, styles.syncedTag]}>
+                    <Ionicons name="cloud-done" size={8} color="#059669" />
+                    <Text style={[styles.sourceTagText, { color: "#059669" }]}>SYNCED</Text>
                 </View>
             </View>
             <Text style={styles.dateText}>
-              {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              {getFormattedTime(item.created_at)}
             </Text>
           </View>
 
@@ -140,18 +129,16 @@ export default function DraftsListScreen() {
           )}
 
           <Text style={styles.contentPreview} numberOfLines={2}>
-            {item.content || "Empty draft content..."}
+            {item.ai_response || "No content available"}
           </Text>
 
           <View style={styles.cardFooter}>
             <View style={styles.footerInfo}>
-                <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
-                <Text style={styles.footerTime}>
-                    {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+                <Ionicons name="document-text-outline" size={12} color="#0058d3" />
+                <Text style={styles.openText}>{item.content_type?.toUpperCase() || "TEXT"}</Text>
             </View>
             <View style={styles.openAction}>
-                <Text style={styles.openText}>Review Draft</Text>
+                <Text style={styles.openText}>Review</Text>
                 <Ionicons name="chevron-forward" size={12} color="#0F4C9C" />
             </View>
           </View>
@@ -167,8 +154,6 @@ export default function DraftsListScreen() {
       <View style={styles.headerContainer}>
         <LinearGradient
             colors={["#156bdb", "#123C78", "#0B2F5B"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
         >
             <SafeAreaView edges={["top"]}>
@@ -176,12 +161,10 @@ export default function DraftsListScreen() {
                     <Pressable onPress={() => router.back()} style={styles.backCircle}>
                         <Ionicons name="arrow-back" size={20} color="#FFF" />
                     </Pressable>
-                    
                     <View style={styles.titleStack}>
-                        <Text style={styles.navSubtitle}>Intelligence Archive</Text>
+                        <Text style={styles.navSubtitle}>Database Archive</Text>
                         <Text style={styles.navTitle}>Generation Log</Text>
                     </View>
-
                     <View style={styles.claimBadge}>
                         <Text style={styles.claimText}>History</Text>
                     </View>
@@ -193,13 +176,13 @@ export default function DraftsListScreen() {
       {loading && !refreshing ? (
         <View style={styles.loaderCenter}>
           <ActivityIndicator size="small" color="#0F4C9C" />
-          <Text style={styles.loaderSub}>Syncing History...</Text>
+          <Text style={styles.loaderSub}>Fetching from Cloud...</Text>
         </View>
       ) : (
         <FlatList
           data={drafts}
           renderItem={renderDraft}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          keyExtractor={(item) => item.id?.toString()}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -207,17 +190,17 @@ export default function DraftsListScreen() {
           }
           ListHeaderComponent={
             <View style={styles.listHeader}>
-                <Text style={styles.headerCount}>{drafts.length} Total Logs</Text>
+                <Text style={styles.headerCount}>{drafts.length} Cloud Logs</Text>
                 <View style={styles.headerLine} />
             </View>
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
-                <MaterialCommunityIcons name="history" size={40} color="#CBD5E1" />
+                <MaterialCommunityIcons name="cloud-off-outline" size={40} color="#CBD5E1" />
               </View>
-              <Text style={styles.emptyTitle}>No History Found</Text>
-              <Text style={styles.emptySubtitle}>Your generated responses saved across all files will appear here.</Text>
+              <Text style={styles.emptyTitle}>Archive Empty</Text>
+              <Text style={styles.emptySubtitle}>All drafts saved to the database will appear here automatically.</Text>
             </View>
           }
         />
@@ -228,56 +211,21 @@ export default function DraftsListScreen() {
 
 const styles = StyleSheet.create({
   mainWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
-  headerContainer: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    overflow: 'hidden',
-    elevation: 10,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  headerGradient: {
-     paddingBottom: 18,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  navBar: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  backCircle: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    backgroundColor: 'rgba(255, 255, 255, 0.15)', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-  },
+  headerContainer: { borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden' },
+  headerGradient: { paddingBottom: 18 },
+  navBar: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  backCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.15)', alignItems: 'center', justifyContent: 'center' },
   titleStack: { alignItems: 'center' },
   navSubtitle: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 1 },
-  navTitle: { fontSize: width < 380 ? 16 : 19, fontWeight: '800', color: '#FFFFFF' }, // Responsive Title
+  navTitle: { fontSize: width < 380 ? 16 : 19, fontWeight: '800', color: '#FFFFFF' },
   claimBadge: { backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   claimText: { color: '#0F172A', fontSize: 11, fontWeight: '800' },
-  
   loaderCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loaderSub: { marginTop: 12, color: '#94A3B8', fontSize: 13, fontWeight: '600' },
-  
-  listContainer: { 
-    padding: 20, 
-    paddingBottom: 40,
-    alignSelf: 'center', // Center list for larger screens
-    width: '100%',
-    maxWidth: 600 // Responsive Max Width for tablets
-  },
+  listContainer: { padding: 20, paddingBottom: 40, width: '100%', maxWidth: 600, alignSelf: 'center' },
   listHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 },
   headerCount: { fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' },
   headerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
-
   draftCard: { 
     backgroundColor: '#FFF', 
     borderRadius: 20, 
@@ -286,10 +234,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1, 
     borderColor: '#E2E8F0',
-    ...Platform.select({
-      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 },
-      android: { elevation: 3 }
-    })
+    ...Platform.select({ ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 }, android: { elevation: 3 } })
   },
   typeIndicator: { width: 5 },
   cardMain: { flex: 1, padding: 16 },
@@ -297,39 +242,19 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   typeBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   typeBadgeText: { fontSize: 9, fontWeight: '900', color: '#475569' },
-  
   sourceTag: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5 },
   syncedTag: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
-  sessionTag: { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
   sourceTagText: { fontSize: 7, fontWeight: '900' },
-
   dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '700' },
   claimNoText: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 4 },
   contentPreview: { fontSize: 15, color: '#1E293B', fontWeight: '500', lineHeight: 22, marginBottom: 14 },
-  
-  cardFooter: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F8FAFC'
-  },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F8FAFC' },
   footerInfo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   footerTime: { fontSize: 11, color: '#94A3B8', fontWeight: '600' },
   openAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   openText: { fontSize: 13, color: '#0F4C9C', fontWeight: '800' },
-
   emptyContainer: { alignItems: 'center', marginTop: 80, paddingHorizontal: 40 },
-  emptyIconCircle: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: '#F1F5F9', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    marginBottom: 20
-  },
+  emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B' },
   emptySubtitle: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 8, lineHeight: 22 },
 });

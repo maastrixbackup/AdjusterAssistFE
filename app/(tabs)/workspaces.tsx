@@ -172,7 +172,7 @@ export default function WorkspacesScreen() {
             {/* Creating new workspace */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => setCreateModalVisible(true)} 
+              onPress={() => setCreateModalVisible(true)}
               style={styles.newWorkspaceBtn}
             >
               <LinearGradient
@@ -241,8 +241,12 @@ export default function WorkspacesScreen() {
             item={item}
             onPress={() =>
               router.push({
-                pathname: "/file-draft-history",
-                params: { fileId: item.id },
+                pathname: "/aiChat",
+                params: {
+                  fileId: item.id,
+                  claimNumber: item.claim_number || `CLM-${item.id}`,
+                  clientName: item.client_name
+                },
               })
             }
             onUpdate={(updateData) => handleUpdateFile(item.id, updateData)}
@@ -259,7 +263,7 @@ export default function WorkspacesScreen() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteModalVisible(false)}
       />
-      <CreateWorkspaceModal 
+      <CreateWorkspaceModal
         isVisible={isCreateModalVisible}
         onClose={() => setCreateModalVisible(false)}
         token={token}
@@ -269,7 +273,7 @@ export default function WorkspacesScreen() {
           setCreateModalVisible(false);
         }}
       />
-    {/* <Toaster/> */}
+      {/* <Toaster/> */}
     </View>
   );
 }
