@@ -50,11 +50,9 @@ export interface ClaimFile {
 
 // Data structure for creating a new file from the frontend
 export interface CreateFileRequest {
-  // Required Claim Identifiers
   claim_number: string; // Unique ID for the claim
   client_name: string; // Insured party's name
 
-  // Mandatory Insurance Metadata
   address: string; // Property location
   policy_form: string; // e.g., 'HO-3', 'HO-5'
   loss_type: string; // e.g., 'water', 'fire', 'wind'
@@ -81,19 +79,21 @@ export interface RecentDraft {
   client_name: string;
 }
 
-export interface Draft {
+export interface ClaimMessage {
   id: number;
-  file_id: number | string;
-  draft_type: string;
-  content_type: string;
-  next_step_suggestion?: string;
-  user_input?: string;
-  claim_state?: string;
+  workspace_id: number;
+  user_id: number;
+  user_input: string;
   ai_response: string;
-  quick_actions?: string[];
+  content_type: string; // e.g., 'email_insured', 'file_note'
+  claim_state: string;
+  next_step_suggestion?: string;
+  activity_type?: string;
+  image_input_url?: string | null;
+  quick_actions?: string[]; // JSONB maps to string array
+  response_used: boolean;
+  metadata?: any;
   created_at: string;
-  claim_number?: string;
-  client_name?: string;
 }
 
 export type GenerateResponseRequest = {
@@ -142,7 +142,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 const responseTypeLabels: Record<string, string> = {
   file_note: "File",
@@ -268,8 +268,8 @@ export const createFile = async (
 export async function getFileDrafts(
   token: string,
   fileId: number,
-): Promise<Draft[]> {
-  const res = await apiRequest<{ success: boolean; drafts: Draft[] }>(
+): Promise<ClaimMessage[]> {
+  const res = await apiRequest<{ success: boolean; drafts: ClaimMessage[] }>(
     `/files/${fileId}/drafts`,
     { method: "GET" },
     token,
@@ -393,18 +393,23 @@ export async function saveDraft(
 
 export async function updateDraft(
   token: string,
-  draftId: number | string,
-  updateData: { content?: string; output_format?: string },
-): Promise<{ success: boolean; draftId: number }> {
-  const res = await apiRequest<{ success: boolean; data: { draftId: number } }>(
-    `/drafts/update/${draftId}`,
+  id: number | string,
+  updateData: Partial<ClaimMessage>,
+): Promise<{ success: boolean; data: ClaimMessage }> {
+  const res = await apiRequest<{ success: boolean; data: ClaimMessage }>(
+    `/drafts/update/${id}`,
     {
-      method: "PUT",
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(updateData),
     },
     token,
   );
-  return { success: res.success, draftId: res.data.draftId };
+  console.log(`Draft ${id} updated successfully:`, res.data);
+
+  return res;
 }
 
 export async function deleteDraft(
@@ -468,13 +473,12 @@ export const getRecentDrafts = async (
 export const getDraftsByFile = async (
   token: string,
   fileId: number,
-): Promise<Draft[]> => {
+): Promise<ClaimMessage[]> => {
   try {
-    const response = await apiRequest<{ success: boolean; drafts: Draft[] }>(
-      `/files/${fileId}/drafts`,
-      { method: "GET" },
-      token,
-    );
+    const response = await apiRequest<{
+      success: boolean;
+      drafts: ClaimMessage[];
+    }>(`/files/${fileId}/drafts`, { method: "GET" }, token);
     return response.drafts || [];
   } catch (error) {
     console.error(`Error fetching drafts for file ${fileId}:`, error);
@@ -541,10 +545,30 @@ export const deleteFile = async (
   }
 };
 
-export const AllDraftsofUser = async (token: string): Promise<Draft[]> => {
+export const getFileById = async (
+  token: string,
+  fileId: number,
+): Promise<ClaimFile> => {
+  try {
+    const response = await apiRequest<{ success: boolean; file: ClaimFile }>(
+      `/files/${fileId}`,
+      { method: "GET" },
+      token,
+    );
+
+    return response.file; // Changed from .data to .file
+  } catch (error) {
+    console.error("Error in getFileById:", error);
+    throw error;
+  }
+};
+
+export const AllDraftsofUser = async (
+  token: string,
+): Promise<ClaimMessage[]> => {
   const response = await apiRequest<{
     success: boolean;
-    data: Draft[];
+    data: ClaimMessage[];
     count: number;
   }>("/drafts/history", {
     method: "GET",

@@ -1,13 +1,16 @@
 import { ChatInputSection } from '@/components/ChatInputSection';
 import { ChatTimelineCard } from '@/components/ChatTimelineCard';
 import { WorkspaceMetaModal } from '@/components/WorkspaceMetaModal';
-import { ClaimFile, getDraftsByFile } from '@/lib/api'; // Ensure this path matches your project structure
+import { ClaimFile, generateResponse, getDraftsByFile, getFileById, updateDraft, updateFile } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics'; // Recommended for premium feel
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
 import {
     ActivityIndicator,
     Animated,
@@ -17,12 +20,14 @@ import {
     Keyboard,
     Platform,
     Pressable,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 const { width } = Dimensions.get('window');
 
@@ -89,25 +94,25 @@ function useKeyboardOffset() {
 }
 
 export default function AiChatScreen() {
-    const { fileId, claimNumber, clientName, credits } = useLocalSearchParams();
+    const { fileId, claimNumber, clientName, credits, initialData } = useLocalSearchParams();
     const { token } = useAuth();
     const insets = useSafeAreaInsets();
 
     const [inputText, setInputText] = useState('');
     const [chatHistory, setChatHistory] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const [isMetaModalVisible, setIsMetaModalVisible] = useState(false);
-    const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(null);
-
-    const handleUpdateWorkspace = async (data: Partial<ClaimFile>) => {
-        // Your API call logic here (e.g., to your CSC-backend pricing/meta APIs)
-        console.log("Updating workspace with:", data);
-    };
+    const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(
+        initialData ? JSON.parse(initialData as string) : null
+    );
 
 
     const flatListRef = useRef<FlatList>(null);
     const keyboardOffset = useKeyboardOffset();
+
+
 
     // ─── Fetch Thread History ────────────────────────────────────────────────
     const loadThreadHistory = useCallback(async () => {
@@ -124,7 +129,10 @@ export default function AiChatScreen() {
                 ai_response: draft.ai_response,
                 output_format: draft.content_type,
                 next_step_suggestion: draft.next_step_suggestion,
-                quick_actions: draft.quick_actions || [],
+                responseUsed: draft.response_used || false,
+                // quick_actions: draft.quick_actions || [],
+                quick_actions: ["Copy", "Create Variant", "Mark as used"],
+                refinement: draft.refinement || ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
             }));
 
@@ -136,9 +144,29 @@ export default function AiChatScreen() {
         }
     }, [fileId, token]);
 
+    const loadFileDetails = useCallback(async () => {
+        if (!fileId || !token) {
+            console.warn("Missing fileId or token in loadFileDetails");
+            return;
+        }
+        try {
+            const fileData = await getFileById(token, Number(fileId));
+            // console.log("API Response for file:", fileData); // Check if this is undefined
+
+            if (fileData) {
+                setCurrentWorkspace(fileData);
+            } else {
+                console.error("API returned empty data for fileId:", fileId);
+            }
+        } catch (error) {
+            console.error("Error loading file metadata:", error);
+        }
+    }, [fileId, token]);
+
     useEffect(() => {
         loadThreadHistory();
-    }, [loadThreadHistory]);
+        loadFileDetails();
+    }, [loadThreadHistory, loadFileDetails]);
 
     const scrollToBottom = useCallback((animated = true) => {
         requestAnimationFrame(() => {
@@ -146,35 +174,212 @@ export default function AiChatScreen() {
         });
     }, []);
 
-    const handleSend = () => {
+    const handleSend = useCallback(async () => {
+        // 1. Validations
+        if (!token) return router.replace("/(auth)/login");
         if (!inputText.trim()) return;
+        if (!fileId) return toast.warning("Workspace context missing.");
 
-        // Logic for sending new prompt would go here (API call to generate new draft)
-        console.log('Sending to file:', fileId, 'Content:', inputText);
-        setInputText('');
+        // 2. Start Loading & Haptics
+        setIsGenerating(true);
+        Keyboard.dismiss();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        try {
+            const payload = {
+                fileId: Number(fileId),
+                // Use existing request text or empty string if not used
+                userInput: inputText.trim(),
+                // Add image logic here if you decide to implement attachments
+                image: null,
+            };
+
+            // 3. Call API (Same call as onGenerate)
+            // Note: Using generateResponse from your lib/api
+            const result = await generateResponse(token, payload);
+
+            if (result) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+                // 4. Clear Input
+                setInputText("");
+
+                // 5. Refresh Data (fetches the list including the new AI response)
+                await loadThreadHistory();
+
+                // 6. Smooth Scroll to bottom
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 300);
+
+                toast.success("Response added to timeline");
+            }
+        } catch (error: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            toast.error(error?.message || "Generation failed");
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [token, fileId, inputText, loadThreadHistory]);
+
+    const handleUpdateWorkspace = async (updatedData: Partial<ClaimFile>) => {
+        if (!fileId || !token) return;
+
+        try {
+            // Optimistic UI update
+            setCurrentWorkspace(prev => prev ? { ...prev, ...updatedData } : null);
+
+            await updateFile(token, Number(fileId), updatedData);
+            console.log("Workspace updated successfully");
+            toast.success("Workspace updated successfully");
+
+            // Refresh data from server to ensure sync
+            await loadFileDetails();
+        } catch (error) {
+            console.error("Failed to update workspace:", error);
+            toast.error("Failed to update workspace");
+            // Rollback on error if necessary
+        }
     };
+
+    const handleQuickAction = useCallback(async (action: string, draftId: number, content: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        switch (action) {
+            case "Copy":
+                await Clipboard.setStringAsync(content);
+                toast.success("Copied to clipboard", {
+                    description: "The AI response is ready to paste."
+                });
+                break;
+
+            case "Mark as used":
+                try {
+                    // 1. Trigger the API call
+                    const response = await updateDraft(token!, draftId, {
+                        response_used: true
+                    });
+
+                    if (response.success) {
+                        toast.success("Interaction Updated");
+
+                        // 2. SMOOTH REFRESH: Update local state instead of re-fetching
+                        setChatHistory(prevHistory =>
+                            prevHistory.map(item =>
+                                item.id === draftId
+                                    ? { ...item, responseUsed: true }
+                                    : item
+                            )
+                        );
+                    }
+                } catch (error) {
+                    console.error("Failed to update interaction:", error);
+                    toast.error("Update failed");
+                }
+                break;
+
+            case "Create Variant":
+                console.log(`Convert to File note clicked for ID: ${draftId}`);
+                toast.info("Processing...", {
+                    description: "Converting response to official file note."
+                });
+                break;
+
+            default:
+                console.log(`Unknown action: ${action} for ID: ${draftId}`);
+                break;
+        }
+    }, [token, setChatHistory]);
+
+    const handleRefinement = useCallback(async (option: string, originalContent: string) => {
+        // 1. Tactile feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        let instruction = "";
+        switch (option) {
+            case "Shorten":
+                instruction = "Please shorten the previous response while keeping the key facts.";
+                break;
+            case "Make more formal":
+                instruction = "Rewrite the previous response to be more professional and formal.";
+                break;
+            case "Make attornary facing":
+                instruction = "Adjust the tone of the previous response to be suitable for an attorney correspondence.";
+                break;
+            case "Make more firm":
+                instruction = "Make the tone of the response more firm and assertive.";
+                break;
+            case "Add DOI safe language":
+                instruction = "Rewrite the response ensuring it includes DOI (Department of Insurance) compliant and safe language.";
+                break;
+            default:
+                instruction = `${option}: ${originalContent}`;
+        }
+
+        // 3. Optional: Set the input text so the user sees what's happening
+        setInputText(instruction);
+
+        // 4. Trigger the send logic automatically
+        // We wrap this in a timeout to ensure setInputText has finished if needed, 
+        // or you can call your API directly here.
+        toast.info(`Refining: ${option}`);
+
+        // Suggestion: Call your onSend logic directly with the instruction
+        // await onSend(instruction); 
+
+        console.log(`Refining ID with instruction: ${instruction}`);
+    }, [token, fileId]);
+
+    const onShare = useCallback(async (content: string) => {
+        try {
+            const result = await Share.share({
+                message: content,
+                title: 'AdjusterAssist Claim Update',
+            });
+
+            if (result.action === Share.sharedAction) {
+                if (result.activityType) {
+                    // shared with a specific activity type on iOS
+                    console.log('Shared via:', result.activityType);
+                } else {
+                    // shared
+                    toast.success("Content shared successfully");
+                }
+            } else if (result.action === Share.dismissedAction) {
+                // dismissed
+            }
+        } catch (error: any) {
+            toast.error("Sharing failed", { description: error.message });
+        }
+    }, []);
 
     const renderItem = useCallback(({ item }: { item: any }) => (
         <View style={styles.turnGroup}>
             <ChatTimelineCard
                 category="USER INPUT"
-                title="Input"
+                title=""
                 content={item.user_input}
                 color="#94A3B8"
+                quickActions={["Copy"]}
                 timeAgo={getFormattedTime(item.created_at)}
             />
             <ChatTimelineCard
                 category="AI RESPONSE"
-                title="Response"
+                title=""
                 content={item.ai_response}
                 color="#3B82F6"
                 timeAgo="Generated"
                 quickActions={item.quick_actions}
                 outputFormat={item.output_format}
+                refinementOptions={item.refinement}
+                responseUsed={item.responseUsed}
+                onActionPress={(action) => handleQuickAction(action, item.id, item.ai_response || "")}
+                onRefinementPress={(option) => handleRefinement(option, item.ai_response || "")}
+                onSharePress={() => onShare(item.ai_response || "")}
             />
             <ChatTimelineCard
-                category="Recommended Next Step"
-                title="Follow up Suggestion"
+                category="Suggestions"
+                title="Recommended Next Step"
                 content={item.next_step_suggestion}
                 color="#10B981"
                 timeAgo={getFormattedTime(item.created_at)}
@@ -201,16 +406,19 @@ export default function AiChatScreen() {
                         </TouchableOpacity>
                         <Text style={styles.logoTextMain}>Adjuster<Text style={styles.logoTextAccent}>Assist</Text></Text>
                         <TouchableOpacity activeOpacity={0.6}>
-                            <Pressable
-                                onPress={() => router.push("/settings")}
-                            >
-                                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                    <Ionicons name="sparkles" size={14} color="#FDE68A" />
-                                    <Text style={styles.creditText}>
-                                        {credits ?? 0}
-                                    </Text>
-                                </View>
-                            </Pressable>
+                            {credits !== undefined && (
+                                <Pressable
+                                    onPress={() => router.push("/settings")}
+                                >
+                                    <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}>
+                                        <Ionicons name="sparkles" size={14} color="#FDE68A" />
+                                        <Text style={styles.creditText}>
+                                            {credits ?? 0}
+                                        </Text>
+                                        {/* <Text style={{ color: "#FDE68A", fontSize: 11, marginLeft: 4 }}>Credits</Text> */}
+                                    </View>
+                                </Pressable>
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -220,7 +428,7 @@ export default function AiChatScreen() {
                                 <View style={styles.pulseDot} />
                                 <Text style={styles.claimNoText}>{claimNumber || 'New Workspace'}</Text>
                             </View>
-                            <Text style={styles.clientText}>{clientName || 'Unassigned'}</Text>
+                            <Text style={styles.clientText}>{clientName || currentWorkspace?.client_name}</Text>
                         </View>
                         <TouchableOpacity
                             style={styles.workspaceBtn}
@@ -268,10 +476,12 @@ export default function AiChatScreen() {
                 inputText={inputText}
                 setInputText={setInputText}
                 onSend={handleSend}
-                onFocus={() => setTimeout(() => scrollToBottom(true), 150)}
+                onFocus={() => { }}
                 keyboardOffset={keyboardOffset}
                 dynamicBottomPadding={dynamicBottomPadding}
+                disabled={isGenerating}
             />
+
             <WorkspaceMetaModal
                 isVisible={isMetaModalVisible}
                 onClose={() => setIsMetaModalVisible(false)}
@@ -298,7 +508,7 @@ const styles = StyleSheet.create({
     topNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     logoTextMain: { color: '#FFF', fontSize: 20, fontWeight: '800' },
     logoTextAccent: { color: '#3B82F6' },
-    navCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    navCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.04)', justifyContent: 'center', alignItems: 'center' },
     workspaceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     infoBlock: { flex: 1 },
     claimBadge: { backgroundColor: 'rgba(59, 130, 246, 0.2)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -319,6 +529,4 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         marginLeft: 6,
     },
-
-
 });
