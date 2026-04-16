@@ -142,7 +142,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<string, string> = {
   file_note: "File",
@@ -283,7 +283,7 @@ export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest,
 ): Promise<GenerateResponseResult> {
-  console.log("Generating response with payload:", payload);
+  // console.log("Generating response with payload:", payload);
 
   const res = await apiRequest<{
     success: boolean;

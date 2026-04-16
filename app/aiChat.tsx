@@ -251,7 +251,7 @@ export default function AiChatScreen() {
             const variantType = action.replace("Variant: ", "");
             // console.log(`Creating variant of type: ${variantType} for draft ID: ${draftId}`);
 
-            setIsGenerating(true); 
+            setIsGenerating(true);
             try {
                 const payload = {
                     fileId: Number(fileId),
@@ -265,7 +265,7 @@ export default function AiChatScreen() {
                     toast.success(`${variantType} Created`, {
                         description: "Added to your claim timeline."
                     });
-                    await loadThreadHistory(); 
+                    await loadThreadHistory();
                 }
             } catch (error: any) {
                 toast.error(error?.message || "Failed to create variant");
@@ -318,43 +318,57 @@ export default function AiChatScreen() {
     }, [token, fileId, setChatHistory]);
 
     const handleRefinement = useCallback(async (option: string, originalContent: string) => {
-        // 1. Tactile feedback
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.selectionAsync();
 
-        let instruction = "";
+        let refinementPrompt = "";
         switch (option) {
             case "Shorten":
-                instruction = "Please shorten the previous response while keeping the key facts.";
+                refinementPrompt = "Concise Summary: Rewrite the following claim content to be brief and punchy, removing fluff while retaining all dates, figures, and technical facts.";
                 break;
             case "Make more formal":
-                instruction = "Rewrite the previous response to be more professional and formal.";
+                refinementPrompt = "Professional Polish: Elevate the tone of the following content to be highly professional, objective, and suitable for high-level corporate reporting.";
                 break;
             case "Make attornary facing":
-                instruction = "Adjust the tone of the previous response to be suitable for an attorney correspondence.";
+                refinementPrompt = "Legal/Attorney Correspondence: Adjust this text to be legally precise, objective, and cautious. Focus on factual evidence and policy language suitable for sharing with legal counsel.";
                 break;
             case "Make more firm":
-                instruction = "Make the tone of the response more firm and assertive.";
+                refinementPrompt = "Assertive Tone: Rewrite this to be more firm and decisive. Use 'active voice' and clear directives, typical for an adjuster setting expectations with a contractor or policyholder.";
                 break;
             case "Add DOI safe language":
-                instruction = "Rewrite the response ensuring it includes DOI (Department of Insurance) compliant and safe language.";
+                refinementPrompt = "Regulatory Compliance: Revise the following text to ensure it uses DOI-compliant terminology. Ensure it sounds fair, objective, and avoids 'bad faith' triggers or inflammatory language.";
                 break;
             default:
-                instruction = `${option}: ${originalContent}`;
+                refinementPrompt = `Refine this content for ${option}:`;
         }
 
-        // 3. Optional: Set the input text so the user sees what's happening
-        setInputText(instruction);
+        setIsGenerating(true);
+        try {
+            const payload = {
+                fileId: Number(fileId),
+                // Improved Prompt Structure: Role + Task + Context + Content
+                userInput: `[SYSTEM: REFINEMENT MODE]\n\nTASK: ${refinementPrompt}\n\nORIGINAL CONTENT TO TRANSFORM:\n"${originalContent}"`,
+            };
 
-        // 4. Trigger the send logic automatically
-        // We wrap this in a timeout to ensure setInputText has finished if needed, 
-        // or you can call your API directly here.
-        toast.info(`Refining: ${option}`);
+            const result = await generateResponse(token!, payload);
 
-        // Suggestion: Call your onSend logic directly with the instruction
-        // await onSend(instruction); 
+            if (result) {
+                toast.success(`${option} Applied`, {
+                    description: "The refined version is now in your timeline."
+                });
+                await loadThreadHistory();
 
-        console.log(`Refining ID with instruction: ${instruction}`);
-    }, [token, fileId]);
+                // Optional: Scroll to bottom after state update
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 500);
+            }
+        } catch (error) {
+            console.error("Refinement error:", error);
+            toast.error("Refinement failed");
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [token, fileId, loadThreadHistory]);
 
     const onShare = useCallback(async (content: string) => {
         try {
