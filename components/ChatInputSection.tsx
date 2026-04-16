@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,10 +17,18 @@ import {
   View,
 } from 'react-native';
 
+// Structure compatible with FormData
+export interface Attachment {
+  uri: string;
+  name: string;
+  type: string;
+  kind: 'image' | 'pdf';
+}
+
 interface ChatInputProps {
   inputText: string;
   setInputText: (text: string) => void;
-  onSend: () => void;
+  onSend: (attachments: Attachment[]) => void; 
   onFocus: () => void;
   keyboardOffset: Animated.Value;
   dynamicBottomPadding: Animated.AnimatedAddition<number> | Animated.AnimatedInterpolation<number>;
@@ -33,15 +45,66 @@ export const ChatInputSection = ({
   disabled,
 }: ChatInputProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedAttachments, setSelectedAttachments] = useState<Attachment[]>([]);
   const sendScale = React.useRef(new Animated.Value(1)).current;
+
+  // 1. Updated Image Picker (FormData ready)
+  const pickImages = async () => {
+    setMenuVisible(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.8, 
+    });
+
+    if (!result.canceled) {
+      const newImages: Attachment[] = result.assets.map(asset => ({
+        uri: asset.uri,
+        // Standardize name for backend
+        name: asset.fileName || `img_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+        kind: 'image'
+      }));
+      setSelectedAttachments(prev => [...prev, ...newImages]);
+    }
+  };
+
+  // 2. Updated Document Picker (FormData ready - no Base64 needed)
+  const pickDocs = async () => {
+    setMenuVisible(false);
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      multiple: true,
+    });
+
+    if (!result.canceled) {
+      const newDocs: Attachment[] = result.assets.map(asset => ({
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/pdf',
+        kind: 'pdf'
+      }));
+      setSelectedAttachments(prev => [...prev, ...newDocs]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setSelectedAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSendPress = () => {
     Animated.sequence([
       Animated.timing(sendScale, { toValue: 0.9, duration: 45, useNativeDriver: true }),
       Animated.spring(sendScale, { toValue: 1, friction: 4, tension: 40, useNativeDriver: true }),
     ]).start();
-    onSend();
+    
+    // Pass the array of attachments to the parent handleSend
+    onSend(selectedAttachments);
+    setSelectedAttachments([]); // Clear UI after sending
   };
+
+  // Text is mandatory, images/pdfs are optional
+  const isSendDisabled = !inputText.trim();
 
   return (
     <>
@@ -51,6 +114,35 @@ export const ChatInputSection = ({
           { paddingBottom: Animated.add(keyboardOffset, dynamicBottomPadding) },
         ]}
       >
+        {/* Preview Section */}
+        {selectedAttachments.length > 0 && (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={styles.previewContainer}
+            contentContainerStyle={styles.previewContent}
+          >
+            {selectedAttachments.map((item, index) => (
+              <View key={index} style={styles.previewItem}>
+                {item.kind === 'image' ? (
+                  <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+                ) : (
+                  <View style={[styles.thumbnail, styles.pdfThumbnail]}>
+                    <Ionicons name="document-text" size={20} color="#004B93" />
+                    <Text numberOfLines={1} style={styles.pdfText}>{item.name}</Text>
+                  </View>
+                )}
+                <TouchableOpacity 
+                  style={styles.removeBtn} 
+                  onPress={() => removeAttachment(index)}
+                >
+                  <Ionicons name="close-circle" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+
         <View style={styles.inputCard}>
           <TouchableOpacity
             style={styles.attachBtn}
@@ -79,8 +171,8 @@ export const ChatInputSection = ({
 
             <Animated.View style={{ transform: [{ scale: sendScale }] }}>
               <TouchableOpacity
-                style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-                disabled={!inputText.trim()}
+                style={[styles.sendBtn, (isSendDisabled || disabled) && styles.sendBtnDisabled]}
+                disabled={isSendDisabled || disabled}
                 onPress={handleSendPress}
                 activeOpacity={0.8}
               >
@@ -95,18 +187,19 @@ export const ChatInputSection = ({
         </View>
       </Animated.View>
 
-      {/* Upload Selection Dialog */}
       <Modal visible={menuVisible} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.menuContainer}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+            <TouchableOpacity style={styles.menuItem} onPress={pickImages}>
               <Ionicons name="image-outline" size={20} color="#003366" />
-              <Text style={styles.menuText}>Upload Image</Text>
+              <Text style={styles.menuText}>Upload Photos</Text>
             </TouchableOpacity>
+            
             <View style={styles.menuSeparator} />
-            <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+            
+            <TouchableOpacity style={styles.menuItem} onPress={pickDocs}>
               <Ionicons name="document-text-outline" size={20} color="#003366" />
-              <Text style={styles.menuText}>Upload Document</Text>
+              <Text style={styles.menuText}>Upload Documents</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -117,6 +210,13 @@ export const ChatInputSection = ({
 
 const styles = StyleSheet.create({
   inputWrapper: { paddingHorizontal: 16, paddingTop: 10, backgroundColor: '#F8FAFC' },
+  previewContainer: { marginBottom: 10, maxHeight: 70 },
+  previewContent: { gap: 10, paddingRight: 20 },
+  previewItem: { width: 60, height: 60, position: 'relative' },
+  thumbnail: { width: '100%', height: '100%', borderRadius: 12, backgroundColor: '#E2E8F0' },
+  pdfThumbnail: { justifyContent: 'center', alignItems: 'center', padding: 4, borderWidth: 1, borderColor: '#CBD5E1' },
+  pdfText: { fontSize: 8, color: '#475569', marginTop: 2, textAlign: 'center' },
+  removeBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: '#FFF', borderRadius: 10 },
   inputCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,10 +237,8 @@ const styles = StyleSheet.create({
   micBtn: { padding: 8 },
   sendBtn: { backgroundColor: '#003366', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#CBD5E1' },
-
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'flex-end', paddingBottom: 110, paddingHorizontal: 25 },
-  menuContainer: { backgroundColor: '#FFF', borderRadius: 20, padding: 8, width: 200, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  menuContainer: { backgroundColor: '#FFF', borderRadius: 20, padding: 8, width: 220, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
   menuItem: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
   menuText: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
   menuSeparator: { height: 1, backgroundColor: '#F1F5F9', marginHorizontal: 8 },

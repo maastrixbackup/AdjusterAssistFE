@@ -33,6 +33,7 @@ export const ChatTimelineCard = ({
 }: ChatTimelineCardProps) => {
 
   const [showRefinements, setShowRefinements] = useState(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
 
   const animatedValue = useRef(new Animated.Value(1)).current;
 
@@ -114,7 +115,7 @@ export const ChatTimelineCard = ({
             style={[
               styles.cardDescription,
               {
-                fontStyle: isAI ? 'italic' : 'normal', 
+                fontStyle: isAI ? 'italic' : 'normal',
                 color: '#0a2447'
               }
             ]}
@@ -132,7 +133,11 @@ export const ChatTimelineCard = ({
                     key={index}
                     onPress={(e) => {
                       e.stopPropagation();
-                      onActionPress?.(action);
+                      if (action === "Create Variant") {
+                        setShowVariantModal(true);
+                      } else {
+                        onActionPress?.(action);
+                      }
                     }}
                     style={({ pressed }) => [
                       styles.actionBadge,
@@ -221,6 +226,50 @@ export const ChatTimelineCard = ({
               </TouchableOpacity>
             </Animated.View>
           </View>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={showVariantModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowVariantModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowVariantModal(false)}
+        >
+          <Animated.View style={styles.variantSheet}>
+            <View style={styles.dragHandle} />
+
+            <View style={styles.sheetHeader}>
+              <Text style={styles.menuTitle}>Create Variant</Text>
+              <Text style={styles.menuSubtitle}>Select the format for this claim record</Text>
+            </View>
+
+            <View style={styles.variantGrid}>
+              {[
+                { id: 'file_note', label: 'File Note', icon: 'file-text' },
+                { id: 'email', label: 'Email', icon: 'mail' },
+                { id: 'xa_note', label: 'XA Note', icon: 'zap' },
+                { id: 'attorney', label: 'Attorney Response', icon: 'shield' },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.variantOption}
+                  onPress={() => {
+                    console.log("Selected Variant:", item.id);
+                    onActionPress?.(`Variant: ${item.label}`); // Pass back to parent
+                    setShowVariantModal(false);
+                  }}
+                >
+                  <View style={styles.variantIconCircle}>
+                    <Feather name={item.icon as any} size={22} color="#3B82F6" />
+                  </View>
+                  <Text style={styles.variantLabel}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
         </Pressable>
       </Modal>
     </Pressable>
@@ -501,6 +550,43 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     fontWeight: '600',
+    color: '#1E293B',
+  },
+  variantSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    width: '100%',
+  },
+  variantGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  variantOption: {
+    width: '48%', // Creates a 2x2 grid
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  variantIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  variantLabel: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#1E293B',
   },
 });

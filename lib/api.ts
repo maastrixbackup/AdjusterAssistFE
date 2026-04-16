@@ -142,7 +142,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<string, string> = {
   file_note: "File",
@@ -170,9 +170,14 @@ async function apiRequest<T>(
   }
 
   const url = `${API_BASE_URL}${path}`;
-  const headers = {
-    "Content-Type": "application/json",
+  const isFormData = init.body instanceof FormData;
+  const headers: any = {
+    ...(!isFormData && { "Content-Type": "application/json" }),
+
+    // 2. Add Auth token
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+
+    // 3. Add any other custom headers
     ...(init.headers ?? {}),
   };
 
@@ -278,12 +283,11 @@ export async function getFileDrafts(
 }
 
 /* --- Generation, Saving & Subscription --- */
-
 export async function generateResponse(
   token: string,
-  payload: GenerateResponseRequest,
+  payload: GenerateResponseRequest | FormData,
 ): Promise<GenerateResponseResult> {
-  console.log("Generating response with payload:", payload);
+  const isFormData = payload instanceof FormData;
 
   const res = await apiRequest<{
     success: boolean;
@@ -299,7 +303,9 @@ export async function generateResponse(
     "/drafts/generate",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: isFormData ? payload : JSON.stringify(payload),
+      // We pass custom headers here, but apiRequest MUST not override them with JSON
+      headers: isFormData ? { Authorization: `Bearer ${token}` } : undefined,
     },
     token,
   );
@@ -308,14 +314,22 @@ export async function generateResponse(
     throw new Error("Backend did not provide output_format");
   }
 
-  const outputType = res.data.output_format;
+  // Type-safe extraction of fileId for the return object
+  let extractedFileId: number | string;
+  if (isFormData) {
+    // Access the internal parts array safely using 'any'
+    const parts = (payload as any)._parts;
+    const fileIdPart = parts.find((p: any[]) => p[0] === "fileId");
+    extractedFileId = Number(fileIdPart?.[1]);
+  } else {
+    extractedFileId = (payload as GenerateResponseRequest).fileId;
+  }
 
   return {
-    output_format: outputType,
-    responseTypeLabel:
-      responseTypeLabels[outputType] || res.data.output_format || "Response",
+    output_format: res.data.output_format,
+    responseTypeLabel: responseTypeLabels[res.data.output_format] || "Response",
     responseText: res.data.content,
-    fileId: payload.fileId,
+    fileId: extractedFileId,
     nextStep: res.data.next_step,
     logId: res.data.log_id,
     createdAt: res.data.created_at,

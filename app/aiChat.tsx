@@ -174,10 +174,14 @@ export default function AiChatScreen() {
         });
     }, []);
 
-    const handleSend = useCallback(async () => {
+    const handleSend = useCallback(async (attachments: any[] = []) => {
         // 1. Validations
         if (!token) return router.replace("/(auth)/login");
-        if (!inputText.trim()) return;
+
+        if (!inputText.trim()) {
+            return toast.warning("Please enter a message.");
+        }
+
         if (!fileId) return toast.warning("Workspace context missing.");
 
         // 2. Start Loading & Haptics
@@ -186,28 +190,33 @@ export default function AiChatScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
-            const payload = {
-                fileId: Number(fileId),
-                // Use existing request text or empty string if not used
-                userInput: inputText.trim(),
-                // Add image logic here if you decide to implement attachments
-                image: null,
-            };
+            // 3. Construct FormData instead of a JSON object
+            const formData = new FormData();
 
-            // 3. Call API (Same call as onGenerate)
-            // Note: Using generateResponse from your lib/api
-            const result = await generateResponse(token, payload);
+            // Append text fields
+            formData.append('fileId', fileId.toString());
+            formData.append('userInput', inputText.trim());
+
+            attachments.forEach((file) => {
+                formData.append('attachments', {
+                    uri: Platform.OS === 'android' ? file.uri : file.uri.replace('file://', ''),
+                    type: file.type || 'image/jpeg',
+                    name: file.name || 'upload.jpg',
+                } as any);
+            });
+
+            const result = await generateResponse(token, formData);
 
             if (result) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-                // 4. Clear Input
+                // 6. Clear Input
                 setInputText("");
 
-                // 5. Refresh Data (fetches the list including the new AI response)
+                // 7. Refresh Data
                 await loadThreadHistory();
 
-                // 6. Smooth Scroll to bottom
+                // 8. Smooth Scroll to bottom
                 setTimeout(() => {
                     flatListRef.current?.scrollToEnd({ animated: true });
                 }, 300);
@@ -216,6 +225,7 @@ export default function AiChatScreen() {
             }
         } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            console.log(error)
             toast.error(error?.message || "Generation failed");
         } finally {
             setIsGenerating(false);
@@ -243,8 +253,39 @@ export default function AiChatScreen() {
     };
 
     const handleQuickAction = useCallback(async (action: string, draftId: number, content: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // Using selectionAsync for more reliable haptic feedback on Android
+        Haptics.selectionAsync();
 
+        // 1. Check if the action is a result from the "Create Variant" Modal
+        if (action.startsWith("Variant: ")) {
+            const variantType = action.replace("Variant: ", "");
+            // console.log(`Creating variant of type: ${variantType} for draft ID: ${draftId}`);
+
+            setIsGenerating(true);
+            try {
+                const payload = {
+                    fileId: Number(fileId),
+                    userInput: `Convert the following response into a ${variantType} format: \n\n ${content}`,
+                    // activity_type: variantType.toLowerCase().replace(" ", "_") // Optional: set metadata
+                };
+
+                const result = await generateResponse(token!, payload);
+
+                if (result) {
+                    toast.success(`${variantType} Created`, {
+                        description: "Added to your claim timeline."
+                    });
+                    await loadThreadHistory();
+                }
+            } catch (error: any) {
+                toast.error(error?.message || "Failed to create variant");
+            } finally {
+                setIsGenerating(false);
+            }
+            return;
+        }
+
+        // 2. Standard Quick Actions
         switch (action) {
             case "Copy":
                 await Clipboard.setStringAsync(content);
@@ -255,15 +296,13 @@ export default function AiChatScreen() {
 
             case "Mark as used":
                 try {
-                    // 1. Trigger the API call
                     const response = await updateDraft(token!, draftId, {
                         response_used: true
                     });
 
                     if (response.success) {
                         toast.success("Interaction Updated");
-
-                        // 2. SMOOTH REFRESH: Update local state instead of re-fetching
+                        // Update local state for immediate UI feedback
                         setChatHistory(prevHistory =>
                             prevHistory.map(item =>
                                 item.id === draftId
@@ -279,56 +318,67 @@ export default function AiChatScreen() {
                 break;
 
             case "Create Variant":
-                console.log(`Convert to File note clicked for ID: ${draftId}`);
-                toast.info("Processing...", {
-                    description: "Converting response to official file note."
-                });
+                console.log("Variant Modal opened in Card UI");
                 break;
 
             default:
                 console.log(`Unknown action: ${action} for ID: ${draftId}`);
                 break;
         }
-    }, [token, setChatHistory]);
+    }, [token, fileId, setChatHistory]);
 
     const handleRefinement = useCallback(async (option: string, originalContent: string) => {
-        // 1. Tactile feedback
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.selectionAsync();
 
-        let instruction = "";
+        let refinementPrompt = "";
         switch (option) {
             case "Shorten":
-                instruction = "Please shorten the previous response while keeping the key facts.";
+                refinementPrompt = "Concise Summary: Rewrite the following claim content to be brief and punchy, removing fluff while retaining all dates, figures, and technical facts.";
                 break;
             case "Make more formal":
-                instruction = "Rewrite the previous response to be more professional and formal.";
+                refinementPrompt = "Professional Polish: Elevate the tone of the following content to be highly professional, objective, and suitable for high-level corporate reporting.";
                 break;
             case "Make attornary facing":
-                instruction = "Adjust the tone of the previous response to be suitable for an attorney correspondence.";
+                refinementPrompt = "Legal/Attorney Correspondence: Adjust this text to be legally precise, objective, and cautious. Focus on factual evidence and policy language suitable for sharing with legal counsel.";
                 break;
             case "Make more firm":
-                instruction = "Make the tone of the response more firm and assertive.";
+                refinementPrompt = "Assertive Tone: Rewrite this to be more firm and decisive. Use 'active voice' and clear directives, typical for an adjuster setting expectations with a contractor or policyholder.";
                 break;
             case "Add DOI safe language":
-                instruction = "Rewrite the response ensuring it includes DOI (Department of Insurance) compliant and safe language.";
+                refinementPrompt = "Regulatory Compliance: Revise the following text to ensure it uses DOI-compliant terminology. Ensure it sounds fair, objective, and avoids 'bad faith' triggers or inflammatory language.";
                 break;
             default:
-                instruction = `${option}: ${originalContent}`;
+                refinementPrompt = `Refine this content for ${option}:`;
         }
 
-        // 3. Optional: Set the input text so the user sees what's happening
-        setInputText(instruction);
+        setIsGenerating(true);
+        try {
+            const payload = {
+                fileId: Number(fileId),
+                // Improved Prompt Structure: Role + Task + Context + Content
+                userInput: `[SYSTEM: REFINEMENT MODE]\n\nTASK: ${refinementPrompt}\n\nORIGINAL CONTENT TO TRANSFORM:\n"${originalContent}"`,
+            };
 
-        // 4. Trigger the send logic automatically
-        // We wrap this in a timeout to ensure setInputText has finished if needed, 
-        // or you can call your API directly here.
-        toast.info(`Refining: ${option}`);
+            const result = await generateResponse(token!, payload);
 
-        // Suggestion: Call your onSend logic directly with the instruction
-        // await onSend(instruction); 
+            if (result) {
+                toast.success(`${option} Applied`, {
+                    description: "The refined version is now in your timeline."
+                });
+                await loadThreadHistory();
 
-        console.log(`Refining ID with instruction: ${instruction}`);
-    }, [token, fileId]);
+                // Optional: Scroll to bottom after state update
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 500);
+            }
+        } catch (error) {
+            console.error("Refinement error:", error);
+            toast.error("Refinement failed");
+        } finally {
+            setIsGenerating(false);
+        }
+    }, [token, fileId, loadThreadHistory]);
 
     const onShare = useCallback(async (content: string) => {
         try {
