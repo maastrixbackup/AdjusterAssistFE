@@ -174,10 +174,14 @@ export default function AiChatScreen() {
         });
     }, []);
 
-    const handleSend = useCallback(async () => {
+    const handleSend = useCallback(async (attachments: any[] = []) => {
         // 1. Validations
         if (!token) return router.replace("/(auth)/login");
-        if (!inputText.trim()) return;
+
+        if (!inputText.trim()) {
+            return toast.warning("Please enter a message.");
+        }
+
         if (!fileId) return toast.warning("Workspace context missing.");
 
         // 2. Start Loading & Haptics
@@ -186,28 +190,33 @@ export default function AiChatScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
-            const payload = {
-                fileId: Number(fileId),
-                // Use existing request text or empty string if not used
-                userInput: inputText.trim(),
-                // Add image logic here if you decide to implement attachments
-                image: null,
-            };
+            // 3. Construct FormData instead of a JSON object
+            const formData = new FormData();
 
-            // 3. Call API (Same call as onGenerate)
-            // Note: Using generateResponse from your lib/api
-            const result = await generateResponse(token, payload);
+            // Append text fields
+            formData.append('fileId', fileId.toString());
+            formData.append('userInput', inputText.trim());
+
+            attachments.forEach((file) => {
+                formData.append('attachments', {
+                    uri: Platform.OS === 'android' ? file.uri : file.uri.replace('file://', ''),
+                    type: file.type || 'image/jpeg',
+                    name: file.name || 'upload.jpg',
+                } as any);
+            });
+
+            const result = await generateResponse(token, formData);
 
             if (result) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-                // 4. Clear Input
+                // 6. Clear Input
                 setInputText("");
 
-                // 5. Refresh Data (fetches the list including the new AI response)
+                // 7. Refresh Data
                 await loadThreadHistory();
 
-                // 6. Smooth Scroll to bottom
+                // 8. Smooth Scroll to bottom
                 setTimeout(() => {
                     flatListRef.current?.scrollToEnd({ animated: true });
                 }, 300);
@@ -216,6 +225,7 @@ export default function AiChatScreen() {
             }
         } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            console.log(error)
             toast.error(error?.message || "Generation failed");
         } finally {
             setIsGenerating(false);
