@@ -243,8 +243,39 @@ export default function AiChatScreen() {
     };
 
     const handleQuickAction = useCallback(async (action: string, draftId: number, content: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // Using selectionAsync for more reliable haptic feedback on Android
+        Haptics.selectionAsync();
 
+        // 1. Check if the action is a result from the "Create Variant" Modal
+        if (action.startsWith("Variant: ")) {
+            const variantType = action.replace("Variant: ", "");
+            // console.log(`Creating variant of type: ${variantType} for draft ID: ${draftId}`);
+
+            setIsGenerating(true); 
+            try {
+                const payload = {
+                    fileId: Number(fileId),
+                    userInput: `Convert the following response into a ${variantType} format: \n\n ${content}`,
+                    // activity_type: variantType.toLowerCase().replace(" ", "_") // Optional: set metadata
+                };
+
+                const result = await generateResponse(token!, payload);
+
+                if (result) {
+                    toast.success(`${variantType} Created`, {
+                        description: "Added to your claim timeline."
+                    });
+                    await loadThreadHistory(); 
+                }
+            } catch (error: any) {
+                toast.error(error?.message || "Failed to create variant");
+            } finally {
+                setIsGenerating(false);
+            }
+            return;
+        }
+
+        // 2. Standard Quick Actions
         switch (action) {
             case "Copy":
                 await Clipboard.setStringAsync(content);
@@ -255,15 +286,13 @@ export default function AiChatScreen() {
 
             case "Mark as used":
                 try {
-                    // 1. Trigger the API call
                     const response = await updateDraft(token!, draftId, {
                         response_used: true
                     });
 
                     if (response.success) {
                         toast.success("Interaction Updated");
-
-                        // 2. SMOOTH REFRESH: Update local state instead of re-fetching
+                        // Update local state for immediate UI feedback
                         setChatHistory(prevHistory =>
                             prevHistory.map(item =>
                                 item.id === draftId
@@ -279,17 +308,14 @@ export default function AiChatScreen() {
                 break;
 
             case "Create Variant":
-                console.log(`Convert to File note clicked for ID: ${draftId}`);
-                toast.info("Processing...", {
-                    description: "Converting response to official file note."
-                });
+                console.log("Variant Modal opened in Card UI");
                 break;
 
             default:
                 console.log(`Unknown action: ${action} for ID: ${draftId}`);
                 break;
         }
-    }, [token, setChatHistory]);
+    }, [token, fileId, setChatHistory]);
 
     const handleRefinement = useCallback(async (option: string, originalContent: string) => {
         // 1. Tactile feedback
