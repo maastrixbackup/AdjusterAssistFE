@@ -5,7 +5,7 @@ import { ClaimFile, generateResponse, getDraftsByFile, getFileById, updateDraft,
 import { useAuth } from '@/providers/auth-provider';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics'; // Recommended for premium feel
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -209,18 +209,24 @@ export default function AiChatScreen() {
 
             if (result) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                const NewInteraction = {
+                    id: result.id || Date.now() ,
+                    user_input: inputText.trim(),
+                    ai_response: result.responseText,
+                    output_format: result.output_format,
+                    next_step_suggestion: result.nextStep,
+                    responseUsed: false,
+                    quick_actions: ["Copy", "Create Variant", "Mark as used"],
+                    refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
+                    created_at: result.createdAt,
+                }
 
-                // 6. Clear Input
+                setChatHistory(prev => [...prev, NewInteraction]);
                 setInputText("");
 
-                // 7. Refresh Data
-                await loadThreadHistory();
-
-                // 8. Smooth Scroll to bottom
                 setTimeout(() => {
                     flatListRef.current?.scrollToEnd({ animated: true });
                 }, 300);
-
                 toast.success("Response added to timeline");
             }
         } catch (error: any) {
@@ -230,7 +236,7 @@ export default function AiChatScreen() {
         } finally {
             setIsGenerating(false);
         }
-    }, [token, fileId, inputText, loadThreadHistory]);
+    }, [token, fileId, inputText]);
 
     const handleUpdateWorkspace = async (updatedData: Partial<ClaimFile>) => {
         if (!fileId || !token) return;
@@ -253,13 +259,11 @@ export default function AiChatScreen() {
     };
 
     const handleQuickAction = useCallback(async (action: string, draftId: number, content: string) => {
-        // Using selectionAsync for more reliable haptic feedback on Android
         Haptics.selectionAsync();
 
-        // 1. Check if the action is a result from the "Create Variant" Modal
         if (action.startsWith("Variant: ")) {
             const variantType = action.replace("Variant: ", "");
-            // console.log(`Creating variant of type: ${variantType} for draft ID: ${draftId}`);
+            console.log(`Creating variant of type: ${variantType} for draft ID: ${draftId}`);
 
             setIsGenerating(true);
             try {
@@ -275,8 +279,21 @@ export default function AiChatScreen() {
                     toast.success(`${variantType} Created`, {
                         description: "Added to your claim timeline."
                     });
-                    await loadThreadHistory();
+                    const NewInteraction = {
+                    id: result.id || Date.now() ,
+                    user_input: inputText.trim(),
+                    ai_response: result.responseText,
+                    output_format: result.output_format,
+                    next_step_suggestion: result.nextStep,
+                    responseUsed: false,
+                    quick_actions: ["Copy", "Create Variant", "Mark as used"],
+                    refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
+                    created_at: result.createdAt,
                 }
+
+                setChatHistory(prev => [...prev, NewInteraction]);
+                }
+                
             } catch (error: any) {
                 toast.error(error?.message || "Failed to create variant");
             } finally {
@@ -325,7 +342,7 @@ export default function AiChatScreen() {
                 console.log(`Unknown action: ${action} for ID: ${draftId}`);
                 break;
         }
-    }, [token, fileId, setChatHistory]);
+    }, [fileId, token, loadThreadHistory]);
 
     const handleRefinement = useCallback(async (option: string, originalContent: string) => {
         Haptics.selectionAsync();
@@ -418,7 +435,7 @@ export default function AiChatScreen() {
                 title=""
                 content={item.ai_response}
                 color="#3B82F6"
-                timeAgo="Generated"
+                timeAgo=""
                 quickActions={item.quick_actions}
                 outputFormat={item.output_format}
                 refinementOptions={item.refinement}

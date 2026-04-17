@@ -102,15 +102,17 @@ export type GenerateResponseRequest = {
   image?: string | null;
 };
 
-export type GenerateResponseResult = {
+export interface GenerateResponseResult {
+  id: number; // Add this line
   output_format: string;
   responseTypeLabel: string;
   responseText: string;
+  user_input: string;
   fileId: number | string;
   nextStep?: string;
   logId?: number;
   createdAt?: string;
-};
+}
 
 export type GenerateNextStepRequest = {
   fileId: number;
@@ -291,13 +293,13 @@ export async function generateResponse(
 
   const res = await apiRequest<{
     success: boolean;
-    message: string;
     data: {
-      content: string;
+      id: number;
+      ai_response: string;
+      user_input: string;
       output_format: string;
-      next_step?: string;
-      log_id?: number;
-      created_at?: string;
+      next_step_suggestion: string;
+      created_at: string;
     };
   }>(
     "/drafts/generate",
@@ -313,7 +315,6 @@ export async function generateResponse(
   if (!res.data?.output_format) {
     throw new Error("Backend did not provide output_format");
   }
-
   // Type-safe extraction of fileId for the return object
   let extractedFileId: number | string;
   if (isFormData) {
@@ -326,12 +327,14 @@ export async function generateResponse(
   }
 
   return {
+    id: res.data.id, // Map the ID from the JSON data
     output_format: res.data.output_format,
     responseTypeLabel: responseTypeLabels[res.data.output_format] || "Response",
-    responseText: res.data.content,
+    responseText: res.data.ai_response,
+    user_input: res.data.user_input,
     fileId: extractedFileId,
-    nextStep: res.data.next_step,
-    logId: res.data.log_id,
+    nextStep: res.data.next_step_suggestion,
+    // logId: res.data.log_id, // or res.data.id depending on your backend naming
     createdAt: res.data.created_at,
   };
 }
@@ -343,7 +346,6 @@ export async function generateNextStep(
     userInput: string | undefined;
     previousResponse: string;
     output_format: string;
-    // nextPrompt: string;
   },
 ): Promise<GenerateResponseResult> {
   console.log("Chaining workflow for Next Step:", payload);
@@ -352,10 +354,11 @@ export async function generateNextStep(
     success: boolean;
     message: string;
     data: {
+      id: number; // 1. Added id here
       content: string;
+      user_input?: string; // 2. Added user_input if backend returns it
       next_step?: string;
       output_format: string;
-      // suggestions?: any[];
       log_id?: number;
       created_at?: string;
     };
@@ -374,17 +377,19 @@ export async function generateNextStep(
 
   // Consistent return mapping
   return {
+    id: res.data.id, // 3. Map the id to the result
     output_format: res.data.output_format,
     responseTypeLabel:
       responseTypeLabels[res.data.output_format] ||
       res.data.output_format ||
       "Follow-up",
     responseText: res.data.content,
+    // 4. Fallback to payload.userInput if the backend doesn't return user_input
+    user_input: res.data.user_input || payload.userInput || "Follow-up action",
     fileId: Number(payload.fileId),
     nextStep: res.data.next_step,
-    // suggestions: res.data.suggestions,
-    logId: res.data.log_id,
-    createdAt: res.data.created_at,
+    logId: res.data.log_id || res.data.id,
+    createdAt: res.data.created_at || new Date().toISOString(),
   };
 }
 
