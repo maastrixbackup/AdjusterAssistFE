@@ -12,7 +12,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.adjusterassist.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "AdjusterAssist needs access to your photos to document claim damages.",
+        "NSCameraUsageDescription": "AdjusterAssist needs camera access to take photos of claim damages.",
+        "NSMicrophoneUsageDescription": "AdjusterAssist needs microphone access for voice-to-text claim updates.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -40,7 +46,19 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AdjusterAssist needs access to your photos to document claim damages.",
+          "cameraPermission": "AdjusterAssist needs camera access to take photos of claim damages."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "appleTeamId": "YOUR_APPLE_TEAM_ID" 
+        }
+      ],
       [
         "expo-splash-screen",
         {

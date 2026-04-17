@@ -1,3 +1,4 @@
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,6 +17,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { toast } from 'sonner-native';
+import { VoiceOverlay } from './VoiceOverlay';
 
 // Structure compatible with FormData
 export interface Attachment {
@@ -28,7 +31,7 @@ export interface Attachment {
 interface ChatInputProps {
   inputText: string;
   setInputText: (text: string) => void;
-  onSend: (attachments: Attachment[]) => void; 
+  onSend: (attachments: Attachment[]) => void;
   onFocus: () => void;
   keyboardOffset: Animated.Value;
   dynamicBottomPadding: Animated.AnimatedAddition<number> | Animated.AnimatedInterpolation<number>;
@@ -54,7 +57,7 @@ export const ChatInputSection = ({
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      quality: 0.8, 
+      quality: 0.8,
     });
 
     if (!result.canceled) {
@@ -97,7 +100,7 @@ export const ChatInputSection = ({
       Animated.timing(sendScale, { toValue: 0.9, duration: 45, useNativeDriver: true }),
       Animated.spring(sendScale, { toValue: 1, friction: 4, tension: 40, useNativeDriver: true }),
     ]).start();
-    
+
     // Pass the array of attachments to the parent handleSend
     onSend(selectedAttachments);
     setSelectedAttachments([]); // Clear UI after sending
@@ -105,6 +108,23 @@ export const ChatInputSection = ({
 
   // Text is mandatory, images/pdfs are optional
   const isSendDisabled = !inputText.trim();
+
+  const voice = useVoiceInput();
+
+  const handleVoiceToggle = async () => {
+    if (voice.isRecording) {
+      const transcript = await voice.stop();
+      if (transcript) {
+        setInputText(inputText ? `${inputText} ${transcript}` : transcript);
+      }
+    } else {
+      try {
+        await voice.start();
+      } catch {
+        toast.warning("Microphone permission required.");
+      }
+    }
+  };
 
   return (
     <>
@@ -116,9 +136,9 @@ export const ChatInputSection = ({
       >
         {/* Preview Section */}
         {selectedAttachments.length > 0 && (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
             style={styles.previewContainer}
             contentContainerStyle={styles.previewContent}
           >
@@ -132,8 +152,8 @@ export const ChatInputSection = ({
                     <Text numberOfLines={1} style={styles.pdfText}>{item.name}</Text>
                   </View>
                 )}
-                <TouchableOpacity 
-                  style={styles.removeBtn} 
+                <TouchableOpacity
+                  style={styles.removeBtn}
                   onPress={() => removeAttachment(index)}
                 >
                   <Ionicons name="close-circle" size={20} color="#EF4444" />
@@ -154,10 +174,10 @@ export const ChatInputSection = ({
 
           <TextInput
             style={styles.textInput}
-            placeholder="Update claim thread..."
+            placeholder={voice.isTranscribing ? "Transcribing..." : "Update claim thread..."}
             placeholderTextColor="#94A3B8"
             multiline
-            editable={!disabled}
+            editable={!disabled && !voice.isTranscribing}
             value={inputText}
             onChangeText={setInputText}
             onFocus={onFocus}
@@ -165,9 +185,30 @@ export const ChatInputSection = ({
           />
 
           <View style={styles.rightActions}>
-            <TouchableOpacity style={styles.micBtn} activeOpacity={0.7}>
-              <Ionicons name="mic-outline" size={22} color="#64748B" />
+            <TouchableOpacity onPress={handleVoiceToggle}>
+              <Ionicons
+                name={
+                  voice.isRecording
+                    ? "stop-circle"
+                    : voice.isTranscribing
+                      ? "hourglass"
+                      : "mic"
+                }
+                size={25}
+                color={
+                  voice.isRecording
+                    ? "#DC2626"
+                    : voice.isTranscribing
+                      ? "#94A3B8"
+                      : "#0F4C9C"
+                }
+              />
             </TouchableOpacity>
+            <VoiceOverlay
+              visible={voice.isRecording}
+              meteringLevel={voice.meteringLevel}
+              onCancel={handleVoiceToggle}
+            />
 
             <Animated.View style={{ transform: [{ scale: sendScale }] }}>
               <TouchableOpacity
@@ -194,9 +235,9 @@ export const ChatInputSection = ({
               <Ionicons name="image-outline" size={20} color="#003366" />
               <Text style={styles.menuText}>Upload Photos</Text>
             </TouchableOpacity>
-            
+
             <View style={styles.menuSeparator} />
-            
+
             <TouchableOpacity style={styles.menuItem} onPress={pickDocs}>
               <Ionicons name="document-text-outline" size={20} color="#003366" />
               <Text style={styles.menuText}>Upload Documents</Text>
@@ -233,7 +274,7 @@ const styles = StyleSheet.create({
   },
   attachBtn: { width: 40, height: 40, backgroundColor: '#F1F5F9', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   textInput: { flex: 1, fontSize: 16, color: '#1E293B', maxHeight: 100, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 5 },
-  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   micBtn: { padding: 8 },
   sendBtn: { backgroundColor: '#003366', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#CBD5E1' },
