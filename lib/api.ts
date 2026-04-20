@@ -422,7 +422,7 @@ export async function updateDraft(
     },
     token,
   );
-  console.log(`Draft ${id} updated successfully:`, res.data);
+  // console.log(`Draft ${id} updated successfully:`, res.data);
 
   return res;
 }

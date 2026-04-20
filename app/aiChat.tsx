@@ -112,6 +112,16 @@ export default function AiChatScreen() {
     const flatListRef = useRef<FlatList>(null);
     const keyboardOffset = useKeyboardOffset();
 
+    // ─── AUTO SCROLL LOGIC ──────────────────────────────────────────────────
+    useEffect(() => {
+        // Since the list is inverted, index 0 is the bottom (newest)
+        if (chatHistory.length > 0) {
+            setTimeout(() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            }, 100);
+        }
+    }, [chatHistory.length]);
+    // ────────────────────────────────────────────────────────────────────────
 
 
     // ─── Fetch Thread History ────────────────────────────────────────────────
@@ -152,7 +162,6 @@ export default function AiChatScreen() {
         }
         try {
             const fileData = await getFileById(token, Number(fileId));
-            // console.log("API Response for file:", fileData); // Check if this is undefined
 
             if (fileData) {
                 setCurrentWorkspace(fileData);
@@ -170,7 +179,6 @@ export default function AiChatScreen() {
     }, [loadThreadHistory, loadFileDetails]);
 
     const handleSend = useCallback(async (attachments: any[] = []) => {
-        // 1. Validations
         if (!token) return router.replace("/(auth)/login");
 
         if (!inputText.trim()) {
@@ -179,16 +187,12 @@ export default function AiChatScreen() {
 
         if (!fileId) return toast.warning("Workspace context missing.");
 
-        // 2. Start Loading & Haptics
         setIsGenerating(true);
         Keyboard.dismiss();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
-            // 3. Construct FormData instead of a JSON object
             const formData = new FormData();
-
-            // Append text fields
             formData.append('fileId', fileId.toString());
             formData.append('userInput', inputText.trim());
 
@@ -199,8 +203,6 @@ export default function AiChatScreen() {
                     name: file.name || 'upload.jpg',
                 } as any);
             });
-
-            console.log(formData);
 
             const result = await generateResponse(token, formData);
 
@@ -218,14 +220,12 @@ export default function AiChatScreen() {
                     created_at: result.createdAt,
                 }
 
-                // Prepend to history because the list is inverted
                 setChatHistory(prev => [NewInteraction, ...prev]);
                 setInputText("");
                 toast.success("Response added to timeline");
             }
         } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            console.log(error)
             toast.error(error?.message || "Generation failed");
         } finally {
             setIsGenerating(false);
@@ -234,21 +234,14 @@ export default function AiChatScreen() {
 
     const handleUpdateWorkspace = async (updatedData: Partial<ClaimFile>) => {
         if (!fileId || !token) return;
-
         try {
-            // Optimistic UI update
             setCurrentWorkspace(prev => prev ? { ...prev, ...updatedData } : null);
-
             await updateFile(token, Number(fileId), updatedData);
-            console.log("Workspace updated successfully");
             toast.success("Workspace updated successfully");
-
-            // Refresh data from server to ensure sync
             await loadFileDetails();
         } catch (error) {
             console.error("Failed to update workspace:", error);
             toast.error("Failed to update workspace");
-            // Rollback on error if necessary
         }
     };
 
@@ -257,14 +250,11 @@ export default function AiChatScreen() {
 
         if (action.startsWith("Variant: ")) {
             const variantType = action.replace("Variant: ", "");
-            console.log(`Creating variant of type: ${variantType} for draft ID: ${draftId}`);
-
             setIsGenerating(true);
             try {
                 const payload = {
                     fileId: Number(fileId),
                     userInput: `Convert the following response into a ${variantType} format: \n\n ${content}`,
-                    // activity_type: variantType.toLowerCase().replace(" ", "_") // Optional: set metadata
                 };
 
                 const result = await generateResponse(token!, payload);
@@ -275,7 +265,7 @@ export default function AiChatScreen() {
                     });
                     const NewInteraction = {
                         id: result.id || Date.now() ,
-                        user_input: inputText.trim(),
+                        user_input: "Variant Generation",
                         ai_response: result.responseText,
                         output_format: result.output_format,
                         next_step_suggestion: result.nextStep,
@@ -284,10 +274,8 @@ export default function AiChatScreen() {
                         refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
                         created_at: result.createdAt,
                     }
-
                     setChatHistory(prev => [NewInteraction, ...prev]);
                 }
-                
             } catch (error: any) {
                 toast.error(error?.message || "Failed to create variant");
             } finally {
@@ -296,67 +284,49 @@ export default function AiChatScreen() {
             return;
         }
 
-        // 2. Standard Quick Actions
         switch (action) {
             case "Copy":
                 await Clipboard.setStringAsync(content);
-                toast.success("Copied to clipboard", {
-                    description: "The AI response is ready to paste."
-                });
+                toast.success("Copied to clipboard");
                 break;
-
             case "Mark as used":
                 try {
-                    const response = await updateDraft(token!, draftId, {
-                        response_used: true
-                    });
-
+                    const response = await updateDraft(token!, draftId, { response_used: true });
                     if (response.success) {
                         toast.success("Interaction Updated");
-                        // Update local state for immediate UI feedback
                         setChatHistory(prevHistory =>
                             prevHistory.map(item =>
-                                item.id === draftId
-                                    ? { ...item, responseUsed: true }
-                                    : item
+                                item.id === draftId ? { ...item, responseUsed: true } : item
                             )
                         );
                     }
                 } catch (error) {
-                    console.error("Failed to update interaction:", error);
                     toast.error("Update failed");
                 }
                 break;
-
-            case "Create Variant":
-                console.log("Variant Modal opened in Card UI");
-                break;
-
             default:
-                console.log(`Unknown action: ${action} for ID: ${draftId}`);
                 break;
         }
     }, [fileId, token, loadThreadHistory]);
 
     const handleRefinement = useCallback(async (option: string, originalContent: string) => {
         Haptics.selectionAsync();
-
         let refinementPrompt = "";
         switch (option) {
             case "Shorten":
-                refinementPrompt = "Concise Summary: Rewrite the following claim content to be brief and punchy, removing fluff while retaining all dates, figures, and technical facts.";
+                refinementPrompt = "Concise Summary: Rewrite the following claim content to be brief and punchy.";
                 break;
             case "Make more formal":
-                refinementPrompt = "Professional Polish: Elevate the tone of the following content to be highly professional, objective, and suitable for high-level corporate reporting.";
+                refinementPrompt = "Professional Polish: Elevate the tone to be highly professional.";
                 break;
             case "Make attornary facing":
-                refinementPrompt = "Legal/Attorney Correspondence: Adjust this text to be legally precise, objective, and cautious. Focus on factual evidence and policy language suitable for sharing with legal counsel.";
+                refinementPrompt = "Legal/Attorney Correspondence: Adjust this text to be legally precise.";
                 break;
             case "Make more firm":
-                refinementPrompt = "Assertive Tone: Rewrite this to be more firm and decisive. Use 'active voice' and clear directives, typical for an adjuster setting expectations with a contractor or policyholder.";
+                refinementPrompt = "Assertive Tone: Rewrite this to be more firm and decisive.";
                 break;
             case "Add DOI safe language":
-                refinementPrompt = "Regulatory Compliance: Revise the following text to ensure it uses DOI-compliant terminology. Ensure it sounds fair, objective, and avoids 'bad faith' triggers or inflammatory language.";
+                refinementPrompt = "Regulatory Compliance: Revise the text to ensure it uses DOI-compliant terminology.";
                 break;
             default:
                 refinementPrompt = `Refine this content for ${option}:`;
@@ -366,20 +336,15 @@ export default function AiChatScreen() {
         try {
             const payload = {
                 fileId: Number(fileId),
-                // Improved Prompt Structure: Role + Task + Context + Content
-                userInput: `[SYSTEM: REFINEMENT MODE]\n\nTASK: ${refinementPrompt}\n\nORIGINAL CONTENT TO TRANSFORM:\n"${originalContent}"`,
+                userInput: `[SYSTEM: REFINEMENT MODE]\n\nTASK: ${refinementPrompt}\n\nORIGINAL CONTENT:\n"${originalContent}"`,
             };
 
             const result = await generateResponse(token!, payload);
-
             if (result) {
-                toast.success(`${option} Applied`, {
-                    description: "The refined version is now in your timeline."
-                });
+                toast.success(`${option} Applied`);
                 await loadThreadHistory();
             }
         } catch (error) {
-            console.error("Refinement error:", error);
             toast.error("Refinement failed");
         } finally {
             setIsGenerating(false);
@@ -388,20 +353,9 @@ export default function AiChatScreen() {
 
     const onShare = useCallback(async (content: string) => {
         try {
-            const result = await Share.share({
-                message: content,
-                title: 'AdjusterAssist Claim Update',
-            });
-
-            if (result.action === Share.sharedAction) {
-                if (result.activityType) {
-                    console.log('Shared via:', result.activityType);
-                } else {
-                    toast.success("Content shared successfully");
-                }
-            }
+            await Share.share({ message: content, title: 'AdjusterAssist Claim Update' });
         } catch (error: any) {
-            toast.error("Sharing failed", { description: error.message });
+            toast.error("Sharing failed");
         }
     }, []);
 
@@ -438,7 +392,7 @@ export default function AiChatScreen() {
                 timeAgo={getFormattedTime(item.created_at)}
             />
         </View>
-    ), []);
+    ), [handleQuickAction, handleRefinement, onShare]);
 
     const dynamicBottomPadding = keyboardOffset.interpolate({
         inputRange: [0, 100],
@@ -460,14 +414,10 @@ export default function AiChatScreen() {
                         <Text style={styles.logoTextMain}>Adjuster<Text style={styles.logoTextAccent}>Assist</Text></Text>
                         <TouchableOpacity activeOpacity={0.6}>
                             {credits !== undefined && (
-                                <Pressable
-                                    onPress={() => router.push("/settings")}
-                                >
+                                <Pressable onPress={() => router.push("/settings")}>
                                     <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}>
                                         <Ionicons name="sparkles" size={14} color="#FDE68A" />
-                                        <Text style={styles.creditText}>
-                                            {credits ?? 0}
-                                        </Text>
+                                        <Text style={styles.creditText}>{credits ?? 0}</Text>
                                     </View>
                                 </Pressable>
                             )}
@@ -504,7 +454,7 @@ export default function AiChatScreen() {
             ) : (
                 <FlatList
                     ref={flatListRef}
-                    inverted // Lists from bottom up
+                    inverted 
                     data={chatHistory}
                     renderItem={renderItem}
                     keyExtractor={(item) => item.id.toString()}
@@ -574,10 +524,5 @@ const styles = StyleSheet.create({
     loaderText: { marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '500' },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
     emptyText: { marginTop: 16, color: '#94A3B8', fontSize: 15, textAlign: 'center', paddingHorizontal: 40 },
-    creditText: {
-        color: "#FDE68A",
-        fontSize: 13,
-        fontWeight: "700",
-        marginLeft: 6,
-    },
+    creditText: { color: "#FDE68A", fontSize: 13, fontWeight: "700", marginLeft: 6 },
 });
