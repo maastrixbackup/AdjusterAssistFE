@@ -136,7 +136,8 @@ export default function AiChatScreen() {
                 created_at: draft.created_at,
             }));
 
-            setChatHistory(formattedHistory);
+            // We reverse here because we are using the 'inverted' prop on FlatList
+            setChatHistory(formattedHistory.reverse());
         } catch (error) {
             console.error("Error loading chat history:", error);
         } finally {
@@ -167,12 +168,6 @@ export default function AiChatScreen() {
         loadThreadHistory();
         loadFileDetails();
     }, [loadThreadHistory, loadFileDetails]);
-
-    const scrollToBottom = useCallback((animated = true) => {
-        requestAnimationFrame(() => {
-            flatListRef.current?.scrollToEnd({ animated });
-        });
-    }, []);
 
     const handleSend = useCallback(async (attachments: any[] = []) => {
         // 1. Validations
@@ -221,12 +216,9 @@ export default function AiChatScreen() {
                     created_at: result.createdAt,
                 }
 
-                setChatHistory(prev => [...prev, NewInteraction]);
+                // Prepend to history because the list is inverted
+                setChatHistory(prev => [NewInteraction, ...prev]);
                 setInputText("");
-
-                setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }, 300);
                 toast.success("Response added to timeline");
             }
         } catch (error: any) {
@@ -280,18 +272,18 @@ export default function AiChatScreen() {
                         description: "Added to your claim timeline."
                     });
                     const NewInteraction = {
-                    id: result.id || Date.now() ,
-                    user_input: inputText.trim(),
-                    ai_response: result.responseText,
-                    output_format: result.output_format,
-                    next_step_suggestion: result.nextStep,
-                    responseUsed: false,
-                    quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                    refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                    created_at: result.createdAt,
-                }
+                        id: result.id || Date.now() ,
+                        user_input: inputText.trim(),
+                        ai_response: result.responseText,
+                        output_format: result.output_format,
+                        next_step_suggestion: result.nextStep,
+                        responseUsed: false,
+                        quick_actions: ["Copy", "Create Variant", "Mark as used"],
+                        refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
+                        created_at: result.createdAt,
+                    }
 
-                setChatHistory(prev => [...prev, NewInteraction]);
+                    setChatHistory(prev => [NewInteraction, ...prev]);
                 }
                 
             } catch (error: any) {
@@ -383,11 +375,6 @@ export default function AiChatScreen() {
                     description: "The refined version is now in your timeline."
                 });
                 await loadThreadHistory();
-
-                // Optional: Scroll to bottom after state update
-                setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }, 500);
             }
         } catch (error) {
             console.error("Refinement error:", error);
@@ -406,14 +393,10 @@ export default function AiChatScreen() {
 
             if (result.action === Share.sharedAction) {
                 if (result.activityType) {
-                    // shared with a specific activity type on iOS
                     console.log('Shared via:', result.activityType);
                 } else {
-                    // shared
                     toast.success("Content shared successfully");
                 }
-            } else if (result.action === Share.dismissedAction) {
-                // dismissed
             }
         } catch (error: any) {
             toast.error("Sharing failed", { description: error.message });
@@ -482,7 +465,6 @@ export default function AiChatScreen() {
                                         <Text style={styles.creditText}>
                                             {credits ?? 0}
                                         </Text>
-                                        {/* <Text style={{ color: "#FDE68A", fontSize: 11, marginLeft: 4 }}>Credits</Text> */}
                                     </View>
                                 </Pressable>
                             )}
@@ -519,18 +501,17 @@ export default function AiChatScreen() {
             ) : (
                 <FlatList
                     ref={flatListRef}
+                    inverted // Lists from bottom up
                     data={chatHistory}
                     renderItem={renderItem}
                     keyExtractor={(item) => item.id.toString()}
                     contentContainerStyle={styles.listContent}
-                    onContentSizeChange={() => scrollToBottom(true)}
                     showsVerticalScrollIndicator={false}
                     keyboardDismissMode="interactive"
                     keyboardShouldPersistTaps="handled"
                     scrollEventThrottle={16}
-                    maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
                     ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
+                        <View style={[styles.emptyContainer, { transform: [{ scaleY: -1 }] }]}>
                             <Ionicons name="chatbubbles-outline" size={48} color="#CBD5E1" />
                             <Text style={styles.emptyText}>No history yet. Start by asking a question.</Text>
                         </View>
