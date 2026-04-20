@@ -134,7 +134,7 @@ export default function HomeScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
 
-      <LinearGradient colors={["#165bb6", "#003366"]} style={styles.headerGradient}>
+      <LinearGradient colors={["#165bb6", "#02305f"]} style={styles.headerGradient}>
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
           <View style={styles.headerTopRow}>
             <Image source={logo} style={styles.logo} />
@@ -163,7 +163,7 @@ export default function HomeScreen() {
         <View style={styles.bodyWrapper}>
           <View style={styles.quickActionsRow}>
             <ActionBtn icon="add" label="New Claim" color={["#3B82F6", "#0a36b1"]} onPress={() => setIsCreateModalVisible(true)} />
-            <ActionBtn icon="document-text" label="History" color={["#F59E0B", "#D97706"]} onPress={() => router.push("/history")} />
+            <ActionBtn icon="document-text" label="History" color={["#F59E0B", "#D97706"]} onPress={() => router.push("/")} />
           </View>
 
           {mostRecentFile && (
@@ -205,15 +205,15 @@ export default function HomeScreen() {
                   credits: status?.subscription?.remaining ?? 0,
                 }
               })}>
-              <View style={styles.workspaceIcon}><Ionicons name="folder" size={22} color="#3070c9" /></View>
+              <View style={styles.workspaceIcon}><Ionicons name="folder" size={22} color="#045cd8" /></View>
               <View style={styles.workspaceDetails}>
                 <View style={styles.workspaceTopRow}>
-                  <Text style={styles.workspaceTitle} numberOfLines={1}>{file.claim_number || "Draft Workspace"}</Text>
+                  <Text style={styles.workspaceTitle} numberOfLines={1}>Claim: {file.claim_number || "Draft Workspace"}</Text>
                   <View style={[styles.miniBadge, getStatusStyle(file.status).badge]}>
                     <Text style={[styles.miniBadgeText, getStatusStyle(file.status).text]}>{file.status}</Text>
                   </View>
                 </View>
-                <Text style={styles.workspaceClient}>{file.client_name || "New Client Entry"}</Text>
+                <Text style={styles.workspaceClient}>Insured Name: {file.client_name || "New Client Entry"}</Text>
                 <View style={styles.workspaceFooter}>
                   <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
                   <Text style={styles.workspaceDate}>{file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Sync Pending"}</Text>

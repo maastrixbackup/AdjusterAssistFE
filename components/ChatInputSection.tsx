@@ -25,7 +25,7 @@ export interface Attachment {
   uri: string;
   name: string;
   type: string;
-  kind: 'image' | 'pdf';
+  kind: 'image' | 'pdf' | 'document';
 }
 
 interface ChatInputProps {
@@ -50,36 +50,35 @@ export const ChatInputSection = ({
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedAttachments, setSelectedAttachments] = useState<Attachment[]>([]);
   const sendScale = React.useRef(new Animated.Value(1)).current;
-
   const [isPicking, setIsPicking] = useState(false);
 
-  const pickImages = async () => {
+ const pickImages = async () => {
     if (isPicking) return;
     setIsPicking(true);
     setMenuVisible(false);
 
     try {
-      // Wait for menu animation to finish
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        // 'images' covers png, jpg, heic, gif, bmp, etc.
+        mediaTypes: ['images'], 
         allowsMultipleSelection: true,
         quality: 0.8,
       });
 
       if (!result.canceled) {
         const newImages: Attachment[] = result.assets.map(asset => {
-          // Fix for iOS URI
-          const cleanUri = Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri;
-
+          const extension = asset.uri.split('.').pop()?.toLowerCase();
+          
           return {
-            uri: asset.uri, // Keep original for display, use cleanUri for FormData
-            name: asset.fileName || `img_${Date.now()}.jpg`,
-            type: asset.mimeType || 'image/jpeg',
+            uri: asset.uri, 
+            name: asset.fileName || `img_${Date.now()}.${extension || 'jpg'}`,
+            type: asset.mimeType || `image/${extension || 'jpeg'}`,
             kind: 'image'
           };
         });
+        
         setSelectedAttachments(prev => [...prev, ...newImages]);
       }
     } catch (error) {
@@ -90,29 +89,40 @@ export const ChatInputSection = ({
   };
 
   // 2. Updated Document Picker
-  const pickDocs = async () => {
+const pickDocs = async () => {
     if (isPicking) return;
     setIsPicking(true);
     setMenuVisible(false);
 
     try {
-      // Wait for menu animation to finish to avoid "Picking in progress" error
+      // Essential for iOS to prevent the "Picking in progress" crash
       await new Promise(resolve => setTimeout(resolve, 300));
 
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
+        // Array of MIME types for Android and iOS translation
+        type: [
+          'application/pdf',
+          'application/msword', // .doc
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+          'text/plain', // .txt
+        ],
         multiple: true,
-        copyToCacheDirectory: true, // CRITICAL FOR iOS
+        copyToCacheDirectory: true, 
       });
 
       if (!result.canceled) {
-        const newDocs: Attachment[] = result.assets.map(asset => ({
-          // On iOS, ensure the path is usable for FormData
-          uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
-          name: asset.name,
-          type: asset.mimeType || 'application/pdf',
-          kind: 'pdf'
-        }));
+        const newDocs: Attachment[] = result.assets.map(asset => {
+          const isPDF = asset.mimeType?.includes('pdf') || asset.name.toLowerCase().endsWith('.pdf');
+          
+          return {
+            // Keep the file:// prefix for local URI (remove only during actual upload)
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            kind: isPDF ? 'pdf' : 'document'
+          };
+        });
+        
         setSelectedAttachments(prev => [...prev, ...newDocs]);
       }
     } catch (error) {
