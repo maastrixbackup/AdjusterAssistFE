@@ -51,43 +51,74 @@ export const ChatInputSection = ({
   const [selectedAttachments, setSelectedAttachments] = useState<Attachment[]>([]);
   const sendScale = React.useRef(new Animated.Value(1)).current;
 
-  // 1. Updated Image Picker (FormData ready)
-  const pickImages = async () => {
-    setMenuVisible(false);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.8,
-    });
+  const [isPicking, setIsPicking] = useState(false);
 
-    if (!result.canceled) {
-      const newImages: Attachment[] = result.assets.map(asset => ({
-        uri: asset.uri,
-        // Standardize name for backend
-        name: asset.fileName || `img_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`,
-        type: asset.mimeType || 'image/jpeg',
-        kind: 'image'
-      }));
-      setSelectedAttachments(prev => [...prev, ...newImages]);
+  const pickImages = async () => {
+    if (isPicking) return;
+    setIsPicking(true);
+    setMenuVisible(false);
+
+    try {
+      // Wait for menu animation to finish
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        const newImages: Attachment[] = result.assets.map(asset => {
+          // Fix for iOS URI
+          const cleanUri = Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri;
+
+          return {
+            uri: asset.uri, // Keep original for display, use cleanUri for FormData
+            name: asset.fileName || `img_${Date.now()}.jpg`,
+            type: asset.mimeType || 'image/jpeg',
+            kind: 'image'
+          };
+        });
+        setSelectedAttachments(prev => [...prev, ...newImages]);
+      }
+    } catch (error) {
+      console.error("Image Picker Error:", error);
+    } finally {
+      setIsPicking(false);
     }
   };
 
-  // 2. Updated Document Picker (FormData ready - no Base64 needed)
+  // 2. Updated Document Picker
   const pickDocs = async () => {
+    if (isPicking) return;
+    setIsPicking(true);
     setMenuVisible(false);
-    const result = await DocumentPicker.getDocumentAsync({
-      type: 'application/pdf',
-      multiple: true,
-    });
 
-    if (!result.canceled) {
-      const newDocs: Attachment[] = result.assets.map(asset => ({
-        uri: asset.uri,
-        name: asset.name,
-        type: asset.mimeType || 'application/pdf',
-        kind: 'pdf'
-      }));
-      setSelectedAttachments(prev => [...prev, ...newDocs]);
+    try {
+      // Wait for menu animation to finish to avoid "Picking in progress" error
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        multiple: true,
+        copyToCacheDirectory: true, // CRITICAL FOR iOS
+      });
+
+      if (!result.canceled) {
+        const newDocs: Attachment[] = result.assets.map(asset => ({
+          // On iOS, ensure the path is usable for FormData
+          uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+          name: asset.name,
+          type: asset.mimeType || 'application/pdf',
+          kind: 'pdf'
+        }));
+        setSelectedAttachments(prev => [...prev, ...newDocs]);
+      }
+    } catch (error) {
+      console.error("Document Picker Error:", error);
+    } finally {
+      setIsPicking(false);
     }
   };
 

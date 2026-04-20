@@ -250,9 +250,6 @@ export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
   }
 };
 
-/**
- * UPDATED: Now accepts data from the App Frontend modal
- */
 export const createFile = async (
   token: string,
   fileData: CreateFileRequest, // Pass data from the UI
@@ -284,7 +281,6 @@ export async function getFileDrafts(
   return res.drafts || [];
 }
 
-/* --- Generation, Saving & Subscription --- */
 export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest | FormData,

@@ -200,6 +200,8 @@ export default function AiChatScreen() {
                 } as any);
             });
 
+            console.log(formData);
+
             const result = await generateResponse(token, formData);
 
             if (result) {
@@ -432,6 +434,7 @@ export default function AiChatScreen() {
                 title="Recommended Next Step"
                 content={item.next_step_suggestion}
                 color="#10B981"
+                quickActions={["Copy"]}
                 timeAgo={getFormattedTime(item.created_at)}
             />
         </View>
