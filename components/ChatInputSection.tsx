@@ -2,11 +2,13 @@ import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -20,7 +22,6 @@ import {
 import { toast } from 'sonner-native';
 import { VoiceOverlay } from './VoiceOverlay';
 
-// Structure compatible with FormData
 export interface Attachment {
   uri: string;
   name: string;
@@ -50,19 +51,47 @@ export const ChatInputSection = ({
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedAttachments, setSelectedAttachments] = useState<Attachment[]>([]);
   const sendScale = React.useRef(new Animated.Value(1)).current;
-  const [isPicking, setIsPicking] = useState(false);
 
- const pickImages = async () => {
-    if (isPicking) return;
-    setIsPicking(true);
-    setMenuVisible(false);
+  // ─── Track what to launch AFTER the modal fully dismisses ─────────────
+  const pendingAction = useRef<'image' | 'doc' | null>(null);
+  // ──────────────────────────────────────────────────────────────────────
 
+  // ─── Called by Modal's onDismiss — fires only after modal is fully gone ─
+  const handleModalDismissed = async () => {
+    const action = pendingAction.current;
+    pendingAction.current = null;
+
+    if (!action) return;
+
+    if (action === 'image') {
+      await launchImagePicker();
+    } else if (action === 'doc') {
+      await launchDocPicker();
+    }
+  };
+  // ──────────────────────────────────────────────────────────────────────
+
+  const launchImagePicker = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (Platform.OS === 'ios') {
+        const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          if (!canAskAgain) {
+            Alert.alert(
+              'Photo Access Required',
+              'Please enable photo library access in your iPhone Settings to attach images.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ]
+            );
+          }
+          return;
+        }
+      }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        // 'images' covers png, jpg, heic, gif, bmp, etc.
-        mediaTypes: ['images'], 
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         quality: 0.8,
       });
@@ -70,67 +99,84 @@ export const ChatInputSection = ({
       if (!result.canceled) {
         const newImages: Attachment[] = result.assets.map(asset => {
           const extension = asset.uri.split('.').pop()?.toLowerCase();
-          
           return {
-            uri: asset.uri, 
+            uri: asset.uri,
             name: asset.fileName || `img_${Date.now()}.${extension || 'jpg'}`,
             type: asset.mimeType || `image/${extension || 'jpeg'}`,
-            kind: 'image'
+            kind: 'image',
           };
         });
-        
         setSelectedAttachments(prev => [...prev, ...newImages]);
       }
     } catch (error) {
-      console.error("Image Picker Error:", error);
-    } finally {
-      setIsPicking(false);
+      console.error('Image Picker Error:', error);
     }
   };
 
-  // 2. Updated Document Picker
-const pickDocs = async () => {
-    if (isPicking) return;
-    setIsPicking(true);
-    setMenuVisible(false);
-
+  const launchDocPicker = async () => {
     try {
-      // Essential for iOS to prevent the "Picking in progress" crash
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (Platform.OS === 'ios') {
+        const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          if (!canAskAgain) {
+            Alert.alert(
+              'Storage Access Required',
+              'Please enable file/storage access in your iPhone Settings to attach documents.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ]
+            );
+          }
+          return;
+        }
+      }
 
       const result = await DocumentPicker.getDocumentAsync({
-        // Array of MIME types for Android and iOS translation
         type: [
           'application/pdf',
-          'application/msword', // .doc
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-          'text/plain', // .txt
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'text/plain',
         ],
         multiple: true,
-        copyToCacheDirectory: true, 
+        copyToCacheDirectory: true,
       });
 
       if (!result.canceled) {
         const newDocs: Attachment[] = result.assets.map(asset => {
           const isPDF = asset.mimeType?.includes('pdf') || asset.name.toLowerCase().endsWith('.pdf');
-          
           return {
-            // Keep the file:// prefix for local URI (remove only during actual upload)
             uri: asset.uri,
             name: asset.name,
             type: asset.mimeType || 'application/octet-stream',
-            kind: isPDF ? 'pdf' : 'document'
+            kind: isPDF ? 'pdf' : 'document',
           };
         });
-        
         setSelectedAttachments(prev => [...prev, ...newDocs]);
       }
     } catch (error) {
-      console.error("Document Picker Error:", error);
-    } finally {
-      setIsPicking(false);
+      console.error('Document Picker Error:', error);
     }
   };
+
+  // ─── These are what the menu buttons call ─────────────────────────────
+  const pickImages = () => {
+    pendingAction.current = 'image';
+    setMenuVisible(false);
+    if (Platform.OS === 'android') {
+      handleModalDismissed();
+    }
+  };
+
+  const pickDocs = () => {
+    pendingAction.current = 'doc';
+    setMenuVisible(false);
+    if (Platform.OS === 'android') {
+      handleModalDismissed();
+    }
+  };
+  // ──────────────────────────────────────────────────────────────────────
 
   const removeAttachment = (index: number) => {
     setSelectedAttachments(prev => prev.filter((_, i) => i !== index));
@@ -142,14 +188,11 @@ const pickDocs = async () => {
       Animated.spring(sendScale, { toValue: 1, friction: 4, tension: 40, useNativeDriver: true }),
     ]).start();
 
-    // Pass the array of attachments to the parent handleSend
     onSend(selectedAttachments);
-    setSelectedAttachments([]); // Clear UI after sending
+    setSelectedAttachments([]);
   };
 
-  // Text is mandatory, images/pdfs are optional
   const isSendDisabled = !inputText.trim();
-
   const voice = useVoiceInput();
 
   const handleVoiceToggle = async () => {
@@ -162,7 +205,7 @@ const pickDocs = async () => {
       try {
         await voice.start();
       } catch {
-        toast.warning("Microphone permission required.");
+        toast.warning('Microphone permission required.');
       }
     }
   };
@@ -175,7 +218,6 @@ const pickDocs = async () => {
           { paddingBottom: Animated.add(keyboardOffset, dynamicBottomPadding) },
         ]}
       >
-        {/* Preview Section */}
         {selectedAttachments.length > 0 && (
           <ScrollView
             horizontal
@@ -215,7 +257,7 @@ const pickDocs = async () => {
 
           <TextInput
             style={styles.textInput}
-            placeholder={voice.isTranscribing ? "Transcribing..." : "Update claim thread..."}
+            placeholder={voice.isTranscribing ? 'Transcribing...' : 'Update claim thread...'}
             placeholderTextColor="#94A3B8"
             multiline
             editable={!disabled && !voice.isTranscribing}
@@ -230,18 +272,18 @@ const pickDocs = async () => {
               <Ionicons
                 name={
                   voice.isRecording
-                    ? "stop-circle"
+                    ? 'stop-circle'
                     : voice.isTranscribing
-                      ? "hourglass"
-                      : "mic"
+                      ? 'hourglass'
+                      : 'mic'
                 }
                 size={25}
                 color={
                   voice.isRecording
-                    ? "#DC2626"
+                    ? '#DC2626'
                     : voice.isTranscribing
-                      ? "#94A3B8"
-                      : "#0F4C9C"
+                      ? '#94A3B8'
+                      : '#0F4C9C'
                 }
               />
             </TouchableOpacity>
@@ -269,7 +311,14 @@ const pickDocs = async () => {
         </View>
       </Animated.View>
 
-      <Modal visible={menuVisible} transparent animationType="fade">
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        // ─── KEY FIX: fires only after modal is fully unmounted on iOS ───
+        onDismiss={handleModalDismissed}
+      // ─────────────────────────────────────────────────────────────────
+      >
         <Pressable style={styles.modalOverlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.menuContainer}>
             <TouchableOpacity style={styles.menuItem} onPress={pickImages}>
@@ -298,7 +347,7 @@ const styles = StyleSheet.create({
   thumbnail: { width: '100%', height: '100%', borderRadius: 12, backgroundColor: '#E2E8F0' },
   pdfThumbnail: { justifyContent: 'center', alignItems: 'center', padding: 4, borderWidth: 1, borderColor: '#CBD5E1' },
   pdfText: { fontSize: 8, color: '#475569', marginTop: 2, textAlign: 'center' },
-  removeBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: '#FFF', borderRadius: 10 },
+  removeBtn: { position: 'absolute', top: -3, right: -8, backgroundColor: '#FFF', borderRadius: 10 },
   inputCard: {
     flexDirection: 'row',
     alignItems: 'center',
