@@ -620,3 +620,53 @@ export async function savePushToken(
     token,
   );
 }
+
+export interface RefinePayload {
+  fileId: number;
+  parentMessageId: number;
+  refinementType: string;
+  userInput: string;
+}
+
+export const refineResponse = async (token: string, payload: RefinePayload) => {
+  console.log("REFINE API PAYLOAD: ", payload);
+  const response = await fetch(`${BASE_URL}/drafts/refine`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) throw new Error("Refinement failed");
+  return await response.json();
+};
+
+export interface VariantPayload {
+  fileId: number;
+  parentMessageId: number;
+  variantLabel: string;
+  userInput: string;
+}
+
+export const generateVariant = async (
+  token: string,
+  payload: VariantPayload,
+) => {
+  console.log("VARIANT API PAYLOAD: ", payload);
+  const response = await fetch(`${BASE_URL}/drafts/variant`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || "Variant generation failed");
+  }
+  return await response.json();
+};

@@ -1,7 +1,7 @@
 import { ChatInputSection } from '@/components/ChatInputSection';
 import { ChatTimelineCard } from '@/components/ChatTimelineCard';
 import { WorkspaceMetaModal } from '@/components/WorkspaceMetaModal';
-import { ClaimFile, generateResponse, getDraftsByFile, getFileById, updateDraft, updateFile } from '@/lib/api';
+import { ClaimFile, generateResponse, generateVariant, getDraftsByFile, getFileById, refineResponse, updateDraft, updateFile } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -26,8 +26,17 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+
+const REFINEMENT_MAP: Record<string, string> = {
+    "Shorten": "Shorten response",
+    "Make more formal": "Make formal",
+    "Make attornary facing": "Make a attorney response",
+    "Make more firm": "Make more firm",
+    "Add DOI safe language": "Add doi safe language",
+};
 
 const { width } = Dimensions.get('window');
 
@@ -102,6 +111,8 @@ export default function AiChatScreen() {
     const [chatHistory, setChatHistory] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    const [userCredits, setUserCredits] = useState(Number(credits || 0));
 
     const [isMetaModalVisible, setIsMetaModalVisible] = useState(false);
     const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(
@@ -209,7 +220,7 @@ export default function AiChatScreen() {
             if (result) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 const NewInteraction = {
-                    id: result.id || Date.now() ,
+                    id: result.id || Date.now(),
                     user_input: inputText.trim(),
                     ai_response: result.responseText,
                     output_format: result.output_format,
@@ -221,6 +232,7 @@ export default function AiChatScreen() {
                 }
 
                 setChatHistory(prev => [NewInteraction, ...prev]);
+                setUserCredits(prev => Math.max(0, prev - 1));
                 setInputText("");
                 toast.success("Response added to timeline");
             }
@@ -248,33 +260,37 @@ export default function AiChatScreen() {
     const handleQuickAction = useCallback(async (action: string, draftId: number, content: string) => {
         Haptics.selectionAsync();
 
+        // Handle "Create Variant" logic
         if (action.startsWith("Variant: ")) {
-            const variantType = action.replace("Variant: ", "");
+            const variantLabel = action.replace("Variant: ", "");
             setIsGenerating(true);
+
             try {
-                const payload = {
+                const result = await generateVariant(token!, {
                     fileId: Number(fileId),
-                    userInput: `Convert the following response into a ${variantType} format: \n\n ${content}`,
-                };
+                    parentMessageId: draftId,
+                    variantLabel: variantLabel,
+                    userInput: content,
+                });
 
-                const result = await generateResponse(token!, payload);
+                if (result.success) {
+                    toast.success(`${variantLabel} Created`);
 
-                if (result) {
-                    toast.success(`${variantType} Created`, {
-                        description: "Added to your claim timeline."
-                    });
-                    const NewInteraction = {
-                        id: result.id || Date.now() ,
-                        user_input: "Variant Generation",
-                        ai_response: result.responseText,
-                        output_format: result.output_format,
-                        next_step_suggestion: result.nextStep,
+                    const newInteraction = {
+                        id: result.data.id,
+                        user_input: `Variant: ${variantLabel}`,
+                        ai_response: result.data.ai_response,
+                        output_format: variantLabel,
+                        next_step_suggestion: result.data.next_step_suggestion,
                         responseUsed: false,
                         quick_actions: ["Copy", "Create Variant", "Mark as used"],
                         refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                        created_at: result.createdAt,
-                    }
-                    setChatHistory(prev => [NewInteraction, ...prev]);
+                        created_at: result.data.created_at,
+                    };
+
+                    // Add to thread immediately for ChatGPT-style continuity
+                    setChatHistory(prev => [newInteraction, ...prev]);
+                    setUserCredits(prev => Math.max(0, prev - 1));
                 }
             } catch (error: any) {
                 toast.error(error?.message || "Failed to create variant");
@@ -284,6 +300,7 @@ export default function AiChatScreen() {
             return;
         }
 
+        // Handle other actions (Copy, Mark as used, etc.)
         switch (action) {
             case "Copy":
                 await Clipboard.setStringAsync(content);
@@ -294,67 +311,66 @@ export default function AiChatScreen() {
                     const response = await updateDraft(token!, draftId, { response_used: true });
                     if (response.success) {
                         toast.success("Interaction Updated");
-                        setChatHistory(prevHistory =>
-                            prevHistory.map(item =>
-                                item.id === draftId ? { ...item, responseUsed: true } : item
-                            )
+                        setChatHistory(prev =>
+                            prev.map(item => item.id === draftId ? { ...item, responseUsed: true } : item)
                         );
                     }
                 } catch (error) {
+                    console.log(error)
                     toast.error("Update failed");
                 }
                 break;
-            default:
-                break;
         }
-    }, [fileId, token, loadThreadHistory]);
+    }, [fileId, token]);
 
-    const handleRefinement = useCallback(async (option: string, originalContent: string) => {
+    const handleRefinement = useCallback(async (option: string, originalContent: string, parentId: number) => {
         Haptics.selectionAsync();
-        let refinementPrompt = "";
-        switch (option) {
-            case "Shorten":
-                refinementPrompt = "Concise Summary: Rewrite the following claim content to be brief and punchy.";
-                break;
-            case "Make more formal":
-                refinementPrompt = "Professional Polish: Elevate the tone to be highly professional.";
-                break;
-            case "Make attornary facing":
-                refinementPrompt = "Legal/Attorney Correspondence: Adjust this text to be legally precise.";
-                break;
-            case "Make more firm":
-                refinementPrompt = "Assertive Tone: Rewrite this to be more firm and decisive.";
-                break;
-            case "Add DOI safe language":
-                refinementPrompt = "Regulatory Compliance: Revise the text to ensure it uses DOI-compliant terminology.";
-                break;
-            default:
-                refinementPrompt = `Refine this content for ${option}:`;
-        }
+
+        const backendType = REFINEMENT_MAP[option] || 'formal';
 
         setIsGenerating(true);
         try {
-            const payload = {
+            // 2. Call the new dedicated refinement API
+            const result = await refineResponse(token!, {
                 fileId: Number(fileId),
-                userInput: `[SYSTEM: REFINEMENT MODE]\n\nTASK: ${refinementPrompt}\n\nORIGINAL CONTENT:\n"${originalContent}"`,
-            };
+                parentMessageId: parentId,
+                refinementType: backendType,
+                userInput: originalContent,
+            });
 
-            const result = await generateResponse(token!, payload);
-            if (result) {
+            if (result.success) {
                 toast.success(`${option} Applied`);
-                await loadThreadHistory();
+                setUserCredits(prev => Math.max(0, prev - 1));
+
+                // 3. Format the result to match your chatHistory structure
+                const refinedInteraction = {
+                    id: result.data.id,
+                    user_input: `Refine: ${option}`, // Descriptive label for the thread
+                    ai_response: result.data.ai_response,
+                    output_format: result.data.content_type,
+                    next_step_suggestion: result.data.next_step_suggestion,
+                    responseUsed: false,
+                    quick_actions: ["Copy", "Create Variant", "Mark as used"],
+                    refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
+                    created_at: result.data.created_at,
+                };
+
+                // 4. Push to thread as a NEW standalone entry
+                setChatHistory(prev => [refinedInteraction, ...prev]);
             }
         } catch (error) {
+            console.error("Refinement error:", error);
             toast.error("Refinement failed");
         } finally {
             setIsGenerating(false);
         }
-    }, [token, fileId, loadThreadHistory]);
+    }, [token, fileId]);
 
     const onShare = useCallback(async (content: string) => {
         try {
             await Share.share({ message: content, title: 'AdjusterAssist Claim Update' });
         } catch (error: any) {
+            console.log(error)
             toast.error("Sharing failed");
         }
     }, []);
@@ -380,7 +396,7 @@ export default function AiChatScreen() {
                 refinementOptions={item.refinement}
                 responseUsed={item.responseUsed}
                 onActionPress={(action) => handleQuickAction(action, item.id, item.ai_response || "")}
-                onRefinementPress={(option) => handleRefinement(option, item.ai_response || "")}
+                onRefinementPress={(option) => handleRefinement(option, item.ai_response || "", item.id)}
                 onSharePress={() => onShare(item.ai_response || "")}
             />
             <ChatTimelineCard
@@ -417,7 +433,7 @@ export default function AiChatScreen() {
                                 <Pressable onPress={() => router.push("/settings")}>
                                     <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: 'rgba(255, 255, 255, 0.12)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}>
                                         <Ionicons name="sparkles" size={14} color="#FDE68A" />
-                                        <Text style={styles.creditText}>{credits ?? 0}</Text>
+                                        <Text style={styles.creditText}>{userCredits ?? 0}</Text>
                                     </View>
                                 </Pressable>
                             )}
@@ -454,7 +470,7 @@ export default function AiChatScreen() {
             ) : (
                 <FlatList
                     ref={flatListRef}
-                    inverted 
+                    inverted
                     data={chatHistory}
                     renderItem={renderItem}
                     keyExtractor={(item) => item.id.toString()}
