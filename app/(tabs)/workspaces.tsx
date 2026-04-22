@@ -291,15 +291,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   headerContent: { paddingHorizontal: 20, },
-  headerTitle: {
-    // marginTop: 8,
-    fontSize: 18,
-    color: "#0B2F5B",
-    letterSpacing: 0.3,
-    fontFamily: "Inter-Regular",
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
+headerTitle: {
+  marginTop: 8,
+  fontSize: 26, 
+  fontWeight: "700",
+  color: "#043a92",
+  letterSpacing: -0.2, 
+  fontFamily: Platform.OS === 'ios' ? "System" : "Inter-Bold", 
+  includeFontPadding: false, // Essential for Android vertical centering
+  textAlignVertical: "center",
+},
   listContent: { padding: 20, paddingBottom: 120 },
   loaderContainer: {
     flex: 1,

@@ -144,7 +144,7 @@ export type SubscriptionStatus = {
 };
 
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<string, string> = {
   file_note: "File",
