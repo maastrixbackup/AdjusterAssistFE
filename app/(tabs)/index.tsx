@@ -164,7 +164,7 @@ export default function HomeScreen() {
             style={({ pressed }) => [styles.primaryActionBtn, pressed && styles.pressed]} 
             onPress={() => setIsCreateModalVisible(true)}
           >
-            <LinearGradient colors={["#22529e", "#0834af"]} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.primaryActionGradient}>
+            <LinearGradient colors={["#276cdb", "#165bb6"]} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.primaryActionGradient}>
               <View style={styles.primaryActionLeft}>
                 <View style={styles.iconCircle}>
                   <Ionicons name="add" size={24} color="#FFF" />
