@@ -11,7 +11,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-
 import {
     ActivityIndicator,
     Animated,
@@ -27,6 +26,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
