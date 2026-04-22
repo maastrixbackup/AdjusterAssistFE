@@ -316,6 +316,7 @@ export default function AiChatScreen() {
                         );
                     }
                 } catch (error) {
+                    console.log(error)
                     toast.error("Update failed");
                 }
                 break;
@@ -325,7 +326,6 @@ export default function AiChatScreen() {
     const handleRefinement = useCallback(async (option: string, originalContent: string, parentId: number) => {
         Haptics.selectionAsync();
 
-        // 1. Get the key the backend expects
         const backendType = REFINEMENT_MAP[option] || 'formal';
 
         setIsGenerating(true);
@@ -335,7 +335,7 @@ export default function AiChatScreen() {
                 fileId: Number(fileId),
                 parentMessageId: parentId,
                 refinementType: backendType,
-                userInput: originalContent, // Passing the content to be refined
+                userInput: originalContent,
             });
 
             if (result.success) {
