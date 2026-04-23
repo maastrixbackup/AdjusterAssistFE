@@ -24,19 +24,13 @@
       }
     },
     "android": {
-      "newArchEnabled": false,
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": {
-            "scheme": "https"
-          }
-        }
-      ],
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
         "NOTIFICATIONS"
       ],
       "adaptiveIcon": {
@@ -93,9 +87,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6a1feab1-61a6-4811-a565-a7c7c1dc31fc"
+        "projectId": "34289344-f849-4bd5-ae0b-728b8cc40829"
       }
     },
-    "owner": "pintu1001"
+    "owner": "pintu7787"
   }
 }
