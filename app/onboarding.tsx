@@ -58,7 +58,7 @@ export default function OnboardingScreen() {
   const isTablet = width > 768;
   const [activeIndex, setActiveIndex] = useState(0);
   const flatRef = useRef<FlatList>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  // const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
