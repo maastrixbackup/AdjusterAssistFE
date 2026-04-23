@@ -14,6 +14,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "AdjusterAssist needs access to your photos to document claim damages.",
+        "NSPhotoLibraryAddUsageDescription": "AdjusterAssist needs access to save photos for claim documentation.",
         "NSCameraUsageDescription": "AdjusterAssist needs camera access to take photos of claim damages.",
         "NSMicrophoneUsageDescription": "AdjusterAssist needs microphone access for voice-to-text claim updates.",
         "NSAppTransportSecurity": {
@@ -22,13 +23,15 @@
       }
     },
     "android": {
+      "newArchEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.NOTIFICATIONS"
+        "android.permission.READ_MEDIA_AUDIO",
+        "NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
@@ -49,15 +52,11 @@
         "expo-image-picker",
         {
           "photosPermission": "AdjusterAssist needs access to your photos to document claim damages.",
-          "cameraPermission": "AdjusterAssist needs camera access to take photos of claim damages."
+          "cameraPermission": "AdjusterAssist needs camera access to take photos of claim damages.",
+          "microphonePermission": false
         }
       ],
-      [
-        "expo-document-picker",
-        {
-          "appleTeamId": "YOUR_APPLE_TEAM_ID"
-        }
-      ],
+      "expo-document-picker",
       [
         "expo-splash-screen",
         {
@@ -87,8 +86,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "34289344-f849-4bd5-ae0b-728b8cc40829"
+        "projectId": "6a1feab1-61a6-4811-a565-a7c7c1dc31fc"
       }
-    }
+    },
+    "owner": "pintu1001"
   }
 }
