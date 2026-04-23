@@ -19,7 +19,8 @@
         "NSMicrophoneUsageDescription": "AdjusterAssist needs microphone access for voice-to-text claim updates.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "LSApplicationQueriesSchemes": ["http", "https"]
       }
     },
     "android": {
@@ -73,7 +74,8 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
