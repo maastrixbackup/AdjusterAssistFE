@@ -231,8 +231,10 @@ export default function AiChatScreen() {
                     responseUsed: false,
                     quick_actions: ["Copy", "Create Variant", "Mark as used"],
                     refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                    // attachments:  result.attachments,
-                    created_at: result.createdAt
+                    created_at: result.createdAt,
+
+                    doccuments_url: result.doccuments_url,
+                    image_input_url: result.image_input_url
                 }
 
                 console.log("Attachments: ",attachments)

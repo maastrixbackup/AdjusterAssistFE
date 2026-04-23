@@ -111,9 +111,11 @@ export interface GenerateResponseResult {
   user_input: string;
   fileId: number | string;
   nextStep?: string;
-  attachments: [];
   logId?: number;
   createdAt?: string;
+
+  image_input_url?: string | null;
+  doccuments_url?: string | null;
 }
 
 export type GenerateNextStepRequest = {
@@ -298,8 +300,9 @@ export async function generateResponse(
       user_input: string;
       output_format: string;
       next_step_suggestion: string;
-      attachments: [];
       created_at: string;
+      image_input_url?: string | null;
+      doccuments_url?: string | null;
     };
   }>(
     "/drafts/generate",
@@ -334,9 +337,10 @@ export async function generateResponse(
     user_input: res.data.user_input,
     fileId: extractedFileId,
     nextStep: res.data.next_step_suggestion,
-    attachments: res.data.attachments,
-    // logId: res.data.log_id, // or res.data.id depending on your backend naming
     createdAt: res.data.created_at,
+
+    doccuments_url: res.data.doccuments_url,
+    image_input_url: res.data.image_input_url,
   };
 }
 
