@@ -71,47 +71,34 @@ export const ChatInputSection = ({
   };
   // ──────────────────────────────────────────────────────────────────────
 
-  const launchImagePicker = async () => {
-    try {
-      if (Platform.OS === 'ios') {
-        const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          if (!canAskAgain) {
-            Alert.alert(
-              'Photo Access Required',
-              'Please enable photo library access in your iPhone Settings to attach images.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Open Settings', onPress: () => Linking.openSettings() },
-              ]
-            );
-          }
-          return;
-        }
-      }
+const launchImagePicker = async () => {
+  try {
+    const isMultiple = Platform.OS === 'ios';  // Android: single only for reliability
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: isMultiple,
+      quality: 0.8,
+    });
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: true,
-        quality: 0.8,
-      });
+    console.log('PICKER RESULT:', result);
 
-      if (!result.canceled) {
-        const newImages: Attachment[] = result.assets.map(asset => {
-          const extension = asset.uri.split('.').pop()?.toLowerCase();
-          return {
-            uri: asset.uri,
-            name: asset.fileName || `img_${Date.now()}.${extension || 'jpg'}`,
-            type: asset.mimeType || `image/${extension || 'jpeg'}`,
-            kind: 'image',
-          };
-        });
-        setSelectedAttachments(prev => [...prev, ...newImages]);
-      }
-    } catch (error) {
-      console.error('Image Picker Error:', error);
+    if (!result.canceled && result.assets?.length) {
+      const newImages: Attachment[] = result.assets.map(asset => ({
+        uri: asset.uri,
+        name: asset.fileName || `img_${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+        kind: 'image',
+      }));
+      setSelectedAttachments(prev => [...prev, ...newImages]);
+      toast.success(`${newImages.length} image(s) added`);
+    } else {
+      console.log('No assets despite !canceled:', result);
     }
-  };
+  } catch (error) {
+    console.error('Image Picker Error:', error);
+    toast.error('Image selection failed');
+  }
+};
 
   const launchDocPicker = async () => {
     try {
