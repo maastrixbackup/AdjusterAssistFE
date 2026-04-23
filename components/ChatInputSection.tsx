@@ -143,6 +143,7 @@ const launchImagePicker = async () => {
         setSelectedAttachments(prev => [...prev, ...newDocs]);
       }
     } catch (error) {
+      toast.error("Unable to upload file.")
       console.error('Document Picker Error:', error);
     }
   };
