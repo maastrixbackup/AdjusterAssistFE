@@ -342,6 +342,7 @@ export default function AiChatScreen() {
                 refinementType: backendType,
                 userInput: originalContent,
             });
+            // console.log(result)
 
             if (result.success) {
                 toast.success(`${option} Applied`);
@@ -352,7 +353,7 @@ export default function AiChatScreen() {
                     id: result.data.id,
                     user_input: `Refine: ${option}`, // Descriptive label for the thread
                     ai_response: result.data.ai_response,
-                    output_format: result.data.content_type,
+                    output_format: result.data.output_format,
                     next_step_suggestion: result.data.next_step_suggestion,
                     responseUsed: false,
                     quick_actions: ["Copy", "Create Variant", "Mark as used"],

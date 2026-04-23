@@ -71,34 +71,63 @@ export const ChatInputSection = ({
   };
   // ──────────────────────────────────────────────────────────────────────
 
-const launchImagePicker = async () => {
-  try {
-    const isMultiple = Platform.OS === 'ios';  // Android: single only for reliability
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: isMultiple,
-      quality: 0.8,
-    });
+  const launchImagePicker = async () => {
+    try {
+      // 1. Request Permissions (Crucial for Standalone Builds)
+      const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    console.log('PICKER RESULT:', result);
+      if (status !== 'granted') {
+        if (!canAskAgain) {
+          // User denied permanently; must send them to Settings
+          Alert.alert(
+            'Permission Required',
+            'AdjusterAssist needs gallery access to upload photos. Please enable it in Settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
+          );
+        } else {
+          toast.error('Permission to access gallery is required.');
+        }
+        return;
+      }
 
-    if (!result.canceled && result.assets?.length) {
-      const newImages: Attachment[] = result.assets.map(asset => ({
-        uri: asset.uri,
-        name: asset.fileName || `img_${Date.now()}.jpg`,
-        type: asset.mimeType || 'image/jpeg',
-        kind: 'image',
-      }));
-      setSelectedAttachments(prev => [...prev, ...newImages]);
-      toast.success(`${newImages.length} image(s) added`);
-    } else {
-      console.log('No assets despite !canceled:', result);
+      // 2. Configure Picker
+      // Note: Android supports multiple selection in recent Expo versions, 
+      // but keeping your logic for 'isMultiple' if you prefer stability.
+      const isMultiple = Platform.OS === 'ios';
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'], // Correct modern array format
+        allowsMultipleSelection: isMultiple,
+        quality: 0.8,
+        selectionLimit: isMultiple ? 10 : 1, // Optional: safety limit
+      });
+
+      console.log('PICKER RESULT:', result);
+
+      // 3. Handle Results
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImages: Attachment[] = result.assets.map(asset => ({
+          uri: asset.uri,
+          // Fallback for name if fileName is null
+          name: asset.fileName || `img_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+          kind: 'image',
+        }));
+
+        setSelectedAttachments(prev => [...prev, ...newImages]);
+        toast.success(`${newImages.length} image(s) added`);
+      } else {
+        console.log('User cancelled or no assets found');
+      }
+    } catch (error) {
+      // This will now capture the 'ImageLoader' or 'Permission' errors in your logs
+      console.error('Image Picker Error:', error);
+      toast.error('Image selection failed. Please try again.');
     }
-  } catch (error) {
-    console.error('Image Picker Error:', error);
-    toast.error('Image selection failed');
-  }
-};
+  };
 
   const launchDocPicker = async () => {
     try {
