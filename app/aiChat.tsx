@@ -158,7 +158,6 @@ export default function AiChatScreen() {
                 refinement: draft.refinement || ["Shorten", "Make more formal", "Make attorney facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
             }));
-            console.log(drafts);
             
             // We reverse here because we are using the 'inverted' prop on FlatList
             setChatHistory(formattedHistory.reverse());
@@ -237,7 +236,6 @@ export default function AiChatScreen() {
                     image_input_url: result.image_input_url
                 }
 
-                console.log("Attachments: ",attachments)
                 setChatHistory(prev => [NewInteraction, ...prev]);
                 setUserCredits(prev => Math.max(0, prev - 1));
                 setInputText("");
