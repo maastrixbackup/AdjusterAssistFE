@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ChatTimelineCardProps {
   title: string;
@@ -15,6 +15,9 @@ interface ChatTimelineCardProps {
   onActionPress?: (action: string) => void;
   onRefinementPress?: (option: string) => void;
   onSharePress?: () => void;
+
+  imageInput?: string;   // Add these props
+  documentInput?: string; // Add these props
 }
 
 export const ChatTimelineCard = ({
@@ -30,6 +33,9 @@ export const ChatTimelineCard = ({
   onActionPress,
   onRefinementPress,
   onSharePress,
+
+  imageInput,
+  documentInput
 }: ChatTimelineCardProps) => {
 
   const [showRefinements, setShowRefinements] = useState(false);
@@ -110,6 +116,40 @@ export const ChatTimelineCard = ({
           {title && (
             <Text style={styles.cardTitle}>{title}</Text>
           )}
+{/* --- NEW PREMIUM ATTACHMENT SECTION --- */}
+          {(imageInput || documentInput) && (
+            <View style={styles.premiumAttachmentSection}>
+              
+              {imageInput && (
+                <TouchableOpacity 
+                  activeOpacity={0.8} 
+                  onPress={() => Linking.openURL(imageInput)}
+                  style={styles.premiumImageBadge}
+                >
+                  <Image source={{ uri: imageInput }} style={styles.imageThumbnail} resizeMode="cover" />
+                  <View style={styles.maximizeHint}>
+                    <Feather name="maximize-2" size={8} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {documentInput && (
+                <TouchableOpacity 
+                  style={styles.premiumDocBadge} 
+                  onPress={() => Linking.openURL(documentInput)}
+                >
+                  <View style={styles.premiumIconCircle}>
+                    <Feather name="file-text" size={13} color="#004B93" />
+                  </View>
+                  <Text style={styles.premiumDocText} numberOfLines={1}>
+                    Evidence File
+                  </Text>
+                  <Feather name="external-link" size={11} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {/* --------------------------------------- */}
 
           <Text
             style={[
@@ -123,6 +163,7 @@ export const ChatTimelineCard = ({
             {content}
           </Text>
 
+       
           <View style={styles.footer}>
             <View style={styles.actionsRow}>
               {quickActions.slice(0, 3).map((action, index) => {
@@ -333,14 +374,14 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 2,
   },
-  cardDescription: {
-    fontSize: 16,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-    fontStyle: 'italic',
-    color: '#0a2447',
-    lineHeight: 18,
-    marginBottom: 6,
-  },
+  // cardDescription: {
+  //   fontSize: 16,
+  //   fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  //   fontStyle: 'italic',
+  //   color: '#0a2447',
+  //   lineHeight: 18,
+  //   marginBottom: 6,
+  // },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -588,5 +629,140 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#1E293B',
+  },
+
+  attachmentSection: {
+    marginTop: 10,
+    marginBottom: 6,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  imageAttachmentWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: 4,
+    borderRadius: 6,
+  },
+  docAttachment: {
+    flex: 1,
+    minWidth: 180,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  docIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  docInfo: {
+    flex: 1,
+  },
+  docTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  docSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  premiumAttachmentSection: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8, // Tighter gap
+    marginTop: 8,
+    marginBottom: 4, // Tuck neatly before the description
+  },
+  premiumImageBadge: {
+    width: 60, // Much smaller, "premium badge" size
+    height: 60,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0', // Soft Slate
+    backgroundColor: '#F8FAFC',
+    shadowColor: "#1E293B",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+  },
+  imageThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  maximizeHint: {
+    position: 'absolute',
+    bottom: 3,
+    right: 3,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 3,
+    borderRadius: 6,
+  },
+  premiumDocBadge: {
+    height: 60, // Match the image height for stability
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flex: 1, // Let it fill remaining space
+    minWidth: 160,
+  },
+  premiumIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(59, 130, 246, 0.08)', // Deep Blue alpha
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  premiumDocText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#004B93', // Deep adjusting navy
+    flex: 1, // Ensure text truncates properly if too long
+    marginRight: 6,
+  },
+  // -------------------------------------
+
+  cardDescription: {
+    fontSize: 16,
+    // Ensure Roboto is bold if available for better readability
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto-Bold', 
+    fontStyle: 'italic',
+    color: '#0a2447',
+    lineHeight: 20, // Tighter spacing makes bold text cleaner
+    marginBottom: 6,
   },
 });

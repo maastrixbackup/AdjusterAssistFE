@@ -90,6 +90,7 @@ export interface ClaimMessage {
   next_step_suggestion?: string;
   activity_type?: string;
   image_input_url?: string | null;
+  doccuments_url?: string | null;
   quick_actions?: string[]; // JSONB maps to string array
   response_used: boolean;
   metadata?: any;
@@ -112,6 +113,9 @@ export interface GenerateResponseResult {
   nextStep?: string;
   logId?: number;
   createdAt?: string;
+
+  image_input_url?: string | null;
+  doccuments_url?: string | null;
 }
 
 export type GenerateNextStepRequest = {
@@ -157,6 +161,7 @@ const responseTypeLabels: Record<string, string> = {
   claim_summary: "Claim Summary",
   xactanalysis_response: "Xact Analysis",
   damage_evaluation: "Damage Evaluation",
+  attorney_response: "Attorney Response",
 };
 
 /**
@@ -296,6 +301,8 @@ export async function generateResponse(
       output_format: string;
       next_step_suggestion: string;
       created_at: string;
+      image_input_url?: string | null;
+      doccuments_url?: string | null;
     };
   }>(
     "/drafts/generate",
@@ -330,62 +337,10 @@ export async function generateResponse(
     user_input: res.data.user_input,
     fileId: extractedFileId,
     nextStep: res.data.next_step_suggestion,
-    // logId: res.data.log_id, // or res.data.id depending on your backend naming
     createdAt: res.data.created_at,
-  };
-}
 
-export async function generateNextStep(
-  token: string,
-  payload: {
-    fileId: string;
-    userInput: string | undefined;
-    previousResponse: string;
-    output_format: string;
-  },
-): Promise<GenerateResponseResult> {
-  console.log("Chaining workflow for Next Step:", payload);
-
-  const res = await apiRequest<{
-    success: boolean;
-    message: string;
-    data: {
-      id: number; // 1. Added id here
-      content: string;
-      user_input?: string; // 2. Added user_input if backend returns it
-      next_step?: string;
-      output_format: string;
-      log_id?: number;
-      created_at?: string;
-    };
-  }>(
-    "/drafts/generate-next-step",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-    token,
-  );
-
-  if (!res.success || !res.data) {
-    throw new Error(res.message || "Failed to generate next workflow step");
-  }
-
-  // Consistent return mapping
-  return {
-    id: res.data.id, // 3. Map the id to the result
-    output_format: res.data.output_format,
-    responseTypeLabel:
-      responseTypeLabels[res.data.output_format] ||
-      res.data.output_format ||
-      "Follow-up",
-    responseText: res.data.content,
-    // 4. Fallback to payload.userInput if the backend doesn't return user_input
-    user_input: res.data.user_input || payload.userInput || "Follow-up action",
-    fileId: Number(payload.fileId),
-    nextStep: res.data.next_step,
-    logId: res.data.log_id || res.data.id,
-    createdAt: res.data.created_at || new Date().toISOString(),
+    doccuments_url: res.data.doccuments_url,
+    image_input_url: res.data.image_input_url,
   };
 }
 
