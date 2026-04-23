@@ -151,12 +151,15 @@ export default function AiChatScreen() {
                 output_format: draft.content_type,
                 next_step_suggestion: draft.next_step_suggestion,
                 responseUsed: draft.response_used || false,
+                doccuments_url:draft.doccuments_url,
+                image_input_url: draft.image_input_url,
                 // quick_actions: draft.quick_actions || [],
                 quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                refinement: draft.refinement || ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
+                refinement: draft.refinement || ["Shorten", "Make more formal", "Make attorney facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
             }));
-
+            console.log(drafts);
+            
             // We reverse here because we are using the 'inverted' prop on FlatList
             setChatHistory(formattedHistory.reverse());
         } catch (error) {
@@ -228,9 +231,11 @@ export default function AiChatScreen() {
                     responseUsed: false,
                     quick_actions: ["Copy", "Create Variant", "Mark as used"],
                     refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                    created_at: result.createdAt,
+                    // attachments:  result.attachments,
+                    created_at: result.createdAt
                 }
 
+                console.log("Attachments: ",attachments)
                 setChatHistory(prev => [NewInteraction, ...prev]);
                 setUserCredits(prev => Math.max(0, prev - 1));
                 setInputText("");
@@ -383,6 +388,8 @@ export default function AiChatScreen() {
                 content={item.user_input}
                 color="#94A3B8"
                 quickActions={["Copy"]}
+                imageInput={item?.image_input_url}
+                documentInput={item?.doccuments_url}
                 timeAgo={getFormattedTime(item.created_at)}
             />
             <ChatTimelineCard
