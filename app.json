@@ -39,7 +39,7 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/images/adaptive-icon.png"
+        "foregroundImage": "./assets/images/icon.png"
       },
       "package": "com.adjusterassist.app",
       "googleServicesFile": "./google-services.json"
