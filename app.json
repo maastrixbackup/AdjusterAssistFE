@@ -14,19 +14,16 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "AdjusterAssist needs access to your photos to document claim damages.",
-        "NSPhotoLibraryAddUsageDescription": "AdjusterAssist needs access to save photos for claim documentation.",
         "NSCameraUsageDescription": "AdjusterAssist needs camera access to take photos of claim damages.",
         "NSMicrophoneUsageDescription": "AdjusterAssist needs microphone access for voice-to-text claim updates.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        },
-        "LSApplicationQueriesSchemes": [
-          "http",
-          "https"
-        ]
+        }
       }
     },
     "android": {
+      "package": "com.adjusterassist.app",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",
@@ -39,10 +36,8 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/images/adaptive-icon.png"
-      },
-      "package": "com.adjusterassist.app",
-      "googleServicesFile": "./google-services.json"
+        "foregroundImage": "./assets/images/icon.png"
+      }
     },
     "plugins": [
       "expo-router",
@@ -54,13 +49,13 @@
           "cameraPermission": "AdjusterAssist needs camera access to take photos of claim damages."
         }
       ],
+      "expo-document-picker",
       [
         "expo-av",
         {
           "microphonePermission": "AdjusterAssist needs microphone access for voice-to-text claim updates."
         }
       ],
-      "expo-document-picker",
       [
         "expo-splash-screen",
         {
@@ -76,14 +71,12 @@
           "android": {
             "useAndroidX": true,
             "enableJetifier": true,
-            "compileSdkVersion": 34,
+            "compileSdkVersion": 35,
             "targetSdkVersion": 34
           }
         }
       ],
-      "@react-native-community/datetimepicker",
-      "expo-web-browser",
-      "expo-asset"
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

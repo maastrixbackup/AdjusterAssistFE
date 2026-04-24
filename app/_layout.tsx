@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -27,58 +27,67 @@ function NavigationGuard() {
   const segments = useSegments();
   const router = useRouter();
 
-  // 1. Memoized check function to allow re-triggering
-  const checkOnboardingStatus = useCallback(async () => {
-    try {
-      const value = await AsyncStorage.getItem("@has_seen_onboarding");
-      setHasSeenOnboarding(value === "true");
-    } catch (e) {
-      setHasSeenOnboarding(false);
-    }
-  }, []);
+  // ─── Track if we've already navigated to prevent double-fire ────────────
+  const hasNavigated = useRef(false);
 
+  // ─── Read onboarding flag ONCE on mount ──────────────────────────────────
   useEffect(() => {
-    checkOnboardingStatus();
-  }, [checkOnboardingStatus]);
+    AsyncStorage.getItem("@has_seen_onboarding")
+      .then(value => setHasSeenOnboarding(value === "true"))
+      .catch(() => setHasSeenOnboarding(false));
+  }, []); // ← empty deps: runs once, no re-check loop
 
-  // 2. Optimized Navigation Logic
+  // ─── Navigation logic ─────────────────────────────────────────────────────
   useEffect(() => {
-    // If auth state isn't loaded or onboarding status is unknown, wait.
+    // Wait until both auth and onboarding status are resolved
     if (!isHydrated || hasSeenOnboarding === null) return;
 
     const rootSegment = segments[0];
-    
     const inAuthGroup = rootSegment === "(auth)" || rootSegment === "login";
-    const inProtectedGroup = rootSegment === "(tabs)" || rootSegment === "workspaces" || rootSegment === "generate";
+    const inProtectedGroup =
+      rootSegment === "(tabs)" ||
+      rootSegment === "workspaces" ||
+      rootSegment === "generate";
     const inOnboardingGroup = rootSegment === "onboarding";
 
-    // A. Re-check storage if we are currently in the auth group but the guard thinks we haven't seen onboarding
-    // This handles the transition immediately after router.replace('/login') is called in onboarding
-    if (inAuthGroup && hasSeenOnboarding === false) {
-        checkOnboardingStatus();
-    }
-
-    // B. Logic Gate: Force Onboarding if never seen
+    // ─── A. Never seen onboarding → go to onboarding ──────────────────────
     if (!hasSeenOnboarding && !inOnboardingGroup) {
-      router.replace("/onboarding");
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        router.replace("/onboarding");
+      }
       return;
     }
 
-    // C. Logic Gate: Redirect to login if unauthorized
+    // Reset nav guard once we're in the onboarding screen
+    if (inOnboardingGroup) {
+      hasNavigated.current = false;
+      return;
+    }
+
+    // ─── B. Seen onboarding + not authenticated + in protected area ───────
     if (hasSeenOnboarding && !isAuthenticated && inProtectedGroup) {
       router.replace("/(auth)/login");
       return;
     }
 
-    // D. Logic Gate: Redirect to app if already authenticated
+    // ─── C. Already authenticated → skip auth/onboarding screens ─────────
     if (isAuthenticated && (inAuthGroup || inOnboardingGroup)) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments, checkOnboardingStatus]);
+  }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (!isHydrated || hasSeenOnboarding === null) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B3C7A" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#0B3C7A",
+        }}
+      >
         <ActivityIndicator size="large" color="#FFFFFF" />
       </View>
     );
@@ -90,7 +99,7 @@ function NavigationGuard() {
         headerTintColor: "#FFFFFF",
         contentStyle: { backgroundColor: "#0B3C7A" },
         headerTitleStyle: { fontSize: 15, fontWeight: "600" },
-        animation: "fade", 
+        animation: "fade",
         headerBackground: () => (
           <LinearGradient
             colors={["#276bbd", "#0B3C7A"]}
@@ -131,7 +140,6 @@ export default function RootLayout() {
           <ThemeProvider value={AppTheme}>
             <View style={{ flex: 1, backgroundColor: "#263369" }}>
               <NavigationGuard />
-              {/* Toaster is placed at the bottom of the View to be on top of everything except Native Modals */}
               <Toaster />
             </View>
             <StatusBar style="light" />
