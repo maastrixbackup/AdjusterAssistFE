@@ -488,9 +488,9 @@ export default function AiChatScreen() {
                     keyboardShouldPersistTaps="handled"
                     scrollEventThrottle={16}
                     ListEmptyComponent={
-                        <View style={[styles.emptyContainer, { transform: [{ scaleY: -1 }] }]}>
+                        <View style={[styles.emptyContainer]}>
                             <Ionicons name="chatbubbles-outline" size={48} color="#CBD5E1" />
-                            <Text style={styles.emptyText}>No history yet. Start by asking a question.</Text>
+                            <Text style={styles.emptyText}>Add claim details, upload documents, or ask for a file note.</Text>
                         </View>
                     }
                 />
@@ -547,6 +547,6 @@ const styles = StyleSheet.create({
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     loaderText: { marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '500' },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
-    emptyText: { marginTop: 16, color: '#94A3B8', fontSize: 15, textAlign: 'center', paddingHorizontal: 40 },
+    emptyText: { marginTop: 16, color: '#94A3B8', fontSize: 15, textAlign: 'center', paddingHorizontal: 40},
     creditText: { color: "#FDE68A", fontSize: 13, fontWeight: "700", marginLeft: 6 },
 });
