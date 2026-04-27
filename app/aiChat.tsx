@@ -151,14 +151,14 @@ export default function AiChatScreen() {
                 output_format: draft.content_type,
                 next_step_suggestion: draft.next_step_suggestion,
                 responseUsed: draft.response_used || false,
-                doccuments_url:draft.doccuments_url,
+                doccuments_url: draft.doccuments_url,
                 image_input_url: draft.image_input_url,
                 // quick_actions: draft.quick_actions || [],
                 quick_actions: ["Copy", "Create Variant", "Mark as used"],
                 refinement: draft.refinement || ["Shorten", "Make more formal", "Make attorney facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
             }));
-            
+
             // We reverse here because we are using the 'inverted' prop on FlatList
             setChatHistory(formattedHistory.reverse());
         } catch (error) {
@@ -281,20 +281,18 @@ export default function AiChatScreen() {
                 if (result.success) {
                     toast.success(`${variantLabel} Created`);
 
-                    const newInteraction = {
-                        id: result.data.id,
-                        user_input: `Variant: ${variantLabel}`,
-                        ai_response: result.data.ai_response,
-                        output_format: variantLabel,
-                        next_step_suggestion: result.data.next_step_suggestion,
-                        responseUsed: false,
-                        quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                        refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                        created_at: result.data.created_at,
-                    };
-
-                    // Add to thread immediately for ChatGPT-style continuity
-                    setChatHistory(prev => [newInteraction, ...prev]);
+                    setChatHistory(prev => prev.map(item =>
+                        item.id === draftId
+                            ? {
+                                ...item,
+                                ai_response: result.data.ai_response,
+                                output_format: variantLabel,
+                                next_step_suggestion: result.data.next_step_suggestion,
+                                // If your backend returns a new timestamp for the update:
+                                created_at: result.data.updated_at || item.created_at
+                            }
+                            : item
+                    ));
                     setUserCredits(prev => Math.max(0, prev - 1));
                 }
             } catch (error: any) {
@@ -547,6 +545,6 @@ const styles = StyleSheet.create({
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     loaderText: { marginTop: 12, color: '#64748B', fontSize: 14, fontWeight: '500' },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
-    emptyText: { marginTop: 16, color: '#94A3B8', fontSize: 15, textAlign: 'center', paddingHorizontal: 40},
+    emptyText: { marginTop: 16, color: '#94A3B8', fontSize: 15, textAlign: 'center', paddingHorizontal: 40 },
     creditText: { color: "#FDE68A", fontSize: 13, fontWeight: "700", marginLeft: 6 },
 });
