@@ -151,14 +151,15 @@ export default function AiChatScreen() {
                 output_format: draft.content_type,
                 next_step_suggestion: draft.next_step_suggestion,
                 responseUsed: draft.response_used || false,
-                doccuments_url:draft.doccuments_url,
+                doccuments_url: draft.doccuments_url,
                 image_input_url: draft.image_input_url,
                 // quick_actions: draft.quick_actions || [],
                 quick_actions: ["Copy", "Create Variant", "Mark as used"],
                 refinement: draft.refinement || ["Shorten", "Make more formal", "Make attorney facing", "Make more firm", " Add DOI safe language"],
                 created_at: draft.created_at,
+                updated_at: draft.updated_at || draft.created_at,
             }));
-            
+
             // We reverse here because we are using the 'inverted' prop on FlatList
             setChatHistory(formattedHistory.reverse());
         } catch (error) {
@@ -281,20 +282,18 @@ export default function AiChatScreen() {
                 if (result.success) {
                     toast.success(`${variantLabel} Created`);
 
-                    const newInteraction = {
-                        id: result.data.id,
-                        user_input: `Variant: ${variantLabel}`,
-                        ai_response: result.data.ai_response,
-                        output_format: variantLabel,
-                        next_step_suggestion: result.data.next_step_suggestion,
-                        responseUsed: false,
-                        quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                        refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                        created_at: result.data.created_at,
-                    };
-
-                    // Add to thread immediately for ChatGPT-style continuity
-                    setChatHistory(prev => [newInteraction, ...prev]);
+                    setChatHistory(prev => prev.map(item =>
+                        item.id === draftId
+                            ? {
+                                ...item,
+                                ai_response: result.data.ai_response,
+                                output_format: variantLabel,
+                                next_step_suggestion: result.data.next_step_suggestion,
+                                created_at: item.created_at,
+                                updated_at: result.updated_at
+                            }
+                            : item
+                    ));
                     setUserCredits(prev => Math.max(0, prev - 1));
                 }
             } catch (error: any) {
@@ -306,6 +305,7 @@ export default function AiChatScreen() {
         }
 
         // Handle other actions (Copy, Mark as used, etc.)
+        // console.log(action)
         switch (action) {
             case "Copy":
                 await Clipboard.setStringAsync(content);
@@ -313,15 +313,30 @@ export default function AiChatScreen() {
                 break;
             case "Mark as used":
                 try {
-                    const response = await updateDraft(token!, draftId, { response_used: true });
+                    // 1. Find the current state from the local history
+                    const currentItem = chatHistory.find(item => item.id === draftId);
+                    const currentUsedStatus = currentItem?.responseUsed || false;
+
+                    // 2. Send the toggled value (!currentUsedStatus) to the API
+                    const response = await updateDraft(token!, draftId, {
+                        response_used: !currentUsedStatus
+                    });
+
                     if (response.success) {
-                        toast.success("Interaction Updated");
+                        const newStatus = !currentUsedStatus;
+                        toast.success(newStatus ? "Marked as Used" : "Marked as Unused");
+
+                        // 3. Update the local state to reflect the change
                         setChatHistory(prev =>
-                            prev.map(item => item.id === draftId ? { ...item, responseUsed: true } : item)
+                            prev.map(item =>
+                                item.id === draftId
+                                    ? { ...item, responseUsed: newStatus }
+                                    : item
+                            )
                         );
                     }
                 } catch (error) {
-                    console.log(error)
+                    console.error("Toggle used error:", error);
                     toast.error("Update failed");
                 }
                 break;
@@ -335,34 +350,30 @@ export default function AiChatScreen() {
 
         setIsGenerating(true);
         try {
-            // 2. Call the new dedicated refinement API
             const result = await refineResponse(token!, {
                 fileId: Number(fileId),
                 parentMessageId: parentId,
                 refinementType: backendType,
-                userInput: originalContent,
+                userInput: originalContent, // This is the content to be refined
             });
-            // console.log(result)
 
             if (result.success) {
                 toast.success(`${option} Applied`);
                 setUserCredits(prev => Math.max(0, prev - 1));
 
-                // 3. Format the result to match your chatHistory structure
-                const refinedInteraction = {
-                    id: result.data.id,
-                    user_input: `Refine: ${option}`, // Descriptive label for the thread
-                    ai_response: result.data.ai_response,
-                    output_format: result.data.output_format,
-                    next_step_suggestion: result.data.next_step_suggestion,
-                    responseUsed: false,
-                    quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                    refinement: ["Shorten", "Make more formal", "Make attornary facing", "Make more firm", " Add DOI safe language"],
-                    created_at: result.data.created_at,
-                };
-
-                // 4. Push to thread as a NEW standalone entry
-                setChatHistory(prev => [refinedInteraction, ...prev]);
+                setChatHistory(prev => prev.map(item => {
+                    if (item.id === parentId) {
+                        return {
+                            ...item, // Keep the original ID and existing properties (like images/docs)
+                            ai_response: result.data.ai_response, // Replace with refined text
+                            output_format: result.data.output_format,
+                            next_step_suggestion: result.data.next_step_suggestion,
+                            created_at: result.data.created_at,
+                            updated_at: result.data.updated_at
+                        };
+                    }
+                    return item;
+                }));
             }
         } catch (error) {
             console.error("Refinement error:", error);
@@ -413,7 +424,7 @@ export default function AiChatScreen() {
                 content={item.next_step_suggestion}
                 color="#10B981"
                 quickActions={["Copy"]}
-                timeAgo={getFormattedTime(item.created_at)}
+                timeAgo={getFormattedTime(item.updated_at)}
             />
         </View>
     ), [handleQuickAction, handleRefinement, onShare]);
@@ -488,9 +499,9 @@ export default function AiChatScreen() {
                     keyboardShouldPersistTaps="handled"
                     scrollEventThrottle={16}
                     ListEmptyComponent={
-                        <View style={[styles.emptyContainer, { transform: [{ scaleY: -1 }] }]}>
+                        <View style={[styles.emptyContainer]}>
                             <Ionicons name="chatbubbles-outline" size={48} color="#CBD5E1" />
-                            <Text style={styles.emptyText}>No history yet. Start by asking a question.</Text>
+                            <Text style={styles.emptyText}>Add claim details, upload documents, or ask for a file note.</Text>
                         </View>
                     }
                 />

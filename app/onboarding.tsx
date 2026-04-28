@@ -20,9 +20,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 // --- SLIDES DATA stays the same ---
 const SLIDES = [
-  { id: "1", icon: "file-text" as const, badge: "AI-Powered", badgeColor: "#22c55e", heading: "Draft Claims\nin Minutes", sub: "AI-powered claims drafting for insurance adjusters. Accurate, fast, professional." },
+  { id: "1", icon: "file-text" as const, badge: "AI-Powered", badgeColor: "#22c55e", heading: "Manage Claims\nwith AI Guidance", sub: "AI-powered claims drafting for insurance adjusters. Accurate, fast, professional." },
   { id: "2", icon: "camera" as const, badge: "Smart Capture", badgeColor: "#f59e0b", heading: "Capture &\nOrganize Evidence", sub: "Photo, notes, and damage reports — all organized automatically in one place." },
-  { id: "3", icon: "send" as const, badge: "Instant Submit", badgeColor: "#276bbd", heading: "Submit with\nConfidence", sub: "Review, approve, and submit polished claim drafts directly from the field." },
+  { id: "3", icon: "send" as const, badge: "Instant Submit", badgeColor: "#276bbd", heading: "Review and Use with\nConfidence", sub: "Review, approve, and submit polished claim drafts directly from the field." },
 ];
 
 function SlideIllustration({ icon, badge, badgeColor }: any) {

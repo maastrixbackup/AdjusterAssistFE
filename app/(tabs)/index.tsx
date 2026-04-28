@@ -143,7 +143,7 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.welcomeText}>Claims Workspace</Text>
-          <Text style={styles.welcomeSub}>Manage assessments efficiently.</Text>
+          <Text style={styles.welcomeSub}>Manage claim workspaces efficiently.</Text>
 
           <View style={styles.statsRow}>
             <StatCard label="Total" val={files.length} />
