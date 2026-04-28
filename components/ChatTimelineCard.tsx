@@ -1,6 +1,17 @@
-import { Feather } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
-import { Animated, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from "@expo/vector-icons";
+import { useRef, useState } from "react";
+import {
+  Animated,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 interface ChatTimelineCardProps {
   title: string;
@@ -15,8 +26,7 @@ interface ChatTimelineCardProps {
   onActionPress?: (action: string) => void;
   onRefinementPress?: (option: string) => void;
   onSharePress?: () => void;
-
-  imageInput?: string;   // Add these props
+  imageInput?: string; // Add these props
   documentInput?: string; // Add these props
 }
 
@@ -33,11 +43,9 @@ export const ChatTimelineCard = ({
   onActionPress,
   onRefinementPress,
   onSharePress,
-
   imageInput,
-  documentInput
+  documentInput,
 }: ChatTimelineCardProps) => {
-
   const [showRefinements, setShowRefinements] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
 
@@ -60,7 +68,7 @@ export const ChatTimelineCard = ({
     }).start();
   };
 
-  const isAI = category.toUpperCase() === 'AI RESPONSE';
+  const isAI = category.toUpperCase() === "AI RESPONSE";
 
   return (
     <Pressable
@@ -68,15 +76,18 @@ export const ChatTimelineCard = ({
       onPressOut={handlePressOut}
       style={styles.cardWrapper}
     >
-      <Animated.View style={[
-        styles.card,
-        { transform: [{ scale: animatedValue }] }
-      ]}>
-        <View style={[
-          styles.accentBar,
-          { backgroundColor: color },
-          category.toUpperCase() === 'USER INPUT' ? { right: 0, width: 6 } : { left: 0 }
-        ]} />
+      <Animated.View
+        style={[styles.card, { transform: [{ scale: animatedValue }] }]}
+      >
+        <View
+          style={[
+            styles.accentBar,
+            { backgroundColor: color },
+            category.toUpperCase() === "USER INPUT"
+              ? { right: 0, width: 6 }
+              : { left: 0 },
+          ]}
+        />
 
         <View style={styles.contentContainer}>
           <View style={styles.cardHeader}>
@@ -90,13 +101,13 @@ export const ChatTimelineCard = ({
             {/* Right Side: Output Format & Dot Indicator */}
             <View style={styles.rightHeaderGroup}>
               {outputFormat && (
-                <Text style={[styles.formatText, { color: '#f80505' }]}>
-                  {outputFormat.replace('_', ' ')}
+                <Text style={[styles.formatText, { color: "#f80505" }]}>
+                  {outputFormat.replace("_", " ")}
                 </Text>
               )}
 
               <View style={styles.arrowIcon}>
-                <View style={[styles.dot, { backgroundColor: '#CBD5E1' }]} />
+                <View style={[styles.dot, { backgroundColor: "#CBD5E1" }]} />
               </View>
 
               {isAI && refinementOptions.length > 0 && (
@@ -108,25 +119,24 @@ export const ChatTimelineCard = ({
                   <Text style={styles.refineText}>Refine</Text>
                 </TouchableOpacity>
               )}
-
-
             </View>
           </View>
 
-          {title && (
-            <Text style={styles.cardTitle}>{title}</Text>
-          )}
-{/* --- NEW PREMIUM ATTACHMENT SECTION --- */}
+          {title && <Text style={styles.cardTitle}>{title}</Text>}
+          {/* --- NEW PREMIUM ATTACHMENT SECTION --- */}
           {(imageInput || documentInput) && (
             <View style={styles.premiumAttachmentSection}>
-              
               {imageInput && (
-                <TouchableOpacity 
-                  activeOpacity={0.8} 
+                <TouchableOpacity
+                  activeOpacity={0.8}
                   onPress={() => Linking.openURL(imageInput)}
                   style={styles.premiumImageBadge}
                 >
-                  <Image source={{ uri: imageInput }} style={styles.imageThumbnail} resizeMode="cover" />
+                  <Image
+                    source={{ uri: imageInput }}
+                    style={styles.imageThumbnail}
+                    resizeMode="cover"
+                  />
                   <View style={styles.maximizeHint}>
                     <Feather name="maximize-2" size={8} color="#FFF" />
                   </View>
@@ -134,8 +144,8 @@ export const ChatTimelineCard = ({
               )}
 
               {documentInput && (
-                <TouchableOpacity 
-                  style={styles.premiumDocBadge} 
+                <TouchableOpacity
+                  style={styles.premiumDocBadge}
                   onPress={() => Linking.openURL(documentInput)}
                 >
                   <View style={styles.premiumIconCircle}>
@@ -155,15 +165,14 @@ export const ChatTimelineCard = ({
             style={[
               styles.cardDescription,
               {
-                fontStyle: isAI ? 'italic' : 'normal',
-                color: '#0a2447'
-              }
+                fontStyle: isAI ? "italic" : "normal",
+                color: "#0a2447",
+              },
             ]}
           >
             {content}
           </Text>
 
-       
           <View style={styles.footer}>
             <View style={styles.actionsRow}>
               {quickActions.slice(0, 3).map((action, index) => {
@@ -183,14 +192,16 @@ export const ChatTimelineCard = ({
                     style={({ pressed }) => [
                       styles.actionBadge,
                       isActuallyUsed && styles.actionBadgeUsed,
-                      pressed && styles.actionBadgePressed
+                      pressed && styles.actionBadgePressed,
                     ]}
                   >
-                    <Text style={[
-                      styles.actionBadgeText,
-                      // Apply white or darker green text if used
-                      isActuallyUsed && styles.actionBadgeTextUsed
-                    ]}>
+                    <Text
+                      style={[
+                        styles.actionBadgeText,
+                        // Apply white or darker green text if used
+                        isActuallyUsed && styles.actionBadgeTextUsed,
+                      ]}
+                    >
                       {isActuallyUsed ? "Used" : action}
                     </Text>
                   </Pressable>
@@ -209,7 +220,6 @@ export const ChatTimelineCard = ({
               )}
               <Text style={styles.timeText}>{timeAgo}</Text>
             </View>
-
           </View>
         </View>
       </Animated.View>
@@ -221,7 +231,10 @@ export const ChatTimelineCard = ({
         animationType="slide" // Slide feels more organic for bottom sheets
         onRequestClose={() => setShowRefinements(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowRefinements(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowRefinements(false)}
+        >
           {/* Inner container to keep the sheet at the bottom */}
           <View style={styles.sheetContainer}>
             <Animated.View style={styles.refinementSheet}>
@@ -230,7 +243,9 @@ export const ChatTimelineCard = ({
 
               <View style={styles.sheetHeader}>
                 <Text style={styles.menuTitle}>Refine Response</Text>
-                <Text style={styles.menuSubtitle}>Adjust the tone or length of the AI output</Text>
+                <Text style={styles.menuSubtitle}>
+                  Adjust the tone or length of the AI output
+                </Text>
               </View>
 
               <View style={styles.optionsList}>
@@ -240,7 +255,9 @@ export const ChatTimelineCard = ({
                     activeOpacity={0.7}
                     style={[
                       styles.menuItem,
-                      idx === refinementOptions.length - 1 && { borderBottomWidth: 0 }
+                      idx === refinementOptions.length - 1 && {
+                        borderBottomWidth: 0,
+                      },
                     ]}
                     onPress={() => {
                       onRefinementPress?.(option);
@@ -284,15 +301,17 @@ export const ChatTimelineCard = ({
 
             <View style={styles.sheetHeader}>
               <Text style={styles.menuTitle}>Create Variant</Text>
-              <Text style={styles.menuSubtitle}>Select the format for this claim record</Text>
+              <Text style={styles.menuSubtitle}>
+                Select the format for this claim record
+              </Text>
             </View>
 
             <View style={styles.variantGrid}>
               {[
-                { id: 'file_note', label: 'File Note', icon: 'file-text' },
-                { id: 'email', label: 'Email', icon: 'mail' },
-                { id: 'xa_note', label: 'XA Note', icon: 'zap' },
-                { id: 'attorney', label: 'Attorney Response', icon: 'shield' },
+                { id: "file_note", label: "File Note", icon: "file-text" },
+                { id: "email", label: "Email", icon: "mail" },
+                { id: "xa_note", label: "XA Note", icon: "zap" },
+                { id: "attorney", label: "Attorney Response", icon: "shield" },
               ].map((item) => (
                 <TouchableOpacity
                   key={item.id}
@@ -304,7 +323,11 @@ export const ChatTimelineCard = ({
                   }}
                 >
                   <View style={styles.variantIconCircle}>
-                    <Feather name={item.icon as any} size={22} color="#3B82F6" />
+                    <Feather
+                      name={item.icon as any}
+                      size={22}
+                      color="#3B82F6"
+                    />
                   </View>
                   <Text style={styles.variantLabel}>{item.label}</Text>
                 </TouchableOpacity>
@@ -320,16 +343,16 @@ export const ChatTimelineCard = ({
 const styles = StyleSheet.create({
   cardWrapper: {
     marginVertical: 4,
-    width: '100%',
+    width: "100%",
     paddingHorizontal: 4,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    flexDirection: 'row',
-    overflow: 'hidden',
+    flexDirection: "row",
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: "#F1F5F9",
     shadowColor: "#1E293B",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -338,8 +361,8 @@ const styles = StyleSheet.create({
   },
   accentBar: {
     width: 4,
-    height: '100%',
-    position: 'absolute',
+    height: "100%",
+    position: "absolute",
     zIndex: 10,
   },
   contentContainer: {
@@ -351,13 +374,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    flexDirection: 'row',
+    flexDirection: "row",
     alignItems: "stretch",
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   badgeText: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.5,
   },
   arrowIcon: {
@@ -370,8 +393,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: "700",
+    color: "#0F172A",
     marginBottom: 2,
   },
   // cardDescription: {
@@ -383,85 +406,85 @@ const styles = StyleSheet.create({
   //   marginBottom: 6,
   // },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 4,
   },
   actionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     flex: 1,
     gap: 6,
   },
   actionBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: "#F1F5F9",
     paddingHorizontal: 8,
     paddingVertical: 4, // Slightly taller for better touch target
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   actionBadgeUsed: {
-    backgroundColor: '#DCFCE7', // Light green background
-    borderColor: '#86EFAC',     // Soft green border
+    backgroundColor: "#DCFCE7", // Light green background
+    borderColor: "#86EFAC", // Soft green border
   },
   actionBadgeTextUsed: {
-    color: '#166534', // Deep green text
+    color: "#166534", // Deep green text
   },
   actionBadgePressed: {
-    backgroundColor: '#cfd9e6',
-    borderColor: '#7aa0ce',
+    backgroundColor: "#cfd9e6",
+    borderColor: "#7aa0ce",
   },
   actionBadgeText: {
     fontSize: 12,
-    color: '#0052c5',
-    fontWeight: '700',
+    color: "#0052c5",
+    fontWeight: "700",
   },
   timeText: {
     fontSize: 10,
-    color: '#94A3B8',
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
+    color: "#94A3B8",
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
   },
   rightFooterGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   shareBtn: {
     padding: 4,
-    backgroundColor: '#eff6fff3',
+    backgroundColor: "#eff6fff3",
     borderRadius: 8,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 6,
   },
   rightHeaderGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8, // Spacing between text and the dot
   },
   formatText: {
     fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
     letterSpacing: 0.3,
   },
   refineTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: "#EEF2FF",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: "#C7D2FE",
   },
-  refineText: { fontSize: 13, color: '#3048b3', fontWeight: '700' },
+  refineText: { fontSize: 13, color: "#3048b3", fontWeight: "700" },
 
   // modalOverlay: {
   //   flex: 1,
@@ -471,15 +494,15 @@ const styles = StyleSheet.create({
   //   padding: 20
   // },
   refinementMenu: {
-    backgroundColor: '#FFF',
-    width: '80%',
+    backgroundColor: "#FFF",
+    width: "80%",
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
-    elevation: 10
+    elevation: 10,
   },
   // menuTitle: {
   //   fontSize: 14,
@@ -507,23 +530,23 @@ const styles = StyleSheet.create({
   cancelButton: {
     marginTop: 16,
     paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelButtonText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontWeight: "700",
+    color: "#94A3B8",
   },
   sheetContainer: {
-    width: '100%',
+    width: "100%",
   },
   refinementSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24, // Account for safe areas
+    paddingBottom: Platform.OS === "ios" ? 40 : 24, // Account for safe areas
     paddingTop: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -20 },
@@ -534,9 +557,9 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 38,
     height: 4,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: "#E2E8F0",
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 24,
   },
   sheetHeader: {
@@ -544,142 +567,142 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)', // Deeper, more sophisticated slate blue alpha
-    justifyContent: 'flex-end', // Aligns to bottom
+    backgroundColor: "rgba(15, 23, 42, 0.6)", // Deeper, more sophisticated slate blue alpha
+    justifyContent: "flex-end", // Aligns to bottom
   },
   menuTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontWeight: "800",
+    color: "#0F172A",
     letterSpacing: -0.5,
   },
   menuSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: "#64748B",
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   optionsList: {
-    backgroundColor: '#F8FAFC', // Subtle contrast background
+    backgroundColor: "#F8FAFC", // Subtle contrast background
     borderRadius: 20,
     paddingHorizontal: 4,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: "#F1F5F9",
   },
   menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 16,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: "#F1F5F9",
   },
   menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   iconCircle: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   menuItemText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
   },
   variantSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    width: '100%',
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    width: "100%",
   },
   variantGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 12,
   },
   variantOption: {
-    width: '48%', // Creates a 2x2 grid
-    backgroundColor: '#F8FAFC',
+    width: "48%", // Creates a 2x2 grid
+    backgroundColor: "#F8FAFC",
     borderRadius: 20,
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: "#F1F5F9",
   },
   variantIconCircle: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
   },
   variantLabel: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
   },
 
   attachmentSection: {
     marginTop: 10,
     marginBottom: 6,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: "#F1F5F9",
   },
   imageAttachmentWrapper: {
     width: 100,
     height: 100,
     borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#F8FAFC',
+    overflow: "hidden",
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   imagePreview: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   imageOverlay: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 4,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: "rgba(0,0,0,0.4)",
     padding: 4,
     borderRadius: 6,
   },
   docAttachment: {
     flex: 1,
     minWidth: 180,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
     padding: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
   },
   docIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 10,
   },
   docInfo: {
@@ -687,16 +710,16 @@ const styles = StyleSheet.create({
   },
   docTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: "700",
+    color: "#1E293B",
   },
   docSubtitle: {
     fontSize: 11,
-    color: '#64748B',
+    color: "#64748B",
   },
   premiumAttachmentSection: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8, // Tighter gap
     marginTop: 8,
     marginBottom: 4, // Tuck neatly before the description
@@ -705,36 +728,36 @@ const styles = StyleSheet.create({
     width: 60, // Much smaller, "premium badge" size
     height: 60,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: '#E2E8F0', // Soft Slate
-    backgroundColor: '#F8FAFC',
+    borderColor: "#E2E8F0", // Soft Slate
+    backgroundColor: "#F8FAFC",
     shadowColor: "#1E293B",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 3,
   },
   imageThumbnail: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   maximizeHint: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 3,
     right: 3,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: "rgba(0,0,0,0.5)",
     padding: 3,
     borderRadius: 6,
   },
   premiumDocBadge: {
     height: 60, // Match the image height for stability
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
     borderRadius: 12,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     flex: 1, // Let it fill remaining space
     minWidth: 160,
   },
@@ -742,15 +765,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: 'rgba(59, 130, 246, 0.08)', // Deep Blue alpha
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(59, 130, 246, 0.08)", // Deep Blue alpha
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 10,
   },
   premiumDocText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#004B93', // Deep adjusting navy
+    fontWeight: "700",
+    color: "#004B93", // Deep adjusting navy
     flex: 1, // Ensure text truncates properly if too long
     marginRight: 6,
   },
@@ -759,9 +782,9 @@ const styles = StyleSheet.create({
   cardDescription: {
     fontSize: 16,
     // Ensure Roboto is bold if available for better readability
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto-Bold', 
-    fontStyle: 'italic',
-    color: '#0a2447',
+    fontFamily: Platform.OS === "ios" ? "System" : "Roboto-Bold",
+    fontStyle: "italic",
+    color: "#0a2447",
     lineHeight: 20, // Tighter spacing makes bold text cleaner
     marginBottom: 6,
   },
