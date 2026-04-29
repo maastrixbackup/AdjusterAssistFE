@@ -171,7 +171,7 @@ export default function AiChatScreen() {
                     "Make more formal",
                     "Make attorney facing",
                     "Make more firm",
-                    " Add DOI safe language",
+                    "Add DOI safe language",
                 ],
                 created_at: draft.created_at,
                 updated_at: draft.updated_at || draft.created_at,
@@ -256,7 +256,7 @@ export default function AiChatScreen() {
                             "Make more formal",
                             "Make attornary facing",
                             "Make more firm",
-                            " Add DOI safe language",
+                            "Add DOI safe language",
                         ],
                         created_at: result.createdAt,
 
