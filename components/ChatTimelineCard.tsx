@@ -1,5 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
+import Markdown from 'react-native-markdown-display';
+
 import {
   Animated,
   Image,
@@ -62,7 +64,7 @@ function SkeletonLine({
     );
     pulse.start();
     return () => pulse.stop();
-  }, []);
+  }, [opacity]);
 
   return (
     <Animated.View
@@ -356,17 +358,13 @@ export const ChatTimelineCard = ({
             </View>
           )}
 
-          <Text
-            style={[
-              styles.cardDescription,
-              {
-                fontStyle: isAI ? "italic" : "normal",
-                color: "#0a2447",
-              },
-            ]}
-          >
-            {content}
-          </Text>
+          {isAI ? (
+            <Markdown style={markdownStyles}>{content}</Markdown>
+          ) : (
+            <Text style={[styles.cardDescription, { fontStyle: "normal", color: "#0a2447" }]}>
+              {content}
+            </Text>
+          )}
 
           <View style={styles.footer}>
             <View style={styles.actionsRow}>
@@ -750,3 +748,121 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 });
+
+const markdownStyles = {
+  body: {
+    color: "#0a2447",
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
+  },
+  heading1: {
+    fontSize: 18,
+    fontWeight: "800" as const,
+    color: "#0F172A",
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  heading2: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: "#0F172A",
+    marginBottom: 4,
+    marginTop: 6,
+  },
+  heading3: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: "#1E293B",
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  strong: {
+    fontWeight: "700" as const,
+    color: "#0F172A",
+  },
+  em: {
+    fontStyle: "italic" as const,
+    color: "#334155",
+  },
+  bullet_list: {
+    marginBottom: 6,
+  },
+  ordered_list: {
+    marginBottom: 6,
+  },
+  list_item: {
+    marginBottom: 4,
+    flexDirection: "row" as const,
+  },
+  bullet_list_icon: {
+    color: "#3B82F6",
+    fontSize: 14,
+    marginRight: 6,
+    marginTop: 2,
+  },
+  code_inline: {
+    backgroundColor: "#F1F5F9",
+    color: "#0052c5",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    fontSize: 13,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  fence: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#3B82F6",
+  },
+  code_block: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: 8,
+    padding: 12,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  blockquote: {
+    backgroundColor: "#EFF6FF",
+    borderLeftWidth: 3,
+    borderLeftColor: "#3B82F6",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginVertical: 6,
+    borderRadius: 4,
+  },
+  hr: {
+    backgroundColor: "#E2E8F0",
+    height: 1,
+    marginVertical: 10,
+  },
+  link: {
+    color: "#3B82F6",
+    textDecorationLine: "underline" as const,
+  },
+  paragraph: {
+    marginBottom: 8,
+    marginTop: 0,
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    marginVertical: 8,
+  },
+  th: {
+    backgroundColor: "#F1F5F9",
+    padding: 8,
+    fontWeight: "700" as const,
+    color: "#0F172A",
+  },
+  td: {
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    color: "#334155",
+  },
+};
