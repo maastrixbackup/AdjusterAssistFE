@@ -340,7 +340,7 @@ export default function AiChatScreen() {
             }
 
             // Handle other actions (Copy, Mark as used, etc.)
-            // console.log(action)
+            // console.log("ACTION: ", action)
             switch (action) {
                 case "Copy":
                     await Clipboard.setStringAsync(content);
@@ -377,7 +377,7 @@ export default function AiChatScreen() {
                     break;
             }
         },
-        [fileId, token],
+        [fileId, token, chatHistory],
     );
 
     const handleRefinement = useCallback(
@@ -450,6 +450,9 @@ export default function AiChatScreen() {
                     imageInput={item?.image_input_url}
                     documentInput={item?.doccuments_url}
                     timeAgo={getFormattedTime(item.created_at)}
+                    onActionPress={(action) =>
+                        handleQuickAction(action, item.id, item.ai_response || "")
+                    }
                 />
                 <ChatTimelineCard
                     category="AI RESPONSE"
@@ -477,6 +480,9 @@ export default function AiChatScreen() {
                     color="#10B981"
                     quickActions={["Copy"]}
                     timeAgo={getFormattedTime(item.updated_at)}
+                    onActionPress={(action) =>
+                        handleQuickAction(action, item.id, item.ai_response || "")
+                    }
                 />
             </View>
         ),
