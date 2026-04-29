@@ -451,7 +451,7 @@ export default function AiChatScreen() {
                     documentInput={item?.doccuments_url}
                     timeAgo={getFormattedTime(item.created_at)}
                     onActionPress={(action) =>
-                        handleQuickAction(action, item.id, item.ai_response || "")
+                        handleQuickAction(action, item.id, item.user_input || "")
                     }
                 />
                 <ChatTimelineCard
@@ -481,7 +481,7 @@ export default function AiChatScreen() {
                     quickActions={["Copy"]}
                     timeAgo={getFormattedTime(item.updated_at)}
                     onActionPress={(action) =>
-                        handleQuickAction(action, item.id, item.ai_response || "")
+                        handleQuickAction(action, item.id, item.next_step_suggestion || "")
                     }
                 />
             </View>
