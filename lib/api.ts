@@ -584,7 +584,7 @@ export interface RefinePayload {
 }
 
 export const refineResponse = async (token: string, payload: RefinePayload) => {
-  console.log("REFINE API PAYLOAD: ", payload);
+  // console.log("REFINE API PAYLOAD: ", payload);
   const response = await fetch(`${BASE_URL}/drafts/refine`, {
     method: "POST",
     headers: {
@@ -609,7 +609,7 @@ export const generateVariant = async (
   token: string,
   payload: VariantPayload,
 ) => {
-  console.log("VARIANT API PAYLOAD: ", payload);
+  // console.log("VARIANT API PAYLOAD: ", payload);
   const response = await fetch(`${BASE_URL}/drafts/variant`, {
     method: "POST",
     headers: {

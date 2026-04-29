@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
@@ -26,9 +26,200 @@ interface ChatTimelineCardProps {
   onActionPress?: (action: string) => void;
   onRefinementPress?: (option: string) => void;
   onSharePress?: () => void;
-  imageInput?: string; // Add these props
-  documentInput?: string; // Add these props
+  imageInput?: string;
+  documentInput?: string;
+  isLoading?: boolean; // ← NEW: triggers skeleton
 }
+
+// ─── MUI-style Pulsating Skeleton ────────────────────────────────────────────
+function SkeletonLine({
+  width = "100%",
+  height = 14,
+  borderRadius = 8,
+  style,
+}: {
+  width?: string | number;
+  height?: number;
+  borderRadius?: number;
+  style?: any;
+}) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: "#CBD5E1",
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+function generateSkeletonWidths(text: string): number[] {
+  if (!text) return [100, 90, 75]; // fallback
+
+  // Estimate characters per line (roughly 42 chars per line on mobile)
+  const CHARS_PER_LINE = 42;
+  const totalChars = text.length;
+  const estimatedLines = Math.ceil(totalChars / CHARS_PER_LINE);
+
+  // Cap between 2 and 12 lines
+  const lineCount = Math.min(Math.max(estimatedLines, 2), 12);
+
+  // Generate widths: full lines are 100%, last line is shorter
+  return Array.from({ length: lineCount }, (_, i) => {
+    if (i < lineCount - 1) {
+      // Full lines vary slightly: 88–100%
+      return 88 + Math.floor((i % 3) * 6); // cycles: 88, 94, 100, 88, 94...
+    } else {
+      // Last line is always shorter — mimics real text
+      const lastLineChars = totalChars % CHARS_PER_LINE || CHARS_PER_LINE / 2;
+      return Math.round((lastLineChars / CHARS_PER_LINE) * 100);
+    }
+  });
+}
+
+function CardSkeleton({ color, content }: { color: string, content: string }) {
+  const skeletonWidths = generateSkeletonWidths(content);
+  return (
+    <View style={[skeletonStyles.card]}>
+      {/* Accent bar */}
+      <View style={[skeletonStyles.accentBar, { backgroundColor: color }]} />
+
+      <View style={skeletonStyles.content}>
+        {/* Header row */}
+        <View style={skeletonStyles.headerRow}>
+          <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
+            <Text style={[styles.badgeText, { color: color }]}>
+              AI RESPONSE
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.refineTrigger}
+          >
+            <Feather name="sliders" size={12} color="#4056d1" />
+            <Text style={styles.refineText}>Refine</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Format badge */}
+        <SkeletonLine
+          width={100}
+          height={12}
+          borderRadius={4}
+          style={{ marginBottom: 12 }}
+        />
+
+        {/* Content lines */}
+        {skeletonWidths.map((w, i) => (
+          <SkeletonLine
+            key={i}
+            width={`${w}%`}
+            height={14}
+            style={{ marginBottom: i === skeletonWidths.length - 1 ? 16 : 8 }}
+          />
+        ))}
+
+        {/* Footer */}
+        <View style={skeletonStyles.footerRow}>
+          <View style={skeletonStyles.footerLeft}>
+            {/* Static Buttons that match the live UI exactly */}
+            {["Copy", "Create Variant", "Mark as used"].map((action, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.actionBadge,
+                  { opacity: 0.8 } // Slightly dimmed to show the card is "busy"
+                ]}
+              >
+                <Text style={styles.actionBadgeText}>
+                  {action}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Maintain the share icon for layout consistency */}
+          <View style={{ opacity: 0.5 }}>
+            <Feather name="share-2" size={18} color="#3B82F6" />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    flexDirection: "row",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#1E293B",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    marginVertical: 4,
+  },
+  accentBar: {
+    width: 4,
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 10,
+  },
+  content: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    paddingLeft: 18,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  footerLeft: {
+    flexDirection: "row",
+    gap: 8,
+  },
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const ChatTimelineCard = ({
   title,
@@ -45,6 +236,7 @@ export const ChatTimelineCard = ({
   onSharePress,
   imageInput,
   documentInput,
+  isLoading = false, // ← NEW
 }: ChatTimelineCardProps) => {
   const [showRefinements, setShowRefinements] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
@@ -70,6 +262,12 @@ export const ChatTimelineCard = ({
 
   const isAI = category.toUpperCase() === "AI RESPONSE";
 
+  // ─── Swap card content with skeleton when loading ────────────────────────
+  if (isLoading && isAI) {
+    return <CardSkeleton color={color} content={content} />;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <Pressable
       onPressIn={handlePressIn}
@@ -91,14 +289,12 @@ export const ChatTimelineCard = ({
 
         <View style={styles.contentContainer}>
           <View style={styles.cardHeader}>
-            {/* Left Side: Category Badge */}
             <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
               <Text style={[styles.badgeText, { color: color }]}>
                 {category.toUpperCase()}
               </Text>
             </View>
 
-            {/* Right Side: Output Format & Dot Indicator */}
             <View style={styles.rightHeaderGroup}>
               {outputFormat && (
                 <Text style={[styles.formatText, { color: "#f80505" }]}>
@@ -123,7 +319,7 @@ export const ChatTimelineCard = ({
           </View>
 
           {title && <Text style={styles.cardTitle}>{title}</Text>}
-          {/* --- NEW PREMIUM ATTACHMENT SECTION --- */}
+
           {(imageInput || documentInput) && (
             <View style={styles.premiumAttachmentSection}>
               {imageInput && (
@@ -159,7 +355,6 @@ export const ChatTimelineCard = ({
               )}
             </View>
           )}
-          {/* --------------------------------------- */}
 
           <Text
             style={[
@@ -198,7 +393,6 @@ export const ChatTimelineCard = ({
                     <Text
                       style={[
                         styles.actionBadgeText,
-                        // Apply white or darker green text if used
                         isActuallyUsed && styles.actionBadgeTextUsed,
                       ]}
                     >
@@ -224,30 +418,26 @@ export const ChatTimelineCard = ({
         </View>
       </Animated.View>
 
-      {/* Refinement modal  */}
+      {/* Refinement Modal */}
       <Modal
         visible={showRefinements}
         transparent
-        animationType="slide" // Slide feels more organic for bottom sheets
+        animationType="slide"
         onRequestClose={() => setShowRefinements(false)}
       >
         <Pressable
           style={styles.modalOverlay}
           onPress={() => setShowRefinements(false)}
         >
-          {/* Inner container to keep the sheet at the bottom */}
           <View style={styles.sheetContainer}>
             <Animated.View style={styles.refinementSheet}>
-              {/* Modern "Grabber" handle */}
               <View style={styles.dragHandle} />
-
               <View style={styles.sheetHeader}>
                 <Text style={styles.menuTitle}>Refine Response</Text>
                 <Text style={styles.menuSubtitle}>
                   Adjust the tone or length of the AI output
                 </Text>
               </View>
-
               <View style={styles.optionsList}>
                 {refinementOptions.map((option, idx) => (
                   <TouchableOpacity
@@ -274,8 +464,6 @@ export const ChatTimelineCard = ({
                   </TouchableOpacity>
                 ))}
               </View>
-
-              {/* Cancel Button - Optional but good for UX */}
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => setShowRefinements(false)}
@@ -286,6 +474,8 @@ export const ChatTimelineCard = ({
           </View>
         </Pressable>
       </Modal>
+
+      {/* Variant Modal */}
       <Modal
         visible={showVariantModal}
         transparent
@@ -298,14 +488,12 @@ export const ChatTimelineCard = ({
         >
           <Animated.View style={styles.variantSheet}>
             <View style={styles.dragHandle} />
-
             <View style={styles.sheetHeader}>
               <Text style={styles.menuTitle}>Create Variant</Text>
               <Text style={styles.menuSubtitle}>
                 Select the format for this claim record
               </Text>
             </View>
-
             <View style={styles.variantGrid}>
               {[
                 { id: "file_note", label: "File Note", icon: "file-text" },
@@ -317,17 +505,12 @@ export const ChatTimelineCard = ({
                   key={item.id}
                   style={styles.variantOption}
                   onPress={() => {
-                    console.log("Selected Variant:", item.id);
-                    onActionPress?.(`Variant: ${item.label}`); // Pass back to parent
+                    onActionPress?.(`Variant: ${item.label}`);
                     setShowVariantModal(false);
                   }}
                 >
                   <View style={styles.variantIconCircle}>
-                    <Feather
-                      name={item.icon as any}
-                      size={22}
-                      color="#3B82F6"
-                    />
+                    <Feather name={item.icon as any} size={22} color="#3B82F6" />
                   </View>
                   <Text style={styles.variantLabel}>{item.label}</Text>
                 </TouchableOpacity>
@@ -341,11 +524,7 @@ export const ChatTimelineCard = ({
 };
 
 const styles = StyleSheet.create({
-  cardWrapper: {
-    marginVertical: 4,
-    width: "100%",
-    paddingHorizontal: 4,
-  },
+  cardWrapper: { marginVertical: 4, width: "100%", paddingHorizontal: 4 },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -359,17 +538,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  accentBar: {
-    width: 4,
-    height: "100%",
-    position: "absolute",
-    zIndex: 10,
-  },
-  contentContainer: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
+  accentBar: { width: 4, height: "100%", position: "absolute", zIndex: 10 },
+  contentContainer: { flex: 1, paddingVertical: 10, paddingHorizontal: 14 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -378,101 +548,45 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     justifyContent: "space-between",
   },
-  badgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  arrowIcon: {
-    opacity: 0.5,
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 2,
-  },
-  // cardDescription: {
-  //   fontSize: 16,
-  //   fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-  //   fontStyle: 'italic',
-  //   color: '#0a2447',
-  //   lineHeight: 18,
-  //   marginBottom: 6,
-  // },
+  badgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  arrowIcon: { opacity: 0.5 },
+  dot: { width: 4, height: 4, borderRadius: 2 },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: "#0F172A", marginBottom: 2 },
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 4,
   },
-  actionsRow: {
-    flexDirection: "row",
-    flex: 1,
-    gap: 6,
-  },
+  actionsRow: { flexDirection: "row", flex: 1, gap: 6 },
   actionBadge: {
     backgroundColor: "#F1F5F9",
     paddingHorizontal: 8,
-    paddingVertical: 4, // Slightly taller for better touch target
+    paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
-  actionBadgeUsed: {
-    backgroundColor: "#DCFCE7", // Light green background
-    borderColor: "#86EFAC", // Soft green border
-  },
-  actionBadgeTextUsed: {
-    color: "#166534", // Deep green text
-  },
-  actionBadgePressed: {
-    backgroundColor: "#cfd9e6",
-    borderColor: "#7aa0ce",
-  },
-  actionBadgeText: {
-    fontSize: 12,
-    color: "#0052c5",
-    fontWeight: "700",
-  },
+  actionBadgeUsed: { backgroundColor: "#DCFCE7", borderColor: "#86EFAC" },
+  actionBadgeTextUsed: { color: "#166534" },
+  actionBadgePressed: { backgroundColor: "#cfd9e6", borderColor: "#7aa0ce" },
+  actionBadgeText: { fontSize: 12, color: "#0052c5", fontWeight: "700" },
   timeText: {
     fontSize: 10,
     color: "#94A3B8",
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
-  rightFooterGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  shareBtn: {
-    padding: 4,
-    backgroundColor: "#eff6fff3",
-    borderRadius: 8,
-  },
+  rightFooterGroup: { flexDirection: "row", alignItems: "center", gap: 12 },
+  shareBtn: { padding: 4, backgroundColor: "#eff6fff3", borderRadius: 8 },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 6,
   },
-  rightHeaderGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8, // Spacing between text and the dot
-  },
-  formatText: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
+  rightHeaderGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
+  formatText: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
   refineTrigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -485,14 +599,6 @@ const styles = StyleSheet.create({
     borderColor: "#C7D2FE",
   },
   refineText: { fontSize: 13, color: "#3048b3", fontWeight: "700" },
-
-  // modalOverlay: {
-  //   flex: 1,
-  //   backgroundColor: 'rgba(15, 23, 42, 0.4)',
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  //   padding: 20
-  // },
   refinementMenu: {
     backgroundColor: "#FFF",
     width: "80%",
@@ -504,49 +610,15 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
-  // menuTitle: {
-  //   fontSize: 14,
-  //   fontWeight: '800',
-  //   color: '#64748B',
-  //   marginBottom: 12,
-  //   textTransform: 'uppercase',
-  //   textAlign: 'center'
-  // },
-  // menuItem: {
-  //   flexDirection: 'row',
-  //   justifyContent: 'space-between',
-  //   alignItems: 'center',
-  //   paddingVertical: 12,
-  //   borderBottomWidth: 1,
-  //   borderBottomColor: '#F1F5F9'
-  // },
-  // menuItemText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  // cancelButton: {
-  //   marginTop: 16,
-  //   paddingVertical: 16,
-  //   alignItems: 'center',
-  //   justifyContent: 'center',
-  // },
-  cancelButton: {
-    marginTop: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#94A3B8",
-  },
-  sheetContainer: {
-    width: "100%",
-  },
+  cancelButton: { marginTop: 16, paddingVertical: 16, alignItems: "center", justifyContent: "center" },
+  cancelButtonText: { fontSize: 15, fontWeight: "700", color: "#94A3B8" },
+  sheetContainer: { width: "100%" },
   refinementSheet: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === "ios" ? 40 : 24, // Account for safe areas
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
     paddingTop: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -20 },
@@ -562,28 +634,16 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 24,
   },
-  sheetHeader: {
-    marginBottom: 20,
-  },
+  sheetHeader: { marginBottom: 20 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.6)", // Deeper, more sophisticated slate blue alpha
-    justifyContent: "flex-end", // Aligns to bottom
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "flex-end",
   },
-  menuTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#0F172A",
-    letterSpacing: -0.5,
-  },
-  menuSubtitle: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 4,
-    fontWeight: "500",
-  },
+  menuTitle: { fontSize: 20, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 },
+  menuSubtitle: { fontSize: 13, color: "#64748B", marginTop: 4, fontWeight: "500" },
   optionsList: {
-    backgroundColor: "#F8FAFC", // Subtle contrast background
+    backgroundColor: "#F8FAFC",
     borderRadius: 20,
     paddingHorizontal: 4,
     borderWidth: 1,
@@ -598,11 +658,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
-  menuItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  menuItemLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconCircle: {
     width: 30,
     height: 30,
@@ -611,11 +667,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  menuItemText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
+  menuItemText: { fontSize: 15, fontWeight: "600", color: "#1E293B" },
   variantSheet: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
@@ -624,14 +676,9 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === "ios" ? 40 : 24,
     width: "100%",
   },
-  variantGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-  },
+  variantGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 12 },
   variantOption: {
-    width: "48%", // Creates a 2x2 grid
+    width: "48%",
     backgroundColor: "#F8FAFC",
     borderRadius: 20,
     padding: 20,
@@ -648,99 +695,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  variantLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-
-  attachmentSection: {
-    marginTop: 10,
-    marginBottom: 6,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  imageAttachmentWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  imagePreview: {
-    width: "100%",
-    height: "100%",
-  },
-  imageOverlay: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 4,
-    borderRadius: 6,
-  },
-  docAttachment: {
-    flex: 1,
-    minWidth: 180,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    padding: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  docIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: "#EFF6FF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  docInfo: {
-    flex: 1,
-  },
-  docTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  docSubtitle: {
-    fontSize: 11,
-    color: "#64748B",
-  },
-  premiumAttachmentSection: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8, // Tighter gap
-    marginTop: 8,
-    marginBottom: 4, // Tuck neatly before the description
-  },
+  variantLabel: { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  premiumAttachmentSection: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8, marginBottom: 4 },
   premiumImageBadge: {
-    width: 60, // Much smaller, "premium badge" size
+    width: 60,
     height: 60,
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#E2E8F0", // Soft Slate
+    borderColor: "#E2E8F0",
     backgroundColor: "#F8FAFC",
     shadowColor: "#1E293B",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 3,
   },
-  imageThumbnail: {
-    width: "100%",
-    height: "100%",
-  },
+  imageThumbnail: { width: "100%", height: "100%" },
   maximizeHint: {
     position: "absolute",
     bottom: 3,
@@ -750,7 +720,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   premiumDocBadge: {
-    height: 60, // Match the image height for stability
+    height: 60,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F8FAFC",
@@ -758,34 +728,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    flex: 1, // Let it fill remaining space
+    flex: 1,
     minWidth: 160,
   },
   premiumIconCircle: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: "rgba(59, 130, 246, 0.08)", // Deep Blue alpha
+    backgroundColor: "rgba(59, 130, 246, 0.08)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
-  premiumDocText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#004B93", // Deep adjusting navy
-    flex: 1, // Ensure text truncates properly if too long
-    marginRight: 6,
-  },
-  // -------------------------------------
-
+  premiumDocText: { fontSize: 13, fontWeight: "700", color: "#004B93", flex: 1, marginRight: 6 },
   cardDescription: {
     fontSize: 16,
-    // Ensure Roboto is bold if available for better readability
     fontFamily: Platform.OS === "ios" ? "System" : "Roboto-Bold",
     fontStyle: "italic",
     color: "#0a2447",
-    lineHeight: 20, // Tighter spacing makes bold text cleaner
+    lineHeight: 20,
     marginBottom: 6,
   },
 });
