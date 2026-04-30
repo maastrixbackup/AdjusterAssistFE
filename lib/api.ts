@@ -162,6 +162,10 @@ const responseTypeLabels: Record<string, string> = {
   xactanalysis_response: "Xact Analysis",
   damage_evaluation: "Damage Evaluation",
   attorney_response: "Attorney Response",
+  fnol: "FNOL",
+  inspection_summary: "Inspection Summary",
+  first_contact_note: "First Contact Note",
+  closing_note: "Closing Note",
 };
 
 /**
@@ -332,7 +336,8 @@ export async function generateResponse(
   return {
     id: res.data.id, // Map the ID from the JSON data
     output_format: res.data.output_format,
-    responseTypeLabel: responseTypeLabels[res.data.output_format] || "Response",
+    responseTypeLabel:
+      responseTypeLabels[res.data.output_format] || res.data.output_format,
     responseText: res.data.ai_response,
     user_input: res.data.user_input,
     fileId: extractedFileId,

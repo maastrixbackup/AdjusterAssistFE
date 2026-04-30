@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -51,6 +52,9 @@ export const ChatInputSection = ({
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedAttachments, setSelectedAttachments] = useState<Attachment[]>([]);
   const sendScale = React.useRef(new Animated.Value(1)).current;
+  const [isFullEditorVisible, setIsFullEditorVisible] = useState(false);
+  const MAX_INPUT_HEIGHT = 150; // Threshold before the small input scrolls
+  const isLongText = inputText.length > 200;
 
   // ─── Track what to launch AFTER the modal fully dismisses ─────────────
   const pendingAction = useRef<'image' | 'doc' | null>(null);
@@ -272,17 +276,32 @@ export const ChatInputSection = ({
             <Ionicons name="add" size={28} color="#004B93" />
           </TouchableOpacity>
 
-          <TextInput
-            style={styles.textInput}
-            placeholder={voice.isTranscribing ? 'Transcribing...' : 'Update claim thread...'}
-            placeholderTextColor="#94A3B8"
-            multiline
-            editable={!disabled && !voice.isTranscribing}
-            value={inputText}
-            onChangeText={setInputText}
-            onFocus={onFocus}
-            underlineColorAndroid="transparent"
-          />
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end' }}>
+            <TextInput
+              style={[
+                styles.textInput,
+                { maxHeight: MAX_INPUT_HEIGHT } // Forces scrollability after this height
+              ]}
+              placeholder={voice.isTranscribing ? 'Transcribing...' : 'Update claim thread...'}
+              placeholderTextColor="#94A3B8"
+              multiline
+              editable={!disabled && !voice.isTranscribing}
+              value={inputText}
+              onChangeText={setInputText}
+              onFocus={onFocus}
+              underlineColorAndroid="transparent"
+              scrollEnabled={true}
+            />
+            {/* OPTION: Full Screen Trigger Icon */}
+            {isLongText && (
+              <TouchableOpacity
+                onPress={() => setIsFullEditorVisible(true)}
+                style={styles.expandIcon}
+              >
+                <Ionicons name="expand-outline" size={20} color="#64748B" />
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View style={styles.rightActions}>
             <TouchableOpacity onPress={handleVoiceToggle}>
@@ -328,11 +347,54 @@ export const ChatInputSection = ({
         </View>
       </Animated.View>
 
+      <Modal visible={isFullEditorVisible} animationType="slide" presentationStyle="fullScreen">
+        {/* KeyboardAvoidingView prevents the keyboard from covering the input */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.fullEditorContainer}>
+            {/* Header stays fixed at the top */}
+            <View style={styles.fullEditorHeader}>
+              <TouchableOpacity onPress={() => setIsFullEditorVisible(false)}>
+                <Text style={styles.closeEditorText}>Done</Text>
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Review Claim Draft</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  handleSendPress();
+                  setIsFullEditorVisible(false);
+                }}
+                disabled={isSendDisabled}
+              >
+                <Text style={[styles.sendEditorText, isSendDisabled && { opacity: 0.5 }]}>Send</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ScrollView allows the user to see everything, even with the keyboard up */}
+            <ScrollView
+              contentContainerStyle={{ flexGrow: 1 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              <TextInput
+                style={styles.fullEditorInput}
+                multiline
+                autoFocus
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type or paste your detailed claim notes..."
+                textAlignVertical="top" // Important for Android to start text at top
+                scrollEnabled={false} // Disable internal scroll so the parent ScrollView handles it
+              />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <Modal
         visible={menuVisible}
         transparent
         animationType="fade"
-        // ─── KEY FIX: fires only after modal is fully unmounted on iOS ───
         onDismiss={handleModalDismissed}
       // ─────────────────────────────────────────────────────────────────
       >
@@ -380,7 +442,7 @@ const styles = StyleSheet.create({
     }),
   },
   attachBtn: { width: 40, height: 40, backgroundColor: '#F1F5F9', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  textInput: { flex: 1, fontSize: 16, color: '#1E293B', maxHeight: 100, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 5 },
+  // textInput: { flex: 1, fontSize: 16, color: '#1E293B', maxHeight: 100, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 5 },
   rightActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   micBtn: { padding: 8 },
   sendBtn: { backgroundColor: '#003366', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
@@ -390,4 +452,55 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
   menuText: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
   menuSeparator: { height: 1, backgroundColor: '#F1F5F9', marginHorizontal: 8 },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1E293B',
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'ios' ? 10 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    textAlignVertical: 'top', // Crucial for Android multiline
+  },
+  expandIcon: {
+    paddingBottom: 10,
+    paddingRight: 5,
+  },
+  fullEditorContainer: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+  },
+  fullEditorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  closeEditorText: {
+    color: '#004B93',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sendEditorText: {
+    color: '#004B93',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  fullEditorInput: {
+    flex: 1,
+    padding: 20,
+    fontSize: 18,
+    lineHeight: 26,
+    color: '#1E293B',
+    minHeight:300,
+    textAlignVertical: 'top',
+  },
 });

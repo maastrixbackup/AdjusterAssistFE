@@ -146,21 +146,6 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      <Tabs.Screen
-        name="response"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
- 
-      <Tabs.Screen
-        name="file-draft-history"
-        options={{
-          headerShown: false,
-          href: null,
-        }}
-      />
       
     </Tabs>
   );

@@ -307,7 +307,7 @@ const handlePickImage = async () => {
       };
       const result = await generateResponse(token, payload);
       router.push({
-        pathname: "/response",
+        pathname: "/",
         params: {
           output_format: result.output_format,
           type: result.responseTypeLabel,
