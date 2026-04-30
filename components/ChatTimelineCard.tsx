@@ -156,7 +156,7 @@ function CardSkeleton({ color, content }: { color: string, content: string }) {
                 key={index}
                 style={[
                   styles.actionBadge,
-                  { opacity: 0.8 } // Slightly dimmed to show the card is "busy"
+                  { opacity: 0.8 }
                 ]}
               >
                 <Text style={styles.actionBadgeText}>
