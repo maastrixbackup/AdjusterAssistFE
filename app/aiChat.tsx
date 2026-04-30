@@ -474,7 +474,7 @@ export default function AiChatScreen() {
                     isLoading={loadingCardId === item.id}
                 />
                 <ChatTimelineCard
-                    category="Suggestions"
+                    category="SUGGESTIONS"
                     title="Recommended Next Step"
                     content={item.next_step_suggestion}
                     color="#10B981"
