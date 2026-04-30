@@ -263,6 +263,7 @@ export const ChatTimelineCard = ({
   };
 
   const isAI = category.toUpperCase() === "AI RESPONSE";
+  const isSUGGESTIONS = category.toUpperCase() === "SUGGESTIONS";
 
   // ─── Swap card content with skeleton when loading ────────────────────────
   if (isLoading && isAI) {
@@ -358,7 +359,7 @@ export const ChatTimelineCard = ({
             </View>
           )}
 
-          {isAI ? (
+          {isAI || isSUGGESTIONS ? (
             <Markdown style={markdownStyles}>{content}</Markdown>
           ) : (
             <Text style={[styles.cardDescription, { fontStyle: "normal", color: "#0a2447" }]}>
