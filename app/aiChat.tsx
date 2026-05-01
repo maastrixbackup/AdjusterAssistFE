@@ -256,7 +256,7 @@ export default function AiChatScreen() {
                             "Make more formal",
                             "Make attornary facing",
                             "Make more firm",
-                            " Add DOI safe language",
+                            "Add DOI safe language",
                         ],
                         created_at: result.createdAt,
 
