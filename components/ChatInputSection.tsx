@@ -383,8 +383,8 @@ export const ChatInputSection = ({
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="Type or paste your detailed claim notes..."
-                textAlignVertical="top" // Important for Android to start text at top
-                scrollEnabled={false} // Disable internal scroll so the parent ScrollView handles it
+                textAlignVertical="top"
+                scrollEnabled={false} 
               />
             </ScrollView>
           </View>
