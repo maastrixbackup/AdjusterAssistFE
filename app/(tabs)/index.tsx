@@ -35,15 +35,22 @@ export default function HomeScreen() {
   const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
-  
+
   const logo = require("../../assets/images/AdjusterAssist1.png");
 
   const mostRecentFile = useMemo(() => {
     if (!files || files.length === 0) return null;
+
     return [...files].sort((a, b) => {
-      const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-      const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-      return dateB - dateA;
+      const getTime = (f: any) => {
+        return f.last_activity_at
+          ? new Date(f.last_activity_at).getTime()
+          : f.updated_at
+            ? new Date(f.updated_at).getTime()
+            : 0;
+      };
+
+      return getTime(b) - getTime(a);
     })[0];
   }, [files]);
 
@@ -55,7 +62,7 @@ export default function HomeScreen() {
   const recentClaims = useMemo(() => {
     return files
       .filter((f) => ["active", "draft"].includes(f.status?.toLowerCase() || ""))
-      .slice(0, 8); // Increased limit for a better list feel
+      .slice(0, 8);
   }, [files]);
 
   const loadData = React.useCallback(
@@ -84,7 +91,7 @@ export default function HomeScreen() {
   );
 
   useEffect(() => { loadData(); }, [loadData]);
-  
+
   useFocusEffect(
     React.useCallback(() => { loadData(true); }, [loadData])
   );
@@ -160,11 +167,11 @@ export default function HomeScreen() {
       >
         <View style={styles.bodyWrapper}>
           {/* Unified Quick Action - Removing History Button for Premium focus */}
-          <Pressable 
-            style={({ pressed }) => [styles.primaryActionBtn, pressed && styles.pressed]} 
+          <Pressable
+            style={({ pressed }) => [styles.primaryActionBtn, pressed && styles.pressed]}
             onPress={() => setIsCreateModalVisible(true)}
           >
-            <LinearGradient colors={["#297afc", "#165bb6"]} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.primaryActionGradient}>
+            <LinearGradient colors={["#297afc", "#165bb6"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryActionGradient}>
               <View style={styles.primaryActionLeft}>
                 <View style={styles.iconCircle}>
                   <Ionicons name="add" size={24} color="#FFF" />
@@ -223,7 +230,7 @@ export default function HomeScreen() {
                   }
                 })}>
                 <View style={styles.workspaceIcon}>
-                    <Ionicons name="layers" size={20} color="#165bb6" />
+                  <Ionicons name="layers" size={20} color="#165bb6" />
                 </View>
                 <View style={styles.workspaceDetails}>
                   <View style={styles.workspaceTopRow}>
@@ -235,8 +242,8 @@ export default function HomeScreen() {
                   <Text style={styles.workspaceClient} numberOfLines={1}>{file.client_name || "New Client Entry"}</Text>
                   <View style={styles.workspaceFooter}>
                     <View style={styles.footerItem}>
-                        <Ionicons name="time-outline" size={12} color="#94A3B8" />
-                        <Text style={styles.workspaceDate}>{file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Pending"}</Text>
+                      <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                      <Text style={styles.workspaceDate}>{file.updated_at ? new Date(file.updated_at).toLocaleDateString() : "Pending"}</Text>
                     </View>
                     <View style={styles.dotSeparator} />
                     <Text style={styles.workspaceDate}>{file.loss_type || 'General'}</Text>
@@ -247,8 +254,8 @@ export default function HomeScreen() {
             )
           }) : (
             <View style={styles.emptyState}>
-                <Ionicons name="document-text-outline" size={48} color="#CBD5E1" />
-                <Text style={styles.emptyStateText}>No active claims found.</Text>
+              <Ionicons name="document-text-outline" size={48} color="#CBD5E1" />
+              <Text style={styles.emptyStateText}>No active claims found.</Text>
             </View>
           )}
         </View>
@@ -283,7 +290,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 10, color: "#E2E8F0", marginTop: 4, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600" },
   scrollContent: { paddingBottom: 40 },
   bodyWrapper: { paddingHorizontal: 20, paddingTop: 26 },
-  
+
   // Premium Primary Action
   primaryActionBtn: { marginBottom: 24, borderRadius: 24, overflow: 'hidden', elevation: 8, shadowColor: "#3B82F6", shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   primaryActionGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
@@ -317,7 +324,7 @@ const styles = StyleSheet.create({
   footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dotSeparator: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#CBD5E1', marginHorizontal: 8 },
   workspaceDate: { fontSize: 12, color: "#94A3B8", fontWeight: "600" },
-  
+
   miniBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   miniBadgeText: { fontSize: 10, fontWeight: "800" },
   sBadgeA: { backgroundColor: "#DCFCE7" },
@@ -326,7 +333,7 @@ const styles = StyleSheet.create({
   sTextD: { color: "#9a3412" },
   sBadgeN: { backgroundColor: "#F8FAFC" },
   sTextN: { color: "#64748B" },
-  
+
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   emptyStateText: { color: '#94A3B8', marginTop: 12, fontWeight: '600' },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },

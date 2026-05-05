@@ -43,6 +43,7 @@ export interface ClaimFile {
   status: "active" | "closed" | "draft";
   created_at: string;
   updated_at?: string;
+  last_activity_at?: string;
 
   // Derived / UI Fields
   draft_count?: number;
