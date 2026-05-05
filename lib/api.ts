@@ -631,3 +631,41 @@ export const generateVariant = async (
   }
   return await response.json();
 };
+
+export type UpdateUserPayload = {
+  name?: string;
+  phone?: number;
+  company?: string;
+  avatar_url?: string;
+  expo_push_token?: string;
+};
+
+export type UpdateUserResponse = {
+  message: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    created_at: string;
+    updated_at: string;
+    phone?: number;
+    company?: string;
+    avatar_url?: string;
+    expo_push_token?: string;
+  };
+};
+
+export async function updateUserProfile(
+  payload: UpdateUserPayload,
+  token: string,
+): Promise<UpdateUserResponse> {
+  return apiRequest<UpdateUserResponse>(
+    "/user/update",
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
+}

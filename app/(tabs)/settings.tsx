@@ -4,6 +4,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ReactElement, useCallback, useState } from "react";
+
+
+
 import {
   Linking,
   Pressable,

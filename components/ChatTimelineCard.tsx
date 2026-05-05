@@ -301,11 +301,13 @@ export const ChatTimelineCard = ({
                 </Text>
               </View>
               {isAI && (<View style={[styles.badge]}>
-                <Text style={[styles.badgeText, { color: color }]}>
-                  {actualTime ? actualTime : timeAgo}
-                </Text>
-              </View>)}
+              <Text style={[styles.badgeText, { color: color }]}>
+                {actualTime ? actualTime : timeAgo}
+              </Text>
+            </View>)}
+
             </View>
+            
 
             <View style={styles.rightHeaderGroup}>
               {outputFormat && (
