@@ -282,7 +282,7 @@ export const ChatInputSection = ({
                 styles.textInput,
                 { maxHeight: MAX_INPUT_HEIGHT } // Forces scrollability after this height
               ]}
-              placeholder={voice.isTranscribing ? 'Transcribing...' : 'Update claim thread...'}
+              placeholder={voice.isTranscribing ? 'Transcribing...' : 'Add claim details, upload documents, or ask a claim question...'}
               placeholderTextColor="#94A3B8"
               multiline
               editable={!disabled && !voice.isTranscribing}

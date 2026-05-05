@@ -15,6 +15,7 @@ import { Toaster } from "sonner-native";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export const unstable_settings = {
@@ -124,6 +125,7 @@ function NavigationGuard() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [queryClient] = useState(() => new QueryClient());
 
   const AppTheme = {
     ...(colorScheme === "dark" ? DarkTheme : DefaultTheme),
@@ -137,6 +139,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
+          <QueryClientProvider client={queryClient}>
           <ThemeProvider value={AppTheme}>
             <View style={{ flex: 1, backgroundColor: "#263369" }}>
               <NavigationGuard />
@@ -144,6 +147,7 @@ export default function RootLayout() {
             </View>
             <StatusBar style="light" />
           </ThemeProvider>
+          </QueryClientProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

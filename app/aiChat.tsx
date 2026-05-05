@@ -75,6 +75,23 @@ const getFormattedTime = (timestamp: string | number | Date) => {
     return "Just now";
 };
 
+const formatFullDateTime = (dateString: string | Date) => {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+
+  const formatted = date.toLocaleString("en-US", {
+    month: "long",      // May
+    day: "numeric",     // 4
+    year: "numeric",    // 2026
+    hour: "numeric",    // 9
+    minute: "2-digit",  // 14
+    hour12: true,       // AM/PM
+  });
+
+  return formatted.replace(",", " -"); 
+};
+
 // ─── Premium Keyboard Tracking ─────────────────────────────────────────────
 function useKeyboardOffset() {
     const offset = useRef(new Animated.Value(0)).current;
@@ -457,9 +474,10 @@ export default function AiChatScreen() {
                 <ChatTimelineCard
                     category="AI RESPONSE"
                     title=""
+                    timeAgo=""
                     content={item.ai_response}
                     color="#3B82F6"
-                    timeAgo=""
+                    actualTime={formatFullDateTime(item.updated_at)}
                     quickActions={item.quick_actions}
                     outputFormat={item.output_format}
                     refinementOptions={item.refinement}

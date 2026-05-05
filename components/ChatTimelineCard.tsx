@@ -21,6 +21,7 @@ interface ChatTimelineCardProps {
   category: string;
   color: string;
   timeAgo: string;
+  actualTime?: string;
   quickActions?: string[];
   outputFormat?: string;
   refinementOptions?: string[];
@@ -230,6 +231,7 @@ export const ChatTimelineCard = ({
   outputFormat,
   color,
   timeAgo,
+  actualTime,
   quickActions = [],
   refinementOptions = [],
   responseUsed,
@@ -292,11 +294,20 @@ export const ChatTimelineCard = ({
 
         <View style={styles.contentContainer}>
           <View style={styles.cardHeader}>
-            <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
+            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+              <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
+                <Text style={[styles.badgeText, { color: color }]}>
+                  {category.toUpperCase()}
+                </Text>
+              </View>
+              {isAI && (<View style={[styles.badge]}>
               <Text style={[styles.badgeText, { color: color }]}>
-                {category.toUpperCase()}
+                {actualTime ? actualTime : timeAgo}
               </Text>
+            </View>)}
+
             </View>
+            
 
             <View style={styles.rightHeaderGroup}>
               {outputFormat && (
