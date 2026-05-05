@@ -49,7 +49,6 @@ export interface ClaimFile {
   draft_count?: number;
 }
 
-// Data structure for creating a new file from the frontend
 export interface CreateFileRequest {
   claim_number: string; // Unique ID for the claim
   client_name: string; // Insured party's name
@@ -126,17 +125,6 @@ export type GenerateNextStepRequest = {
   output_format: string;
 };
 
-export type GenerateNextStepResult = {
-  next_output_format: string;
-  next_step: string;
-  rationale?: string;
-  source?: string;
-  output_format?: string;
-  responseText?: string;
-  content?: string;
-  created_at?: string;
-};
-
 export type SubscriptionStatus = {
   success: boolean;
   subscription: {
@@ -147,9 +135,6 @@ export type SubscriptionStatus = {
     expires_at: string;
   };
 };
-
-const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
 
 const responseTypeLabels: Record<string, string> = {
   file_note: "File",
@@ -172,6 +157,9 @@ const responseTypeLabels: Record<string, string> = {
 /**
  * Core API Helper
  */
+const API_BASE_URL = BASE_URL;
+const DEBUG_MODE = true;
+
 async function apiRequest<T>(
   path: string,
   init: RequestInit,
@@ -665,6 +653,16 @@ export async function updateUserProfile(
     {
       method: "PATCH",
       body: JSON.stringify(payload),
+    },
+    token,
+  );
+}
+
+export async function getProfile(token: string): Promise<UpdateUserResponse> {
+  return apiRequest<UpdateUserResponse>(
+    "/user/profile",
+    {
+      method: "GET",
     },
     token,
   );

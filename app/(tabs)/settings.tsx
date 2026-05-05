@@ -1,32 +1,40 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ReactElement, useCallback, useState } from "react";
-
-
-
+import React, { ReactElement, useCallback, useState } from "react";
 import {
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Toast from 'react-native-toast-message';
+import { toast } from "sonner-native";
 
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import {
+  getProfile,
   getSubscriptionStatus,
-  SubscriptionStatus,
+  updateUserProfile,
   upgradeSubscription
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
-import { toast } from "sonner-native";
+
+const { width } = Dimensions.get('window');
 
 type MenuLinkProps = {
   icon: React.ComponentProps<typeof Ionicons>["name"];
@@ -38,97 +46,138 @@ type MenuLinkProps = {
 
 export default function SettingsScreen() {
   const { token, email, logout } = useAuth();
-  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
   const [busyCheckout, setBusyCheckout] = useState(false);
-
-  // Logout Modal State
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  const loadSubscription = useCallback(async (showLoading = true) => {
-    if (!token) {
-      setLoading(false);
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    company: "",
+    avatar_url: "",
+  });
+
+  const { data: subscriptionData, isLoading: isSubLoading, refetch: refetchSub } = useQuery({
+    queryKey: ['subscription', token],
+    queryFn: () => getSubscriptionStatus(token!),
+    enabled: !!token,
+  });
+
+  const { data: profileData, isLoading: isProfileLoading, refetch: refetchProfile } = useQuery({
+    queryKey: ['profile', token],
+    queryFn: () => getProfile(token!),
+    enabled: !!token,
+  });
+
+  const { mutate: updateProfile, isPending: isUpdating } = useMutation({
+    mutationFn: (payload: any) => updateUserProfile(payload, token!),
+    onSuccess: () => {
+      toast.success("Profile updated successfully 🚀");
+      setEditModalVisible(false);
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    },
+    onError: (error) => {
+      console.error(error);
+      toast.error("Failed to update profile");
+    },
+  });
+
+  const onRefresh = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Promise.all([refetchSub(), refetchProfile()]);
+  }, [refetchSub, refetchProfile]);
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      toast.error("Permission denied");
       return;
     }
-    if (showLoading) setLoading(true);
-    try {
-      const response = await getSubscriptionStatus(token);
-      setStatus(response);
-    } catch (error) {
-      console.error("Sync Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadSubscription(true);
-    }, [loadSubscription])
-  );
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      setForm({ ...form, avatar_url: result.assets[0].uri });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
 
   const onUpgrade = async () => {
-    if (!token || busyCheckout || !status?.subscription) return;
+    if (!token || busyCheckout || !subscriptionData?.subscription) return;
     setBusyCheckout(true);
-    const targetPlan = status.subscription.plan_type === "pro" ? "enterprise" : "pro";
+    const targetPlan = subscriptionData.subscription.plan_type === "pro" ? "enterprise" : "pro";
     try {
       const { checkoutUrl } = await upgradeSubscription(token, targetPlan);
       if (checkoutUrl) await Linking.openURL(checkoutUrl);
       toast.success(`Plan Upgraded to ${targetPlan}`)
     } catch (error) {
-      toast.error("Unable to react payment gateway")
-      console.log(error)
+      toast.error("Unable to reach payment gateway")
     } finally {
       setBusyCheckout(false);
     }
   };
 
   const handleLogoutConfirm = async () => {
-    setLogoutModalVisible(false); // Close modal first
-    // Perform the Supabase/Auth logout
+    setLogoutModalVisible(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    try {
-      await logout();
-    } catch (error) {
-      toast.error("Error logging out. Please try again.");
-      console.error("Logout Error:", error);
-      return;
-    }
+    await logout();
   };
 
-  const usagePercentage = status?.subscription?.usage_limit
-    ? (status.subscription.current_usage / status.subscription.usage_limit) * 100
+  const usagePercentage = subscriptionData?.subscription?.usage_limit
+    ? (subscriptionData.subscription.current_usage / subscriptionData.subscription.usage_limit) * 100
     : 0;
+
+  const isLoading = isSubLoading || isProfileLoading;
 
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
 
-      {/* Modern Glossy Header */}
       <View style={styles.headerContainer}>
         <LinearGradient
-          colors={["#156bdb", "#123C78", "#0B2F5B"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          colors={["#1E40AF", "#1E3A8A", "#172554"]}
           style={styles.headerGradient}
         >
           <SafeAreaView edges={["top"]}>
             <View style={styles.headerTopRow}>
               <View style={styles.userInfo}>
                 <View style={styles.avatarContainer}>
-                  <LinearGradient colors={["#38BDF8", "#1D4ED8"]} style={styles.avatarGradient}>
-                    <Text style={styles.avatarText}>{email?.[0].toUpperCase()}</Text>
+                  <LinearGradient colors={["#60A5FA", "#2563EB"]} style={styles.avatarGradient}>
+                    {profileData?.user.avatar_url ? (
+                        <Image source={{ uri: profileData.user.avatar_url }} style={styles.avatarImage} />
+                    ) : (
+                        <Text style={styles.avatarText}>{email?.[0].toUpperCase()}</Text>
+                    )}
                   </LinearGradient>
-                  <View style={styles.onlineIndicator} />
+                  <Pressable
+                    onPress={() => {
+                      setForm({
+                        name: profileData?.user.name || "",
+                        phone: profileData?.user.phone?.toString() || "",
+                        company: profileData?.user.company || "",
+                        avatar_url: profileData?.user.avatar_url || "",
+                      });
+                      setEditModalVisible(true);
+                    }}
+                    style={styles.editIcon}
+                  >
+                    <Ionicons name="pencil" size={10} color="#FFF" />
+                  </Pressable>
                 </View>
                 <View style={styles.userText}>
-                  <Text style={styles.userName}>Account Profile</Text>
+                  <Text style={styles.userName}>{profileData?.user.name || "Account Profile"}</Text>
                   <Text style={styles.userEmail} numberOfLines={1}>{email}</Text>
                 </View>
               </View>
-              {/* UPDATED: Trigger modal instead of direct logout */}
               <Pressable onPress={() => setLogoutModalVisible(true)} style={({ pressed }) => [styles.logoutIcon, pressed && { opacity: 0.7 }]}>
-                <MaterialCommunityIcons name="logout-variant" size={22} color="#F8FAFC" />
+                <MaterialCommunityIcons name="logout-variant" size={20} color="#FFF" />
               </Pressable>
             </View>
           </SafeAreaView>
@@ -138,27 +187,26 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={loadSubscription} tintColor="#0F4C9C" />}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor="#1E40AF" />}
       >
-        {/* Subscription Dashboard Card */}
         <View style={styles.mainCard}>
           <View style={styles.cardHeader}>
-            <View style={styles.planBadge}>
-              <Text style={styles.planLabel}>ACTIVE PLAN</Text>
-              <Text style={styles.planName}>{status?.subscription?.plan_type?.toUpperCase() || "FREE"}</Text>
+            <View>
+              <Text style={styles.planLabel}>CURRENT PLAN</Text>
+              <Text style={styles.planName}>{subscriptionData?.subscription?.plan_type?.toUpperCase() || "FREE"}</Text>
             </View>
             <View style={styles.secureBadge}>
               <Ionicons name="shield-checkmark" size={12} color="#10B981" />
-              <Text style={styles.secureText}>SECURE</Text>
+              <Text style={styles.secureText}>VERIFIED</Text>
             </View>
           </View>
 
           <View style={styles.usageWrapper}>
             <View style={styles.usageHeader}>
-              <Text style={styles.usageTitle}>Generation Usage</Text>
+              <Text style={styles.usageTitle}>Resource Usage</Text>
               <Text style={styles.usageValue}>
-                {status?.subscription?.current_usage || 0}
-                <Text style={styles.usageTotal}> / {status?.subscription?.usage_limit || 0}</Text>
+                {subscriptionData?.subscription?.current_usage || 0}
+                <Text style={styles.usageTotal}> / {subscriptionData?.subscription?.usage_limit || 0}</Text>
               </Text>
             </View>
 
@@ -173,7 +221,7 @@ export default function SettingsScreen() {
             <View style={styles.infoPill}>
               <MaterialCommunityIcons name="lightning-bolt" size={14} color="#F59E0B" />
               <Text style={styles.infoPillText}>
-                {status?.subscription?.remaining || 0} credits remaining
+                {subscriptionData?.subscription?.remaining || 0} credits remaining
               </Text>
             </View>
           </View>
@@ -182,41 +230,43 @@ export default function SettingsScreen() {
 
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <Text style={styles.statLabel}>RENEWAL DATE</Text>
+              <Text style={styles.statLabel}>RENEWAL</Text>
               <Text style={styles.statValue}>
-                {status?.subscription?.expires_at
-                  ? new Date(status.subscription.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                  : "Permanent"}
+                {subscriptionData?.subscription?.expires_at
+                  ? new Date(subscriptionData.subscription.expires_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                  : "Lifetime"}
               </Text>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>SERVER STATUS</Text>
+            <View style={[styles.statItem, { alignItems: 'flex-end' }]}>
+              <Text style={styles.statLabel}>AVAILABILITY</Text>
               <View style={styles.statusRow}>
                 <View style={styles.pulseDot} />
-                <Text style={[styles.statValue, { color: '#10B981' }]}>Operational</Text>
+                <Text style={[styles.statValue, { color: '#10B981' }]}>Online</Text>
               </View>
             </View>
           </View>
 
-          {status?.subscription?.plan_type !== "enterprise" && (
-            <Pressable onPress={onUpgrade} style={({ pressed }) => [styles.upgradeBtn, pressed && { transform: [{ scale: 0.97 }] }]}>
+          {subscriptionData?.subscription?.plan_type !== "enterprise" && (
+            <Pressable onPress={onUpgrade} style={({ pressed }) => [styles.upgradeBtn, pressed && { transform: [{ scale: 0.98 }] }]}>
               <LinearGradient colors={["#1E293B", "#0F172A"]} style={styles.upgradeGradient}>
-                <Text style={styles.upgradeBtnText}>Upgrade Your Plan</Text>
-                <Ionicons name="rocket" size={18} color="#FFF" />
+                {busyCheckout ? <ActivityIndicator color="#FFF" size="small" /> : (
+                    <>
+                        <Text style={styles.upgradeBtnText}>Upgrade Performance</Text>
+                        <Ionicons name="sparkles" size={16} color="#FBBF24" />
+                    </>
+                )}
               </LinearGradient>
             </Pressable>
           )}
         </View>
 
-        {/* Action Menu */}
-        <Text style={styles.menuTitle}>Application Settings</Text>
+        <Text style={styles.menuTitle}>Preferences</Text>
         <View style={styles.menuContainer}>
-          <MenuLink icon="notifications-outline" label="Push Notifications" color="#64748B" />
-          <MenuLink icon="lock-closed-outline" label="Security & Privacy" color="#64748B" />
-          {/* UPDATED: Trigger modal instead of direct logout */}
+          <MenuLink icon="notifications-outline" label="Notifications" color="#64748B" />
+          <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" />
           <MenuLink
             icon="log-out-outline"
-            label="Logout Account"
+            label="Sign Out"
             color="#EF4444"
             isLast
             onPress={() => setLogoutModalVisible(true)}
@@ -224,18 +274,111 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>BUILD 1.5.0 | DEVELOPMENT</Text>
-          <Text style={styles.powerText}>AdjusterAssist Intelligence Engine</Text>
+          <Text style={styles.versionText}>v1.5.0 PROD</Text>
+          <Text style={styles.powerText}>AdjusterAssist Intelligence</Text>
         </View>
       </ScrollView>
-      <Toast />
 
-      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
+        >
+          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          
+          <View style={styles.editModal}>
+            <View style={styles.modalDragHandle} />
+            
+            <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Update Profile</Text>
+                <Pressable hitSlop={20} onPress={() => setEditModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#94A3B8" />
+                </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+                <View style={styles.modalAvatarSection}>
+                    <Pressable onPress={pickImage} style={styles.modalAvatarContainer}>
+                        {form.avatar_url ? (
+                            <Image source={{ uri: form.avatar_url }} style={styles.modalAvatar} />
+                        ) : (
+                            <View style={styles.modalAvatarPlaceholder}>
+                                <Ionicons name="camera" size={32} color="#94A3B8" />
+                            </View>
+                        )}
+                        <View style={styles.modalEditBadge}>
+                            <Ionicons name="cloud-upload" size={12} color="#FFF" />
+                        </View>
+                    </Pressable>
+                    <Text style={styles.modalAvatarSub}>Change profile picture</Text>
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Full Name</Text>
+                    <TextInput
+                        placeholder="John Doe"
+                        value={form.name}
+                        onChangeText={(text) => setForm({ ...form, name: text })}
+                        style={styles.input}
+                        placeholderTextColor="#94A3B8"
+                    />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Phone Number</Text>
+                    <TextInput
+                        placeholder="+1 (555) 000-0000"
+                        value={form.phone}
+                        onChangeText={(text) => setForm({ ...form, phone: text })}
+                        keyboardType="phone-pad"
+                        style={styles.input}
+                        placeholderTextColor="#94A3B8"
+                    />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Company</Text>
+                    <TextInput
+                        placeholder="Organization name"
+                        value={form.company}
+                        onChangeText={(text) => setForm({ ...form, company: text })}
+                        style={styles.input}
+                        placeholderTextColor="#94A3B8"
+                    />
+                </View>
+
+                <Pressable
+                  onPress={() =>
+                    updateProfile({
+                      name: form.name || undefined,
+                      phone: form.phone ? Number(form.phone) : undefined,
+                      company: form.company || undefined,
+                      avatar_url: form.avatar_url || undefined,
+                    })
+                  }
+                  disabled={isUpdating}
+                  style={({ pressed }) => [
+                      styles.saveBtn, 
+                      (pressed || isUpdating) && { opacity: 0.9, transform: [{scale: 0.99}] }
+                  ]}
+                >
+                  {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveText}>Save Settings</Text>}
+                </Pressable>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <CustomConfirmModal
         isVisible={isLogoutModalVisible}
         title="Sign Out"
         confirmText='Logout'
-        message="Are you sure you want to log out of AdjusterAssist? You will need to sign in again to access your workspaces."
+        message="Are you sure you want to log out? You will need to sign in again to access your workspaces."
         onConfirm={handleLogoutConfirm}
         onCancel={() => setLogoutModalVisible(false)}
       />
@@ -243,77 +386,205 @@ export default function SettingsScreen() {
   );
 }
 
-// Sub-component for Menu Items
 function MenuLink({ icon, label, color, isLast, onPress }: MenuLinkProps): ReactElement {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#F8FAFC' }]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#F1F5F9' }]}>
       <View style={styles.menuLeft}>
-        <View style={[styles.menuIconBg, { backgroundColor: color + '15' }]}>
-          <Ionicons name={icon} size={20} color={color} />
+        <View style={[styles.menuIconBg, { backgroundColor: color + '12' }]}>
+          <Ionicons name={icon} size={18} color={color} />
         </View>
-        <Text style={[styles.menuLabel, { color: color === '#EF4444' ? color : '#1E293B' }]}>{label}</Text>
+        <Text style={[styles.menuLabel, { color: color === '#EF4444' ? color : '#334155' }]}>{label}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
       {!isLast && <View style={styles.menuDivider} />}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F1F5F9" },
-  headerContainer: { borderBottomLeftRadius: 30, borderBottomRightRadius: 30, overflow: 'hidden', elevation: 20, shadowColor: '#0f4c9c', shadowOpacity: 0.3, shadowRadius: 15 },
-  headerGradient: { paddingBottom: 16, paddingTop: 20 },
-  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25, },
+  screen: { flex: 1, backgroundColor: "#F8FAFC" },
+  headerContainer: { 
+    borderBottomLeftRadius: 32, 
+    borderBottomRightRadius: 32, 
+    overflow: 'hidden',
+    backgroundColor: '#1E3A8A'
+  },
+  headerGradient: { paddingBottom: 30, paddingTop: 10 },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 25 },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
-  avatarContainer: { width: 50, height: 50, position: 'relative' },
-  avatarGradient: { flex: 1, borderRadius: 50, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
-  avatarText: { fontSize: 20, fontWeight: 'bold', color: '#FFF' },
-  onlineIndicator: { position: 'absolute', bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 3, borderColor: '#0F172A' },
-  userText: { marginLeft: 15 },
-  userName: { fontSize: 18, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
-  userEmail: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  avatarContainer: { width: 56, height: 56, position: 'relative' },
+  avatarGradient: { flex: 1, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 28 },
+  avatarText: { fontSize: 24, fontWeight: 'bold', color: '#FFF' },
+  userText: { marginLeft: 16 },
+  userName: { fontSize: 20, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
+  userEmail: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   logoutIcon: { padding: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12 },
 
   scrollContent: { padding: 20 },
-  mainCard: { backgroundColor: '#FFF', borderRadius: 30, padding: 24, shadowColor: '#64748B', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 25 },
-  planBadge: { flex: 1 },
-  planLabel: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 1 },
-  planName: { fontSize: 28, fontWeight: '900', color: '#0010ec', marginTop: 4 },
-  secureBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
-  secureText: { fontSize: 9, fontWeight: '900', color: '#10B981' },
+  mainCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 24, 
+    padding: 24, 
+    marginTop: -20,
+    shadowColor: '#1E293B', 
+    shadowOffset: { width: 0, height: 10 }, 
+    shadowOpacity: 0.08, 
+    shadowRadius: 20, 
+    elevation: 5 
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  planLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
+  planName: { fontSize: 28, fontWeight: '900', color: '#1E3A8A', marginTop: 2 },
+  secureBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, gap: 4 },
+  secureText: { fontSize: 10, fontWeight: '800', color: '#16A34A' },
 
-  usageWrapper: { marginBottom: 25 },
+  usageWrapper: { marginBottom: 20 },
   usageHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  usageTitle: { fontSize: 14, fontWeight: '700', color: '#475569' },
+  usageTitle: { fontSize: 14, fontWeight: '700', color: '#64748B' },
   usageValue: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
-  usageTotal: { color: '#94A3B8', fontWeight: '400' },
+  usageTotal: { color: '#CBD5E1', fontWeight: '500' },
   progressTrack: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 10 },
-  infoPill: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: '#FFFBEB', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, alignSelf: 'flex-start', gap: 6 },
+  infoPill: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: '#FFFBEB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start', gap: 6 },
   infoPillText: { fontSize: 12, fontWeight: '700', color: '#B45309' },
 
-  divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 20 },
-  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
+  divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 24 },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
   statItem: { flex: 1 },
-  statLabel: { fontSize: 9, fontWeight: '900', color: '#94A3B8', marginBottom: 6 },
-  statValue: { fontSize: 14, fontWeight: '700', color: '#1E293B' },
+  statLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', marginBottom: 6 },
+  statValue: { fontSize: 15, fontWeight: '700', color: '#334155' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pulseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
+  pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
 
-  upgradeBtn: { borderRadius: 18, overflow: 'hidden' },
+  upgradeBtn: { borderRadius: 16, overflow: 'hidden' },
   upgradeGradient: { paddingVertical: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   upgradeBtnText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
 
-  menuTitle: { fontSize: 12, fontWeight: '900', color: '#94A3B8', marginTop: 35, marginBottom: 15, marginLeft: 10, textTransform: 'uppercase', letterSpacing: 1 },
-  menuContainer: { backgroundColor: '#FFF', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9' },
+  menuTitle: { fontSize: 11, fontWeight: '800', color: '#94A3B8', marginTop: 32, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1.2 },
+  menuContainer: { backgroundColor: '#FFF', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9' },
   menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18 },
-  menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  menuIconBg: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { fontSize: 15, fontWeight: '700' },
-  menuDivider: { position: 'absolute', bottom: 0, left: 70, right: 20, height: 1, backgroundColor: '#F8FAFC' },
+  menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  menuIconBg: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  menuLabel: { fontSize: 15, fontWeight: '600' },
+  menuDivider: { position: 'absolute', bottom: 0, left: 65, right: 0, height: 1, backgroundColor: '#F8FAFC' },
 
-  footerSection: { marginTop: 40, marginBottom: 50, alignItems: 'center' },
-  versionText: { fontSize: 10, fontWeight: '800', color: '#CBD5E1', letterSpacing: 1 },
-  powerText: { fontSize: 12, fontWeight: '600', color: '#94A3B8', marginTop: 5 }
+  footerSection: { marginTop: 40, marginBottom: 80, alignItems: 'center' },
+  versionText: { fontSize: 10, fontWeight: '700', color: '#CBD5E1', letterSpacing: 1.5 },
+  powerText: { fontSize: 12, fontWeight: '600', color: '#94A3B8', marginTop: 4 },
+  
+  editIcon: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#2563EB",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#1E3A8A",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  editModal: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingTop: 12,
+    maxHeight: '90%',
+  },
+  modalDragHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: '#E2E8F0',
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: 20
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: '#0F172A' },
+  modalAvatarSection: {
+      alignItems: 'center',
+      marginBottom: 24,
+  },
+  modalAvatarContainer: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+      backgroundColor: '#F8FAFC',
+      justifyContent: 'center',
+      alignItems: 'center',
+      position: 'relative'
+  },
+  modalAvatar: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+  },
+  modalAvatarPlaceholder: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+      backgroundColor: '#F1F5F9',
+      justifyContent: 'center',
+      alignItems: 'center'
+  },
+  modalEditBadge: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      backgroundColor: '#2563EB',
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 3,
+      borderColor: '#FFF'
+  },
+  modalAvatarSub: {
+      fontSize: 12,
+      color: '#94A3B8',
+      marginTop: 10,
+      fontWeight: '600'
+  },
+  inputGroup: {
+      marginBottom: 20,
+  },
+  inputLabel: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: '#64748B',
+      marginBottom: 8,
+      marginLeft: 4,
+      textTransform: 'uppercase'
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  saveBtn: {
+    backgroundColor: "#2563EB",
+    padding: 18,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 40,
+  },
+  saveText: { color: "#FFF", fontWeight: "800", fontSize: 16 },
 });
