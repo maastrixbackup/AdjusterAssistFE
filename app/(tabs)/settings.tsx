@@ -92,10 +92,9 @@ export default function SettingsScreen() {
           type,
         } as any);
       }
-
       return updateUserProfile(formData, token!);
     },
-    
+
     onSuccess: () => {
       toast.success("Profile updated successfully 🚀");
       setEditModalVisible(false);
@@ -304,14 +303,23 @@ export default function SettingsScreen() {
       <Modal
         visible={isEditModalVisible}
         transparent
-        animationType="fade"
+        animationType="slide" // Slide is generally smoother for bottom sheets
         onRequestClose={() => setEditModalVisible(false)}
       >
+        {/* Move BlurView here so it doesn't re-calculate with keyboard */}
+        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          // Use 'padding' for iOS and 'undefined' for Android to avoid double-resizing
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.modalOverlay}
+          // This offset helps if you have a header or tabs
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         >
-          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setEditModalVisible(false)}
+          />
 
           <View style={styles.editModal}>
             <View style={styles.modalDragHandle} />
@@ -323,7 +331,16 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {/* 
+         Change: Use 'keyboardShouldPersistTaps' 
+         Change: Ensure ScrollView has 'flexGrow: 1' in contentContainerStyle
+      */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexGrow: 1 }}
+            >
               <View style={styles.modalAvatarSection}>
                 <Pressable onPress={pickImage} style={styles.modalAvatarContainer}>
                   {form.avatar_url ? (
@@ -518,7 +535,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     padding: 24,
     paddingTop: 12,
-    maxHeight: '90%',
+    // Fix: Setting a minHeight or avoiding overly restrictive maxHeights 
+    // helps the ScrollView calculate space better.
+    minHeight: 400,
+    width: '100%',
   },
   modalDragHandle: {
     width: 40,
