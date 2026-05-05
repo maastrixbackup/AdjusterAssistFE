@@ -47,7 +47,7 @@ type MenuLinkProps = {
 export default function SettingsScreen() {
   const { token, email, logout } = useAuth();
   const queryClient = useQueryClient();
-  
+
   const [busyCheckout, setBusyCheckout] = useState(false);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -72,7 +72,30 @@ export default function SettingsScreen() {
   });
 
   const { mutate: updateProfile, isPending: isUpdating } = useMutation({
-    mutationFn: (payload: any) => updateUserProfile(payload, token!),
+    // Inside your mutation function
+    mutationFn: async (payload: any) => {
+      const formData = new FormData();
+
+      // ONLY append if values are truthy
+      if (payload.name) formData.append('name', payload.name);
+      if (payload.phone) formData.append('phone', payload.phone.toString());
+      if (payload.company) formData.append('company', payload.company);
+
+      if (payload.avatar_url && payload.avatar_url.startsWith('file://')) {
+        const filename = payload.avatar_url.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename || '');
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        formData.append('avatar', {
+          uri: payload.avatar_url,
+          name: filename || 'upload.jpg',
+          type,
+        } as any);
+      }
+
+      return updateUserProfile(formData, token!);
+    },
+    
     onSuccess: () => {
       toast.success("Profile updated successfully 🚀");
       setEditModalVisible(false);
@@ -90,22 +113,21 @@ export default function SettingsScreen() {
   }, [refetchSub, refetchProfile]);
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      toast.error("Permission denied");
-      return;
-    }
-
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
     });
 
     if (!result.canceled) {
-      setForm({ ...form, avatar_url: result.assets[0].uri });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const asset = result.assets[0];
+
+      // Set the local state so the UI updates immediately
+      setForm({ ...form, avatar_url: asset.uri });
+
+      // We will handle the actual upload inside the updateProfile mutation
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -151,9 +173,9 @@ export default function SettingsScreen() {
                 <View style={styles.avatarContainer}>
                   <LinearGradient colors={["#60A5FA", "#2563EB"]} style={styles.avatarGradient}>
                     {profileData?.user.avatar_url ? (
-                        <Image source={{ uri: profileData.user.avatar_url }} style={styles.avatarImage} />
+                      <Image source={{ uri: profileData.user.avatar_url }} style={styles.avatarImage} />
                     ) : (
-                        <Text style={styles.avatarText}>{email?.[0].toUpperCase()}</Text>
+                      <Text style={styles.avatarText}>{email?.[0].toUpperCase()}</Text>
                     )}
                   </LinearGradient>
                   <Pressable
@@ -250,10 +272,10 @@ export default function SettingsScreen() {
             <Pressable onPress={onUpgrade} style={({ pressed }) => [styles.upgradeBtn, pressed && { transform: [{ scale: 0.98 }] }]}>
               <LinearGradient colors={["#1E293B", "#0F172A"]} style={styles.upgradeGradient}>
                 {busyCheckout ? <ActivityIndicator color="#FFF" size="small" /> : (
-                    <>
-                        <Text style={styles.upgradeBtnText}>Upgrade Performance</Text>
-                        <Ionicons name="sparkles" size={16} color="#FBBF24" />
-                    </>
+                  <>
+                    <Text style={styles.upgradeBtnText}>Upgrade Performance</Text>
+                    <Ionicons name="sparkles" size={16} color="#FBBF24" />
+                  </>
                 )}
               </LinearGradient>
             </Pressable>
@@ -285,90 +307,90 @@ export default function SettingsScreen() {
         animationType="fade"
         onRequestClose={() => setEditModalVisible(false)}
       >
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalOverlay}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
         >
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-          
+
           <View style={styles.editModal}>
             <View style={styles.modalDragHandle} />
-            
+
             <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Profile</Text>
-                <Pressable hitSlop={20} onPress={() => setEditModalVisible(false)}>
-                    <Ionicons name="close" size={24} color="#94A3B8" />
-                </Pressable>
+              <Text style={styles.modalTitle}>Update Profile</Text>
+              <Pressable hitSlop={20} onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#94A3B8" />
+              </Pressable>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-                <View style={styles.modalAvatarSection}>
-                    <Pressable onPress={pickImage} style={styles.modalAvatarContainer}>
-                        {form.avatar_url ? (
-                            <Image source={{ uri: form.avatar_url }} style={styles.modalAvatar} />
-                        ) : (
-                            <View style={styles.modalAvatarPlaceholder}>
-                                <Ionicons name="camera" size={32} color="#94A3B8" />
-                            </View>
-                        )}
-                        <View style={styles.modalEditBadge}>
-                            <Ionicons name="cloud-upload" size={12} color="#FFF" />
-                        </View>
-                    </Pressable>
-                    <Text style={styles.modalAvatarSub}>Change profile picture</Text>
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Full Name</Text>
-                    <TextInput
-                        placeholder="John Doe"
-                        value={form.name}
-                        onChangeText={(text) => setForm({ ...form, name: text })}
-                        style={styles.input}
-                        placeholderTextColor="#94A3B8"
-                    />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Phone Number</Text>
-                    <TextInput
-                        placeholder="+1 (555) 000-0000"
-                        value={form.phone}
-                        onChangeText={(text) => setForm({ ...form, phone: text })}
-                        keyboardType="phone-pad"
-                        style={styles.input}
-                        placeholderTextColor="#94A3B8"
-                    />
-                </View>
-
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Company</Text>
-                    <TextInput
-                        placeholder="Organization name"
-                        value={form.company}
-                        onChangeText={(text) => setForm({ ...form, company: text })}
-                        style={styles.input}
-                        placeholderTextColor="#94A3B8"
-                    />
-                </View>
-
-                <Pressable
-                  onPress={() =>
-                    updateProfile({
-                      name: form.name || undefined,
-                      phone: form.phone ? Number(form.phone) : undefined,
-                      company: form.company || undefined,
-                      avatar_url: form.avatar_url || undefined,
-                    })
-                  }
-                  disabled={isUpdating}
-                  style={({ pressed }) => [
-                      styles.saveBtn, 
-                      (pressed || isUpdating) && { opacity: 0.9, transform: [{scale: 0.99}] }
-                  ]}
-                >
-                  {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveText}>Save Settings</Text>}
+              <View style={styles.modalAvatarSection}>
+                <Pressable onPress={pickImage} style={styles.modalAvatarContainer}>
+                  {form.avatar_url ? (
+                    <Image source={{ uri: form.avatar_url }} style={styles.modalAvatar} />
+                  ) : (
+                    <View style={styles.modalAvatarPlaceholder}>
+                      <Ionicons name="camera" size={32} color="#94A3B8" />
+                    </View>
+                  )}
+                  <View style={styles.modalEditBadge}>
+                    <Ionicons name="cloud-upload" size={12} color="#FFF" />
+                  </View>
                 </Pressable>
+                <Text style={styles.modalAvatarSub}>Change profile picture</Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  placeholder="John Doe"
+                  value={form.name}
+                  onChangeText={(text) => setForm({ ...form, name: text })}
+                  style={styles.input}
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  placeholder="+1 (555) 000-0000"
+                  value={form.phone}
+                  onChangeText={(text) => setForm({ ...form, phone: text })}
+                  keyboardType="phone-pad"
+                  style={styles.input}
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Company</Text>
+                <TextInput
+                  placeholder="Organization name"
+                  value={form.company}
+                  onChangeText={(text) => setForm({ ...form, company: text })}
+                  style={styles.input}
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  updateProfile({
+                    name: form.name || undefined,
+                    phone: form.phone ? Number(form.phone) : undefined,
+                    company: form.company || undefined,
+                    avatar_url: form.avatar_url || undefined,
+                  })
+                }
+                disabled={isUpdating}
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  (pressed || isUpdating) && { opacity: 0.9, transform: [{ scale: 0.99 }] }
+                ]}
+              >
+                {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveText}>Save Settings</Text>}
+              </Pressable>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -403,9 +425,9 @@ function MenuLink({ icon, label, color, isLast, onPress }: MenuLinkProps): React
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F8FAFC" },
-  headerContainer: { 
-    borderBottomLeftRadius: 32, 
-    borderBottomRightRadius: 32, 
+  headerContainer: {
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     overflow: 'hidden',
     backgroundColor: '#1E3A8A'
   },
@@ -422,16 +444,16 @@ const styles = StyleSheet.create({
   logoutIcon: { padding: 10, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12 },
 
   scrollContent: { padding: 20 },
-  mainCard: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 24, 
-    padding: 24, 
+  mainCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 24,
     marginTop: -20,
-    shadowColor: '#1E293B', 
-    shadowOffset: { width: 0, height: 10 }, 
-    shadowOpacity: 0.08, 
-    shadowRadius: 20, 
-    elevation: 5 
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   planLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
@@ -472,7 +494,7 @@ const styles = StyleSheet.create({
   footerSection: { marginTop: 40, marginBottom: 80, alignItems: 'center' },
   versionText: { fontSize: 10, fontWeight: '700', color: '#CBD5E1', letterSpacing: 1.5 },
   powerText: { fontSize: 12, fontWeight: '600', color: '#94A3B8', marginTop: 4 },
-  
+
   editIcon: {
     position: "absolute",
     bottom: -2,
@@ -499,12 +521,12 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
   },
   modalDragHandle: {
-      width: 40,
-      height: 4,
-      backgroundColor: '#E2E8F0',
-      borderRadius: 2,
-      alignSelf: 'center',
-      marginBottom: 20
+    width: 40,
+    height: 4,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20
   },
   modalHeader: {
     flexDirection: 'row',
@@ -514,60 +536,60 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 20, fontWeight: "800", color: '#0F172A' },
   modalAvatarSection: {
-      alignItems: 'center',
-      marginBottom: 24,
+    alignItems: 'center',
+    marginBottom: 24,
   },
   modalAvatarContainer: {
-      width: 90,
-      height: 90,
-      borderRadius: 45,
-      backgroundColor: '#F8FAFC',
-      justifyContent: 'center',
-      alignItems: 'center',
-      position: 'relative'
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative'
   },
   modalAvatar: {
-      width: 90,
-      height: 90,
-      borderRadius: 45,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
   },
   modalAvatarPlaceholder: {
-      width: 90,
-      height: 90,
-      borderRadius: 45,
-      backgroundColor: '#F1F5F9',
-      justifyContent: 'center',
-      alignItems: 'center'
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   modalEditBadge: {
-      position: 'absolute',
-      bottom: 2,
-      right: 2,
-      backgroundColor: '#2563EB',
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 3,
-      borderColor: '#FFF'
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: '#2563EB',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFF'
   },
   modalAvatarSub: {
-      fontSize: 12,
-      color: '#94A3B8',
-      marginTop: 10,
-      fontWeight: '600'
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 10,
+    fontWeight: '600'
   },
   inputGroup: {
-      marginBottom: 20,
+    marginBottom: 20,
   },
   inputLabel: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: '#64748B',
-      marginBottom: 8,
-      marginLeft: 4,
-      textTransform: 'uppercase'
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 8,
+    marginLeft: 4,
+    textTransform: 'uppercase'
   },
   input: {
     backgroundColor: '#F8FAFC',

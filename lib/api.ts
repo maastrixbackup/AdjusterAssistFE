@@ -645,14 +645,15 @@ export type UpdateUserResponse = {
 };
 
 export async function updateUserProfile(
-  payload: UpdateUserPayload,
+  payload: UpdateUserPayload | FormData,
   token: string,
 ): Promise<UpdateUserResponse> {
+  const isFormData = payload instanceof FormData;
   return apiRequest<UpdateUserResponse>(
     "/user/update",
     {
       method: "PATCH",
-      body: JSON.stringify(payload),
+      body: isFormData ? payload : JSON.stringify(payload),
     },
     token,
   );
