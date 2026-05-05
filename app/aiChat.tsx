@@ -39,11 +39,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 const REFINEMENT_MAP: Record<string, string> = {
-    Shorten: "Shorten response",
-    "Make more formal": "Make formal",
-    "Make attornary facing": "Make a attorney response",
-    "Make more firm": "Make more firm",
-    "Add DOI safe language": "Add doi safe language",
+    "Shorten": "shorten",
+    "Make more formal": "formal",
+    "Make attorney facing": "attorney_facing",
+    "Make more firm": "firm",
+    "Add DOI safe language": "doi_safe",
 };
 
 const { width } = Dimensions.get("window");
@@ -384,7 +384,7 @@ export default function AiChatScreen() {
         async (option: string, originalContent: string, parentId: number) => {
             Haptics.selectionAsync();
 
-            const backendType = REFINEMENT_MAP[option] || "formal";
+            const backendType = REFINEMENT_MAP[option];
             setLoadingCardId(parentId);
             setIsGenerating(true);
             try {

@@ -221,7 +221,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>BUILD 1.3.2 | DEVELOPMENT</Text>
+          <Text style={styles.versionText}>BUILD 1.5.0 | DEVELOPMENT</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence Engine</Text>
         </View>
       </ScrollView>
