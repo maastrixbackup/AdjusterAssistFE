@@ -295,7 +295,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>v1.5.0 PROD</Text>
+          <Text style={styles.versionText}>VERSION 1.6.0 DEVELOPMENT</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence</Text>
         </View>
       </ScrollView>

@@ -1,26 +1,36 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { registerAndSendPushToken } from "@/lib/notifications/registerForPushToken";
+import { AuthProvider, useAuth } from "@/providers/auth-provider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Toaster } from "sonner-native";
-
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { AuthProvider, useAuth } from "@/providers/auth-provider";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { toast, Toaster } from "sonner-native";
 
 export const unstable_settings = {
   initialRouteName: "login",
 };
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 function NavigationGuard() {
   const { isAuthenticated, isHydrated } = useAuth();
@@ -127,6 +137,32 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [queryClient] = useState(() => new QueryClient());
 
+  // --- Get auth state and token ---
+  const { isAuthenticated, token } = useAuth();
+
+  // --- Toast helper (replace with your real toast if needed) ---
+  const showToast = (msg: string, type: "success" | "error" | "warning" = "success") => {
+    switch (type) {
+      case "error":
+        toast.error(msg);
+        break;
+      case "warning":
+        toast.warning(msg);
+        break;
+      default:
+        toast.success(msg);
+    }
+  };
+
+  // --- Push notification registration ---
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    // Request permissions + get Expo push token + send to backend
+    registerAndSendPushToken(token, showToast);
+  }, [isAuthenticated, token]);
+
+
   const AppTheme = {
     ...(colorScheme === "dark" ? DarkTheme : DefaultTheme),
     colors: {
@@ -140,13 +176,13 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
-          <ThemeProvider value={AppTheme}>
-            <View style={{ flex: 1, backgroundColor: "#263369" }}>
-              <NavigationGuard />
-              <Toaster />
-            </View>
-            <StatusBar style="light" />
-          </ThemeProvider>
+            <ThemeProvider value={AppTheme}>
+              <View style={{ flex: 1, backgroundColor: "#263369" }}>
+                <NavigationGuard />
+                <Toaster />
+              </View>
+              <StatusBar style="light" />
+            </ThemeProvider>
           </QueryClientProvider>
         </AuthProvider>
       </SafeAreaProvider>
