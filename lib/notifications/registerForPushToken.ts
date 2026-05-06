@@ -37,13 +37,13 @@ export async function registerAndSendPushToken(
     }
 
     // 3. Get projectId (EAS)
-    const projectId = "34289344‑f849‑4bd5‑ae0b‑728b8cc40829";
+    const projectId = "34289344-f849-4bd5-ae0b-728b8cc40829";
 
     if (!projectId) {
       showToast?.("Project ID not found");
       return;
     }
-
+    // console.log("projectId:", projectId);
     // 4. Get Expo push token
     const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
       projectId,
@@ -64,7 +64,7 @@ export async function registerAndSendPushToken(
 
     // 6. Send to backend
     const res = await fetch(
-      "http://localhost:4000/api/v1/notifications/save-token",
+      "https://adjusterassist-backend.onrender.com/api/v1/notifications/save-token",
       {
         method: "POST",
         headers: {

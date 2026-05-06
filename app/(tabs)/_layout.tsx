@@ -79,21 +79,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="history"
-        options={{
-          headerShown: false,
-          title: "History",
-          tabBarLabel: "History",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              size={26}
-              name={focused ? "clock" : "clock-outline"}
-              color={color}
-            />
-          ),
-        }}
-      /> */}
  
       <Tabs.Screen
         name="workspaces"
@@ -108,21 +93,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="claim-workspace"
-        options={{
-          headerShown: false,
-          title: "Claim Workspace",
-          tabBarLabel: "Workspace",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              size={26}
-              name={focused ? "briefcase" : "briefcase-outline"}
-              color={color}
-            />
-          ),
-        }}
-      /> */}
       <Tabs.Screen
         name="settings"
         options={{
@@ -136,14 +106,6 @@ export default function TabLayout() {
               color={color}
             />
           ),
-        }}
-      />
- 
-      <Tabs.Screen
-        name="generate"
-        options={{
-          headerShown: false,
-          href: null,
         }}
       />
       

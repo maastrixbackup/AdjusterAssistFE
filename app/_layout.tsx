@@ -55,7 +55,7 @@ function NavigationGuard() {
     const inProtectedGroup =
       rootSegment === "(tabs)" ||
       rootSegment === "workspaces" ||
-      rootSegment === "generate";
+      rootSegment === "aiChat";
     const inOnboardingGroup = rootSegment === "onboarding";
 
     if (!hasSeenOnboarding && !inOnboardingGroup) {
