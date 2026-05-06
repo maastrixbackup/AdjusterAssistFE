@@ -13,12 +13,13 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
@@ -34,10 +35,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
+
+// ─── Constants (outside component so they never re-create) ────────────────────
 const REFINEMENT_MAP: Record<string, string> = {
     "Shorten": "shorten",
     "Make more formal": "formal",
@@ -46,17 +48,24 @@ const REFINEMENT_MAP: Record<string, string> = {
     "Add DOI safe language": "doi_safe",
 };
 
+const DEFAULT_QUICK_ACTIONS = ["Copy", "Create Variant", "Mark as used"];
+const DEFAULT_REFINEMENT_OPTIONS = [
+    "Shorten",
+    "Make more formal",
+    "Make attorney facing",
+    "Make more firm",
+    "Add DOI safe language",
+];
+
 const { width } = Dimensions.get("window");
 
+// ─── Pure helper functions (outside component — never re-created) ─────────────
 const getFormattedTime = (timestamp: string | number | Date) => {
     if (!timestamp) return "Just now";
-
     const now = new Date();
     const date = new Date(timestamp);
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
     if (seconds < 60) return "Just now";
-
     const intervals = [
         { label: "year", seconds: 31536000 },
         { label: "month", seconds: 2592000 },
@@ -65,43 +74,50 @@ const getFormattedTime = (timestamp: string | number | Date) => {
         { label: "hour", seconds: 3600 },
         { label: "min", seconds: 60 },
     ];
-
     for (const interval of intervals) {
         const count = Math.floor(seconds / interval.seconds);
-        if (count >= 1) {
-            return `${count} ${interval.label}${count > 1 ? "s" : ""} ago`;
-        }
+        if (count >= 1) return `${count} ${interval.label}${count > 1 ? "s" : ""} ago`;
     }
     return "Just now";
 };
 
 const formatFullDateTime = (dateString: string | Date) => {
-  if (!dateString) return "";
-
-  const date = new Date(dateString);
-
-  const formatted = date.toLocaleString("en-US", {
-    month: "long",      // May
-    day: "numeric",     // 4
-    year: "numeric",    // 2026
-    hour: "numeric",    // 9
-    minute: "2-digit",  // 14
-    hour12: true,       // AM/PM
-  });
-
-  return formatted.replace(",", " -"); 
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const formatted = date.toLocaleString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
+    return formatted.replace(",", " -");
 };
 
-// ─── Premium Keyboard Tracking ─────────────────────────────────────────────
+// ─── Transform a raw API draft into a chat item ───────────────────────────────
+// Defined outside component so useMemo selector stays stable
+const transformDraft = (draft: any) => ({
+    id: draft.id,
+    user_input: draft.user_input || "Analysis request",
+    ai_response: draft.ai_response,
+    output_format: draft.content_type,
+    next_step_suggestion: draft.next_step_suggestion,
+    responseUsed: draft.response_used || false,
+    doccuments_url: draft.doccuments_url,
+    image_input_url: draft.image_input_url,
+    quick_actions: DEFAULT_QUICK_ACTIONS,
+    refinement: DEFAULT_REFINEMENT_OPTIONS,
+    created_at: draft.created_at,
+    updated_at: draft.updated_at || draft.created_at,
+});
+
+// ─── Premium Keyboard Tracking (unchanged) ───────────────────────────────────
 function useKeyboardOffset() {
     const offset = useRef(new Animated.Value(0)).current;
-
     useEffect(() => {
-        const showEvent =
-            Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-        const hideEvent =
-            Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
+        const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+        const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
         const show = Keyboard.addListener(showEvent, (e) => {
             Animated.timing(offset, {
                 toValue: e.endCoordinates.height,
@@ -110,7 +126,6 @@ function useKeyboardOffset() {
                 useNativeDriver: false,
             }).start();
         });
-
         const hide = Keyboard.addListener(hideEvent, (e) => {
             Animated.timing(offset, {
                 toValue: 0,
@@ -119,121 +134,171 @@ function useKeyboardOffset() {
                 useNativeDriver: false,
             }).start();
         });
-
-        return () => {
-            show.remove();
-            hide.remove();
-        };
+        return () => { show.remove(); hide.remove(); };
     }, [offset]);
-
     return offset;
 }
 
+// ─── Memoized Turn Row ────────────────────────────────────────────────────────
+// Extracted so React.memo can bail out when item/callbacks haven't changed
+interface TurnRowProps {
+    item: any;
+    loadingCardId: number | null;
+    onQuickAction: (action: string, draftId: number, content: string) => void;
+    onRefinement: (option: string, originalContent: string, parentId: number) => void;
+    onShare: (content: string) => void;
+}
+
+const TurnRow = React.memo(
+    ({ item, loadingCardId, onQuickAction, onRefinement, onShare }: TurnRowProps) => (
+        <View style={styles.turnGroup}>
+            <ChatTimelineCard
+                category="USER INPUT"
+                title=""
+                content={item.user_input}
+                color="#94A3B8"
+                quickActions={["Copy"]}
+                imageInput={item?.image_input_url}
+                documentInput={item?.doccuments_url}
+                timeAgo={getFormattedTime(item.created_at)}
+                onActionPress={(action: string) =>
+                    onQuickAction(action, item.id, item.user_input || "")
+                }
+            />
+            <ChatTimelineCard
+                category="AI RESPONSE"
+                title=""
+                timeAgo=""
+                content={item.ai_response}
+                color="#3B82F6"
+                actualTime={formatFullDateTime(item.updated_at)}
+                quickActions={item.quick_actions}
+                outputFormat={item.output_format}
+                refinementOptions={item.refinement}
+                responseUsed={item.responseUsed}
+                onActionPress={(action: string) =>
+                    onQuickAction(action, item.id, item.ai_response || "")
+                }
+                onRefinementPress={(option: string) =>
+                    onRefinement(option, item.ai_response || "", item.id)
+                }
+                onSharePress={() => onShare(item.ai_response || "")}
+                isLoading={loadingCardId === item.id}
+            />
+            <ChatTimelineCard
+                category="SUGGESTIONS"
+                title="Recommended Next Step"
+                content={item.next_step_suggestion}
+                color="#10B981"
+                quickActions={["Copy"]}
+                timeAgo={getFormattedTime(item.updated_at)}
+                isLoading={loadingCardId === item.id}
+                onActionPress={(action: string) =>
+                    onQuickAction(action, item.id, item.next_step_suggestion || "")
+                }
+            />
+        </View>
+    ),
+);
+TurnRow.displayName = "TurnRow";
+
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function AiChatScreen() {
-    const { fileId, claimNumber, clientName, credits, initialData } =
-        useLocalSearchParams();
+    const { fileId, claimNumber, clientName, credits, initialData } = useLocalSearchParams();
     const { token } = useAuth();
     const insets = useSafeAreaInsets();
+    const queryClient = useQueryClient();
 
     const [inputText, setInputText] = useState("");
-    const [chatHistory, setChatHistory] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isGenerating, setIsGenerating] = useState(false);
-
     const [userCredits, setUserCredits] = useState(Number(credits || 0));
-
     const [isMetaModalVisible, setIsMetaModalVisible] = useState(false);
-    const [currentWorkspace, setCurrentWorkspace] = useState<ClaimFile | null>(
-        initialData ? JSON.parse(initialData as string) : null,
-    );
+    const [loadingCardId, setLoadingCardId] = useState<number | null>(null);
+
+    // Local optimistic chat list — seeded from React Query cache then updated locally
+    const [chatHistory, setChatHistory] = useState<any[]>([]);
 
     const flatListRef = useRef<FlatList>(null);
     const keyboardOffset = useKeyboardOffset();
 
-    const [loadingCardId, setLoadingCardId] = useState<number | null>(null);
+    // ─── React Query: thread history ─────────────────────────────────────────
+    const {
+        data: draftsData,
+        isLoading: isDraftsLoading,
+    } = useQuery({
+        queryKey: ["drafts", fileId],
+        queryFn: () => getDraftsByFile(token!, Number(fileId)),
+        enabled: !!token && !!fileId,
+        staleTime: 30_000, // consider data fresh for 30 s — avoids redundant refetches
+    });
 
-    // ─── AUTO SCROLL LOGIC ──────────────────────────────────────────────────
+    // Sync React Query data → local chatHistory (reversed for inverted FlatList)
     useEffect(() => {
-        // Since the list is inverted, index 0 is the bottom (newest)
+        if (draftsData) {
+            setChatHistory([...draftsData.map(transformDraft)].reverse());
+        }
+    }, [draftsData]);
+
+    // ─── React Query: file metadata ───────────────────────────────────────────
+    const { data: currentWorkspace } = useQuery({
+        queryKey: ["file", fileId],
+        queryFn: () => getFileById(token!, Number(fileId)),
+        enabled: !!token && !!fileId,
+        // Seed from initialData so we show something immediately
+        initialData: initialData ? JSON.parse(initialData as string) : undefined,
+        staleTime: 60_000,
+    });
+
+    // ─── Auto-scroll to newest message ───────────────────────────────────────
+    useEffect(() => {
         if (chatHistory.length > 0) {
             setTimeout(() => {
                 flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
             }, 100);
         }
     }, [chatHistory.length]);
-    // ────────────────────────────────────────────────────────────────────────
 
-    // ─── Fetch Thread History ────────────────────────────────────────────────
-    const loadThreadHistory = useCallback(async () => {
-        if (!fileId || !token) return;
+    // ─── Mutation: update workspace metadata ──────────────────────────────────
+    const updateWorkspaceMutation = useMutation({
+        mutationFn: (updatedData: Partial<ClaimFile>) =>
+            updateFile(token!, Number(fileId), updatedData),
+        onMutate: async (updatedData) => {
+            await queryClient.cancelQueries({ queryKey: ["file", fileId] });
+            const previous = queryClient.getQueryData(["file", fileId]);
+            queryClient.setQueryData(["file", fileId], (old: any) =>
+                old ? { ...old, ...updatedData } : old,
+            );
+            return { previous };
+        },
+        onSuccess: () => {
+            toast.success("Workspace updated successfully");
+            queryClient.invalidateQueries({ queryKey: ["file", fileId] });
+        },
+        onError: (_err, _vars, context: any) => {
+            queryClient.setQueryData(["file", fileId], context?.previous);
+            toast.error("Failed to update workspace");
+        },
+    });
 
-        setIsLoading(true);
-        try {
-            const drafts = await getDraftsByFile(token, Number(fileId));
+    const handleUpdateWorkspace = useCallback(
+        (updatedData: Partial<ClaimFile>): Promise<void> => {
+            return new Promise((resolve, reject) => {
+                updateWorkspaceMutation.mutate(updatedData, {
+                    onSuccess: () => resolve(),
+                    onError: (err) => reject(err),
+                });
+            });
+        },
+        [updateWorkspaceMutation],
+    );
 
-            // Transform API Drafts into Chat Items
-            const formattedHistory = drafts.map((draft: any) => ({
-                id: draft.id,
-                user_input: draft.user_input || "Analysis request",
-                ai_response: draft.ai_response,
-                output_format: draft.content_type,
-                next_step_suggestion: draft.next_step_suggestion,
-                responseUsed: draft.response_used || false,
-                doccuments_url: draft.doccuments_url,
-                image_input_url: draft.image_input_url,
-                // quick_actions: draft.quick_actions || [],
-                quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                refinement: draft.refinement || [
-                    "Shorten",
-                    "Make more formal",
-                    "Make attorney facing",
-                    "Make more firm",
-                    "Add DOI safe language",
-                ],
-                created_at: draft.created_at,
-                updated_at: draft.updated_at || draft.created_at,
-            }));
-
-            // We reverse here because we are using the 'inverted' prop on FlatList
-            setChatHistory(formattedHistory.reverse());
-        } catch (error) {
-            console.error("Error loading chat history:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [fileId, token]);
-
-    const loadFileDetails = useCallback(async () => {
-        if (!fileId || !token) {
-            console.warn("Missing fileId or token in loadFileDetails");
-            return;
-        }
-        try {
-            const fileData = await getFileById(token, Number(fileId));
-
-            if (fileData) {
-                setCurrentWorkspace(fileData);
-            } else {
-                console.error("API returned empty data for fileId:", fileId);
-            }
-        } catch (error) {
-            console.error("Error loading file metadata:", error);
-        }
-    }, [fileId, token]);
-
-    useEffect(() => {
-        loadThreadHistory();
-        loadFileDetails();
-    }, [loadThreadHistory, loadFileDetails]);
+    // ─── Send message ─────────────────────────────────────────────────────────
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const handleSend = useCallback(
         async (attachments: any[] = []) => {
             if (!token) return router.replace("/(auth)/login");
-
-            if (!inputText.trim()) {
-                return toast.warning("Please enter a message.");
-            }
-
+            if (!inputText.trim()) return toast.warning("Please enter a message.");
             if (!fileId) return toast.warning("Workspace context missing.");
 
             setIsGenerating(true);
@@ -244,13 +309,11 @@ export default function AiChatScreen() {
                 const formData = new FormData();
                 formData.append("fileId", fileId.toString());
                 formData.append("userInput", inputText.trim());
-
                 attachments.forEach((file) => {
                     formData.append("attachments", {
-                        uri:
-                            Platform.OS === "android"
-                                ? file.uri
-                                : file.uri.replace("file://", ""),
+                        uri: Platform.OS === "android"
+                            ? file.uri
+                            : file.uri.replace("file://", ""),
                         type: file.type || "image/jpeg",
                         name: file.name || "upload.jpg",
                     } as any);
@@ -260,31 +323,25 @@ export default function AiChatScreen() {
 
                 if (result) {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    const NewInteraction = {
+                    const newInteraction = {
                         id: result.id || Date.now(),
                         user_input: inputText.trim(),
                         ai_response: result.responseText,
                         output_format: result.output_format,
                         next_step_suggestion: result.nextStep,
                         responseUsed: false,
-                        quick_actions: ["Copy", "Create Variant", "Mark as used"],
-                        refinement: [
-                            "Shorten",
-                            "Make more formal",
-                            "Make attornary facing",
-                            "Make more firm",
-                            "Add DOI safe language",
-                        ],
+                        quick_actions: DEFAULT_QUICK_ACTIONS,
+                        refinement: DEFAULT_REFINEMENT_OPTIONS,
                         created_at: result.createdAt,
-
                         doccuments_url: result.doccuments_url,
                         image_input_url: result.image_input_url,
                     };
-
-                    setChatHistory((prev) => [NewInteraction, ...prev]);
+                    setChatHistory((prev) => [newInteraction, ...prev]);
                     setUserCredits((prev) => Math.max(0, prev - 1));
                     setInputText("");
                     toast.success("Response added to timeline");
+                    // Also invalidate so background sync stays fresh
+                    queryClient.invalidateQueries({ queryKey: ["drafts", fileId] });
                 }
             } catch (error: any) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -293,29 +350,14 @@ export default function AiChatScreen() {
                 setIsGenerating(false);
             }
         },
-        [token, fileId, inputText],
+        [token, fileId, inputText, queryClient],
     );
 
-    const handleUpdateWorkspace = async (updatedData: Partial<ClaimFile>) => {
-        if (!fileId || !token) return;
-        try {
-            setCurrentWorkspace((prev) =>
-                prev ? { ...prev, ...updatedData } : null,
-            );
-            await updateFile(token, Number(fileId), updatedData);
-            toast.success("Workspace updated successfully");
-            await loadFileDetails();
-        } catch (error) {
-            console.error("Failed to update workspace:", error);
-            toast.error("Failed to update workspace");
-        }
-    };
-
+    // ─── Quick actions ────────────────────────────────────────────────────────
     const handleQuickAction = useCallback(
         async (action: string, draftId: number, content: string) => {
             Haptics.selectionAsync();
 
-            // Handle "Create Variant" logic
             if (action.startsWith("Variant: ")) {
                 const variantLabel = action.replace("Variant: ", "");
                 setIsGenerating(true);
@@ -324,13 +366,11 @@ export default function AiChatScreen() {
                     const result = await generateVariant(token!, {
                         fileId: Number(fileId),
                         parentMessageId: draftId,
-                        variantLabel: variantLabel,
+                        variantLabel,
                         userInput: content,
                     });
-
                     if (result.success) {
                         toast.success(`${variantLabel} Created`);
-
                         setChatHistory((prev) =>
                             prev.map((item) =>
                                 item.id === draftId
@@ -339,7 +379,6 @@ export default function AiChatScreen() {
                                         ai_response: result.data.ai_response,
                                         output_format: variantLabel,
                                         next_step_suggestion: result.data.next_step_suggestion,
-                                        created_at: item.created_at,
                                         updated_at: result.updated_at,
                                     }
                                     : item,
@@ -356,8 +395,6 @@ export default function AiChatScreen() {
                 return;
             }
 
-            // Handle other actions (Copy, Mark as used, etc.)
-            // console.log("ACTION: ", action)
             switch (action) {
                 case "Copy":
                     await Clipboard.setStringAsync(content);
@@ -365,20 +402,14 @@ export default function AiChatScreen() {
                     break;
                 case "Mark as used":
                     try {
-                        // 1. Find the current state from the local history
                         const currentItem = chatHistory.find((item) => item.id === draftId);
                         const currentUsedStatus = currentItem?.responseUsed || false;
-
-                        // 2. Send the toggled value (!currentUsedStatus) to the API
                         const response = await updateDraft(token!, draftId, {
                             response_used: !currentUsedStatus,
                         });
-
                         if (response.success) {
                             const newStatus = !currentUsedStatus;
                             toast.success(newStatus ? "Marked as Used" : "Marked as Unused");
-
-                            // 3. Update the local state to reflect the change
                             setChatHistory((prev) =>
                                 prev.map((item) =>
                                     item.id === draftId
@@ -387,8 +418,7 @@ export default function AiChatScreen() {
                                 ),
                             );
                         }
-                    } catch (error) {
-                        console.error("Toggle used error:", error);
+                    } catch {
                         toast.error("Update failed");
                     }
                     break;
@@ -397,10 +427,10 @@ export default function AiChatScreen() {
         [fileId, token, chatHistory],
     );
 
+    // ─── Refinement ───────────────────────────────────────────────────────────
     const handleRefinement = useCallback(
         async (option: string, originalContent: string, parentId: number) => {
             Haptics.selectionAsync();
-
             const backendType = REFINEMENT_MAP[option];
             setLoadingCardId(parentId);
             setIsGenerating(true);
@@ -409,31 +439,27 @@ export default function AiChatScreen() {
                     fileId: Number(fileId),
                     parentMessageId: parentId,
                     refinementType: backendType,
-                    userInput: originalContent, // This is the content to be refined
+                    userInput: originalContent,
                 });
-
                 if (result.success) {
                     toast.success(`${option} Applied`);
                     setUserCredits((prev) => Math.max(0, prev - 1));
-
                     setChatHistory((prev) =>
-                        prev.map((item) => {
-                            if (item.id === parentId) {
-                                return {
-                                    ...item, // Keep the original ID and existing properties (like images/docs)
-                                    ai_response: result.data.ai_response, // Replace with refined text
+                        prev.map((item) =>
+                            item.id === parentId
+                                ? {
+                                    ...item,
+                                    ai_response: result.data.ai_response,
                                     output_format: result.data.output_format,
                                     next_step_suggestion: result.data.next_step_suggestion,
                                     created_at: result.data.created_at,
                                     updated_at: result.data.updated_at,
-                                };
-                            }
-                            return item;
-                        }),
+                                }
+                                : item,
+                        ),
                     );
                 }
-            } catch (error) {
-                console.error("Refinement error:", error);
+            } catch {
                 toast.error("Refinement failed");
             } finally {
                 setIsGenerating(false);
@@ -443,75 +469,61 @@ export default function AiChatScreen() {
         [token, fileId],
     );
 
+    // ─── Share ────────────────────────────────────────────────────────────────
     const onShare = useCallback(async (content: string) => {
         try {
-            await Share.share({
-                message: content,
-                title: "AdjusterAssist Claim Update",
-            });
-        } catch (error: any) {
-            console.log(error);
+            await Share.share({ message: content, title: "AdjusterAssist Claim Update" });
+        } catch {
             toast.error("Sharing failed");
         }
     }, []);
 
+    // ─── Memoised renderItem — stable reference, only re-renders changed rows ─
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
-            <View style={styles.turnGroup}>
-                <ChatTimelineCard
-                    category="USER INPUT"
-                    title=""
-                    content={item.user_input}
-                    color="#94A3B8"
-                    quickActions={["Copy"]}
-                    imageInput={item?.image_input_url}
-                    documentInput={item?.doccuments_url}
-                    timeAgo={getFormattedTime(item.created_at)}
-                    onActionPress={(action) =>
-                        handleQuickAction(action, item.id, item.user_input || "")
-                    }
-                />
-                <ChatTimelineCard
-                    category="AI RESPONSE"
-                    title=""
-                    timeAgo=""
-                    content={item.ai_response}
-                    color="#3B82F6"
-                    actualTime={formatFullDateTime(item.updated_at)}
-                    quickActions={item.quick_actions}
-                    outputFormat={item.output_format}
-                    refinementOptions={item.refinement}
-                    responseUsed={item.responseUsed}
-                    onActionPress={(action) =>
-                        handleQuickAction(action, item.id, item.ai_response || "")
-                    }
-                    onRefinementPress={(option) =>
-                        handleRefinement(option, item.ai_response || "", item.id)
-                    }
-                    onSharePress={() => onShare(item.ai_response || "")}
-                    isLoading={loadingCardId === item.id}
-                />
-                <ChatTimelineCard
-                    category="SUGGESTIONS"
-                    title="Recommended Next Step"
-                    content={item.next_step_suggestion}
-                    color="#10B981"
-                    quickActions={["Copy"]}
-                    timeAgo={getFormattedTime(item.updated_at)}
-                    onActionPress={(action) =>
-                        handleQuickAction(action, item.id, item.next_step_suggestion || "")
-                    }
-                />
-            </View>
+            <TurnRow
+                item={item}
+                loadingCardId={loadingCardId}
+                onQuickAction={handleQuickAction}
+                onRefinement={handleRefinement}
+                onShare={onShare}
+            />
         ),
-        [handleQuickAction, handleRefinement, onShare, loadingCardId],
+        [loadingCardId, handleQuickAction, handleRefinement, onShare],
     );
 
-    const dynamicBottomPadding = keyboardOffset.interpolate({
-        inputRange: [0, 100],
-        outputRange: [Math.max(insets.bottom, 12), 10],
-        extrapolate: "clamp",
-    });
+    // ─── Memoised keyboard interpolation ─────────────────────────────────────
+    const dynamicBottomPadding = useMemo(
+        () =>
+            keyboardOffset.interpolate({
+                inputRange: [0, 100],
+                outputRange: [Math.max(insets.bottom, 12), 10],
+                extrapolate: "clamp",
+            }),
+        [keyboardOffset, insets.bottom],
+    );
+
+    // ─── Memoised empty component so it's not recreated every render ──────────
+    const ListEmptyComponent = useMemo(
+        () => (
+            <View style={[styles.emptyContainer]}>
+                <Ionicons name="chatbubbles-outline" size={48} color="#CBD5E1" />
+                <Text style={styles.emptyText}>
+                    Add claim details, upload documents, or ask for a file note.
+                </Text>
+            </View>
+        ),
+        [],
+    );
+
+    // ─── Memoised key extractor ───────────────────────────────────────────────
+    const keyExtractor = useCallback((item: any) => item.id.toString(), []);
+
+    // ─── Derived display values ───────────────────────────────────────────────
+    const displayClientName = useMemo(
+        () => clientName || currentWorkspace?.client_name,
+        [clientName, currentWorkspace?.client_name],
+    );
 
     return (
         <View style={styles.root}>
@@ -523,6 +535,7 @@ export default function AiChatScreen() {
                     </View>
                 </View>
             )}
+
             {/* HEADER SECTION */}
             <View style={styles.headerContainer}>
                 <LinearGradient
@@ -569,9 +582,7 @@ export default function AiChatScreen() {
                                     {claimNumber || "New Workspace"}
                                 </Text>
                             </View>
-                            <Text style={styles.clientText}>
-                                {clientName || currentWorkspace?.client_name}
-                            </Text>
+                            <Text style={styles.clientText}>{displayClientName}</Text>
                         </View>
                         <TouchableOpacity
                             style={styles.workspaceBtn}
@@ -591,7 +602,7 @@ export default function AiChatScreen() {
             </View>
 
             {/* CHAT LIST */}
-            {isLoading ? (
+            {isDraftsLoading ? (
                 <View style={styles.loaderContainer}>
                     <ActivityIndicator size="large" color="#3B82F6" />
                     <Text style={styles.loaderText}>Loading claim thread...</Text>
@@ -602,20 +613,18 @@ export default function AiChatScreen() {
                     inverted
                     data={chatHistory}
                     renderItem={renderItem}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={keyExtractor}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     keyboardDismissMode="interactive"
                     keyboardShouldPersistTaps="handled"
                     scrollEventThrottle={16}
-                    ListEmptyComponent={
-                        <View style={[styles.emptyContainer]}>
-                            <Ionicons name="chatbubbles-outline" size={48} color="#CBD5E1" />
-                            <Text style={styles.emptyText}>
-                                Add claim details, upload documents, or ask for a file note.
-                            </Text>
-                        </View>
-                    }
+                    ListEmptyComponent={ListEmptyComponent}
+                    // Performance tweaks
+                    removeClippedSubviews={Platform.OS === "android"}
+                    maxToRenderPerBatch={5}
+                    windowSize={10}
+                    initialNumToRender={8}
                 />
             )}
 
@@ -664,7 +673,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         zIndex: 999,
     },
-
     loaderBox: {
         backgroundColor: "#3B82F6",
         padding: 20,
@@ -672,7 +680,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         elevation: 5,
     },
-
     loadingText: {
         marginTop: 10,
         fontSize: 14,
