@@ -108,6 +108,7 @@ function generateSkeletonWidths(text: string): number[] {
 }
 
 function CardSkeleton({ color, content }: { color: string, content: string }) {
+  // console.log("Generating skeleton widths for content length:", content.length);
   const skeletonWidths = generateSkeletonWidths(content);
   return (
     <View style={[skeletonStyles.card]}>
@@ -170,6 +171,66 @@ function CardSkeleton({ color, content }: { color: string, content: string }) {
           {/* Maintain the share icon for layout consistency */}
           <View style={{ opacity: 0.5 }}>
             <Feather name="share-2" size={18} color="#3B82F6" />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function NextStepSkeleton({ color, content }: { color: string, content: string }) {
+  // console.log("Generating skeleton widths for content length:", content.length);
+  const skeletonWidths = generateSkeletonWidths(content);
+  return (
+    <View style={[skeletonStyles.card]}>
+      {/* Accent bar */}
+      <View style={[skeletonStyles.accentBar, { backgroundColor: color }]} />
+
+      <View style={skeletonStyles.content}>
+        {/* Header row */}
+        <View style={skeletonStyles.headerRow}>
+          <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
+            <Text style={[styles.badgeText, { color: color }]}>
+              SUGGESTIONS
+            </Text>
+          </View>
+        </View>
+
+        {/* Format badge */}
+        <SkeletonLine
+          width={100}
+          height={12}
+          borderRadius={4}
+          style={{ marginBottom: 12 }}
+        />
+
+        {/* Content lines */}
+        {skeletonWidths.map((w, i) => (
+          <SkeletonLine
+            key={i}
+            width={`${w}%`}
+            height={14}
+            style={{ marginBottom: i === skeletonWidths.length - 1 ? 16 : 8 }}
+          />
+        ))}
+
+        {/* Footer */}
+        <View style={skeletonStyles.footerRow}>
+          <View style={skeletonStyles.footerLeft}>
+            {/* Static Buttons that match the live UI exactly */}
+            {["Copy"].map((action, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.actionBadge,
+                  { opacity: 0.8 }
+                ]}
+              >
+                <Text style={styles.actionBadgeText}>
+                  {action}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>
@@ -266,10 +327,14 @@ export const ChatTimelineCard = ({
 
   const isAI = category.toUpperCase() === "AI RESPONSE";
   const isSUGGESTIONS = category.toUpperCase() === "SUGGESTIONS";
+  // const isResponse = isAI || isSUGGESTIONS;
 
   // ─── Swap card content with skeleton when loading ────────────────────────
   if (isLoading && isAI) {
     return <CardSkeleton color={color} content={content} />;
+  }
+  if (isLoading && isSUGGESTIONS) {
+    return <NextStepSkeleton color={color} content={content} />;
   }
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -301,13 +366,13 @@ export const ChatTimelineCard = ({
                 </Text>
               </View>
               {isAI && (<View style={[styles.badge]}>
-              <Text style={[styles.badgeText, { color: color }]}>
-                {actualTime ? actualTime : timeAgo}
-              </Text>
-            </View>)}
+                <Text style={[styles.badgeText, { color: color }]}>
+                  {actualTime ? actualTime : timeAgo}
+                </Text>
+              </View>)}
 
             </View>
-            
+
 
             <View style={styles.rightHeaderGroup}>
               {outputFormat && (

@@ -1,46 +1,53 @@
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { registerAndSendPushToken } from "@/lib/notifications/registerForPushToken";
+import { AuthProvider, useAuth } from "@/providers/auth-provider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Toaster } from "sonner-native";
-
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { AuthProvider, useAuth } from "@/providers/auth-provider";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { toast, Toaster } from "sonner-native";
 
 export const unstable_settings = {
   initialRouteName: "login",
 };
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 function NavigationGuard() {
   const { isAuthenticated, isHydrated } = useAuth();
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(
+    null
+  );
   const segments = useSegments();
   const router = useRouter();
-
-  // ─── Track if we've already navigated to prevent double-fire ────────────
   const hasNavigated = useRef(false);
 
-  // ─── Read onboarding flag ONCE on mount ──────────────────────────────────
   useEffect(() => {
     AsyncStorage.getItem("@has_seen_onboarding")
-      .then(value => setHasSeenOnboarding(value === "true"))
+      .then((value) => setHasSeenOnboarding(value === "true"))
       .catch(() => setHasSeenOnboarding(false));
-  }, []); // ← empty deps: runs once, no re-check loop
+  }, []);
 
-  // ─── Navigation logic ─────────────────────────────────────────────────────
   useEffect(() => {
-    // Wait until both auth and onboarding status are resolved
     if (!isHydrated || hasSeenOnboarding === null) return;
 
     const rootSegment = segments[0];
@@ -48,10 +55,9 @@ function NavigationGuard() {
     const inProtectedGroup =
       rootSegment === "(tabs)" ||
       rootSegment === "workspaces" ||
-      rootSegment === "generate";
+      rootSegment === "aiChat";
     const inOnboardingGroup = rootSegment === "onboarding";
 
-    // ─── A. Never seen onboarding → go to onboarding ──────────────────────
     if (!hasSeenOnboarding && !inOnboardingGroup) {
       if (!hasNavigated.current) {
         hasNavigated.current = true;
@@ -60,24 +66,20 @@ function NavigationGuard() {
       return;
     }
 
-    // Reset nav guard once we're in the onboarding screen
     if (inOnboardingGroup) {
       hasNavigated.current = false;
       return;
     }
 
-    // ─── B. Seen onboarding + not authenticated + in protected area ───────
     if (hasSeenOnboarding && !isAuthenticated && inProtectedGroup) {
       router.replace("/(auth)/login");
       return;
     }
 
-    // ─── C. Already authenticated → skip auth/onboarding screens ─────────
     if (isAuthenticated && (inAuthGroup || inOnboardingGroup)) {
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments]);
-  // ─────────────────────────────────────────────────────────────────────────
 
   if (!isHydrated || hasSeenOnboarding === null) {
     return (
@@ -116,9 +118,18 @@ function NavigationGuard() {
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/forgot-password" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/verify-otp" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="(auth)/reset-password"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="(auth)/forgot-password"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="(auth)/verify-otp"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }
@@ -140,16 +151,45 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
-          <ThemeProvider value={AppTheme}>
-            <View style={{ flex: 1, backgroundColor: "#263369" }}>
-              <NavigationGuard />
-              <Toaster />
-            </View>
-            <StatusBar style="light" />
-          </ThemeProvider>
+            <ThemeProvider value={AppTheme}>
+              <AppContent />
+              <StatusBar style="light" />
+            </ThemeProvider>
           </QueryClientProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+// Defined inside layout, but BELOW the provider
+function AppContent() {
+  const { isAuthenticated, token } = useAuth();
+  const showToast = (
+    msg: string,
+    type: "success" | "error" | "warning" = "success"
+  ) => {
+    switch (type) {
+      case "error":
+        toast.error(msg);
+        break;
+      case "warning":
+        toast.warning(msg);
+        break;
+      default:
+        toast.success(msg);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    registerAndSendPushToken(token, showToast);
+  }, [isAuthenticated, token]);
+
+  return (
+    <>
+      <NavigationGuard />
+      <Toaster />
+    </>
   );
 }

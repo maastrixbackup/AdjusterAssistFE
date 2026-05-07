@@ -2,7 +2,7 @@ import { ClaimFile } from '@/lib/api';
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
@@ -63,12 +63,12 @@ const getRelativeTime = (dateString?: string) => {
 interface Props {
     item: ClaimFile;
     onPress: () => void;
-    onUpdate: (data: Partial<ClaimFile>) => Promise<void>;
+    onUpdate: (data: Partial<ClaimFile>) => Promise<void>; // Expected signature
     onDelete: () => void;
     getStatusStyle: (status?: string) => any;
 }
 
-const RenderInput = ({ 
+const RenderInput = React.memo(({ 
     label, 
     value, 
     onChange, 
@@ -91,15 +91,17 @@ const RenderInput = ({
             selectionColor="#4F46E5"
         />
     </View>
-);
+));
+RenderInput.displayName = "RenderInput";
 
-export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, getStatusStyle }: Props) {
+const FileWorkspaceItem = React.memo(({ item, onPress, onUpdate, onDelete, getStatusStyle }: Props) => {
     const translateX = useSharedValue(0);
     const scale = useSharedValue(1);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [editData, setEditData] = useState<Partial<ClaimFile>>({});
 
+    // Reset edit data when modal opens
     useEffect(() => {
         if (editModalVisible) {
             setEditData({
@@ -113,24 +115,36 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                 jurisdiction: item.jurisdiction || "",
                 line_of_business: item.line_of_business || "",
                 claim_stage: item.claim_stage || "",
-                status: (item.status?.toLowerCase() === "closed" ? "closed" : "active") as "active" | "closed"
+                status: (item.status?.toLowerCase() === "closed" ? "closed" : "active") as any
             });
         }
     }, [editModalVisible, item]);
 
-    const statusStyle = getStatusStyle(item.status);
+    // OPTIMIZATION: Memoize calculated styles and values
+    const statusStyle = useMemo(() => getStatusStyle(item.status), [item.status, getStatusStyle]);
+    const relativeTime = useMemo(() => getRelativeTime(item.updated_at), [item.updated_at]);
 
-    const handlePressIn = () => { scale.value = withTiming(0.98, { duration: 150 }); };
-    const handlePressOut = () => { scale.value = withSpring(1); };
-    const closeSwipe = () => { translateX.value = withSpring(0); };
+    // OPTIMIZATION: Memoize Interaction Handlers
+    const handlePressIn = useCallback(() => { 
+        scale.value = withTiming(0.98, { duration: 150 }); 
+    }, [scale]);
 
-    const handleSave = async () => {
+    const handlePressOut = useCallback(() => { 
+        scale.value = withSpring(1); 
+    }, [scale]);
+
+    const closeSwipe = useCallback(() => { 
+        translateX.value = withSpring(0); 
+    }, [translateX]);
+
+    const handleSave = useCallback(async () => {
         if (!editData.claim_number?.trim()) {
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             return;
         }
         setIsUpdating(true);
         try {
+            // FIX: This will work correctly if parent passes 'mutateAsync'
             await onUpdate(editData);
             setEditModalVisible(false);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -139,21 +153,24 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
         } finally {
             setIsUpdating(false);
         }
-    };
+    }, [editData, onUpdate]);
 
-    const pan = Gesture.Pan()
-        .activeOffsetX([-10, 10])
-        .onUpdate((event) => {
-            if (event.translationX < 0) translateX.value = event.translationX;
-        })
-        .onEnd((event) => {
-            if (event.translationX < SWIPE_THRESHOLD) {
-                translateX.value = withSpring(DELETE_WIDTH);
-                if (Platform.OS !== 'web') runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
-            } else {
-                translateX.value = withSpring(0);
-            }
-        });
+    // OPTIMIZATION: Memoize the Gesture Object
+    const pan = useMemo(() => 
+        Gesture.Pan()
+            .activeOffsetX([-10, 10])
+            .onUpdate((event) => {
+                if (event.translationX < 0) translateX.value = event.translationX;
+            })
+            .onEnd((event) => {
+                if (event.translationX < SWIPE_THRESHOLD) {
+                    translateX.value = withSpring(DELETE_WIDTH);
+                    if (Platform.OS !== 'web') runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+                } else {
+                    translateX.value = withSpring(0);
+                }
+            }), 
+    [translateX]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [
@@ -225,9 +242,9 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
                                 </Text>
                                 
                                 <View style={styles.metaRow}>
-                                    <Text style={styles.stageText}>Open Issue: {item.claim_stage.replace('_'," ").toLocaleUpperCase() || "Intake"}</Text>
+                                    <Text style={styles.stageText}>Stage: {item.claim_stage?.replace('_'," ").toLocaleUpperCase() || "INTAKE"}</Text>
                                     <Text style={styles.metaDivider}>|</Text>
-                                    <Text style={styles.dateText}>{getRelativeTime(item.updated_at)}</Text>
+                                    <Text style={styles.dateText}>{relativeTime}</Text>
                                 </View>
                             </View>
 
@@ -320,7 +337,9 @@ export default function FileWorkspaceItem({ item, onPress, onUpdate, onDelete, g
             </Modal>
         </View>
     );
-}
+});
+FileWorkspaceItem.displayName = "FileWorkspaceItem";
+
 
 const styles = StyleSheet.create({
     wrapper: { marginBottom: 14, marginHorizontal: 4 },
@@ -384,3 +403,5 @@ const styles = StyleSheet.create({
     saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
     saveBtnDisabled: { backgroundColor: '#94A3B8', shadowOpacity: 0 }
 });
+
+export default FileWorkspaceItem;

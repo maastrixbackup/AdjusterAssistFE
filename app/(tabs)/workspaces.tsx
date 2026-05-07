@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,19 +22,16 @@ import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
-  ClaimFile,
   deleteFile,
   getMyFiles,
   updateFile
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function WorkspacesScreen() {
   const { token } = useAuth();
-  const [files, setFiles] = useState<ClaimFile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
+  const queryClient = useQueryClient();
   // Modal state for deletion
   const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
@@ -42,108 +39,76 @@ export default function WorkspacesScreen() {
   const [isCreateModalVisible, setCreateModalVisible] = useState(false);
 
   const logo = require("../../assets/images/AdjusterAssist1.png");
-
-
-  const loadFiles = useCallback(
-    async (showLoading = true) => {
-      if (!token) return;
-      if (showLoading) setIsLoading(true);
-      if (!showLoading) setRefreshing(true);
-
-      try {
-        const filesResponse = await getMyFiles(token);
-
-        // Normalize and cast status strictly to "active" | "closed"
-        const normalizedFiles: ClaimFile[] = (filesResponse || []).map((f) => ({
-          ...f,
-          status: (f.status?.toLowerCase() === "closed" ? "closed" : "active") as "active" | "closed",
-        }));
-
-        setFiles(normalizedFiles);
-      } catch (err) {
-        console.error("Error loading files:", err);
-        toast.error("Sync Failed: Could not load workspace data.");
-      } finally {
-        setIsLoading(false);
-        setRefreshing(false);
-      }
+  const {
+    data: files = [],
+    isLoading,
+    refetch,
+    isRefetching: refreshing
+  } = useQuery({
+    queryKey: ["workspaces", token],
+    queryFn: async () => {
+      const res = await getMyFiles(token!);
+      // We move the normalization logic directly into the fetcher
+      return (res || []).map((f: any) => ({
+        ...f,
+        status: (f.status?.toLowerCase() === "closed" ? "closed" : "active") as "active" | "closed",
+      }));
     },
-    [token]
-  );
+    enabled: !!token,
+  });
 
-  useEffect(() => {
-    loadFiles(true);
-  }, [loadFiles]);
-
+  // Re-fetch when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadFiles(false);
-    }, [loadFiles])
+      refetch();
+    }, [refetch])
   );
 
-  const getStatusStyle = (value?: string) => {
+  const getStatusStyle = useCallback((value?: string) => {
     const statusValue = value?.toLowerCase();
     switch (statusValue) {
-      case "active":
-        return { badge: styles.statusBadgeActive, text: styles.statusTextActive };
-      case "closed":
-        return { badge: styles.statusBadgeClosed, text: styles.statusTextClosed };
-      default:
-        return { badge: styles.statusBadgeNeutral, text: styles.statusTextNeutral };
+      case "active": return { badge: styles.statusBadgeActive, text: styles.statusTextActive };
+      case "closed": return { badge: styles.statusBadgeClosed, text: styles.statusTextClosed };
+      default: return { badge: styles.statusBadgeNeutral, text: styles.statusTextNeutral };
     }
-  };
+  }, []); // Empty array means this function is created only once
 
   const handleDeleteFile = (id: number) => {
     setSelectedFileId(id);
     setDeleteModalVisible(true);
   };
 
-  const confirmDelete = async () => {
-    if (selectedFileId === null || !token) return;
-
-    try {
-      await deleteFile(token, selectedFileId);
-      setFiles((prev) => prev.filter((f) => f.id !== selectedFileId));
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteFile(token!, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       toast.success("Workspace deleted successfully");
-    } catch (err) {
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: () => {
       toast.error("Failed to delete workspace.");
-    } finally {
-      setDeleteModalVisible(false);
-      setSelectedFileId(null);
     }
+  });
+
+  // Now confirmDelete just becomes:
+  const confirmDelete = () => {
+    if (selectedFileId) deleteMutation.mutate(selectedFileId);
+    setDeleteModalVisible(false);
   };
 
-  const handleUpdateFile = async (id: number, updateData: Partial<ClaimFile>) => {
-    if (!token) return;
-
-    const previousFiles = [...files];
-
-    const apiPayload = { ...updateData };
-
-    // 2. Fix the "status" incompatibility
-    if (apiPayload.status === "draft") {
-      apiPayload.status = "active";
-    }
-
-    // Optimistic UI Update
-    setFiles((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, ...updateData } : f))
-    );
-
-    try {
-      // 3. Pass the sanitized apiPayload instead of updateData
-      await updateFile(token, id, apiPayload as any);
-
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateFile(token!, id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       toast.success("Workspace updated");
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (err) {
-      setFiles(previousFiles);
-      toast.error("Update failed.");
-      console.error("Update Error:", err);
+    },
+    onMutate: async ({ id, data }) => {
+      // OPTIONAL: This part makes the UI update INSTANTLY before the server responds
+      await queryClient.cancelQueries({ queryKey: ["workspaces"] });
+      const previous = queryClient.getQueryData(["workspaces"]);
+      return { previous };
     }
-  };
+  });
 
   if (isLoading && !refreshing) {
     return (
@@ -223,7 +188,7 @@ export default function WorkspacesScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => loadFiles(false)}
+            onRefresh={refetch}
             tintColor="#0F4C9C"
           />
         }
@@ -249,7 +214,9 @@ export default function WorkspacesScreen() {
                 },
               })
             }
-            onUpdate={(updateData) => handleUpdateFile(item.id, updateData)}
+            onUpdate={async (updateData) => {
+              await updateMutation.mutateAsync({ id: item.id, data: updateData });
+            }}
             onDelete={() => handleDeleteFile(item.id)}
             getStatusStyle={getStatusStyle}
           />
@@ -269,7 +236,7 @@ export default function WorkspacesScreen() {
         token={token}
         onSuccess={(newFile) => {
           // Add the new file to the top of your list
-          setFiles((prev) => [newFile, ...prev]);
+          queryClient.invalidateQueries({ queryKey: ["workspaces"] }); // Fixed: Trigger fresh sync
           setCreateModalVisible(false);
         }}
       />
@@ -291,16 +258,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   headerContent: { paddingHorizontal: 20, },
-headerTitle: {
-  marginTop: 8,
-  fontSize: 26, 
-  fontWeight: "700",
-  color: "#043a92",
-  letterSpacing: -0.2, 
-  fontFamily: Platform.OS === 'ios' ? "System" : "Inter-Bold", 
-  includeFontPadding: false, // Essential for Android vertical centering
-  textAlignVertical: "center",
-},
+  headerTitle: {
+    marginTop: 8,
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#043a92",
+    letterSpacing: -0.2,
+    fontFamily: Platform.OS === 'ios' ? "System" : "Inter-Bold",
+    includeFontPadding: false, // Essential for Android vertical centering
+    textAlignVertical: "center",
+  },
   listContent: { padding: 20, paddingBottom: 120 },
   loaderContainer: {
     flex: 1,
