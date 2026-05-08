@@ -158,7 +158,7 @@ const responseTypeLabels: Record<string, string> = {
  * Core API Helper
  */
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 async function apiRequest<T>(
   path: string,
@@ -641,6 +641,15 @@ export type UpdateUserResponse = {
     company?: string;
     avatar_url?: string;
     expo_push_token?: string;
+    is_signature_enabled?: boolean;
+    push_enabled: boolean;
+    signature_details?: {
+      name?: string;
+      designation?: string;
+      company?: string;
+      phone?: string;
+      email?: string;
+    };
   };
 };
 
@@ -648,6 +657,7 @@ export async function updateUserProfile(
   payload: UpdateUserPayload | FormData,
   token: string,
 ): Promise<UpdateUserResponse> {
+  console.log("Updating user profile with payload:", payload);
   const isFormData = payload instanceof FormData;
   return apiRequest<UpdateUserResponse>(
     "/user/update",

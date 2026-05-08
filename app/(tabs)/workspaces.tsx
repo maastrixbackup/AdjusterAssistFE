@@ -38,7 +38,7 @@ export default function WorkspacesScreen() {
 
   const [isCreateModalVisible, setCreateModalVisible] = useState(false);
 
-  const logo = require("../../assets/images/AdjusterAssist1.png");
+  const logo = require("../../assets/images/header-icon.png");
   const {
     data: files = [],
     isLoading,
@@ -123,18 +123,18 @@ export default function WorkspacesScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={["#156bdb", "#123C78", "#0B2F5B"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={["#001529", "#003366"]}
         style={styles.headerGradient}
       >
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
-          <View style={styles.topRow}>
-
-            <View style={styles.brandBlock}>
+          <View style={styles.headerTopRow}>
+            <View style={styles.brandingContainer}>
               <Image source={logo} style={styles.logo} />
+              <Text style={styles.brandText}>
+                Adjuster<Text style={styles.brandTextAccent}>Assist</Text>
+              </Text>
             </View>
-            {/* Creating new workspace */}
+
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setCreateModalVisible(true)}
@@ -152,11 +152,12 @@ export default function WorkspacesScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Optional: Title text if this is a sub-page */}
+          <Text style={styles.welcomeText}>Workspaces</Text>
         </SafeAreaView>
       </LinearGradient>
 
       <View style={{ paddingHorizontal: 18, marginTop: 10, }}>
-        <Text style={styles.headerTitle}>Workspaces</Text>
         <View style={styles.glassCard}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{files.length}</Text>
@@ -247,17 +248,6 @@ export default function WorkspacesScreen() {
 
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#F1F5F9" },
-  headerGradient: {
-    // paddingBottom: 25,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  headerContent: { paddingHorizontal: 20, },
   headerTitle: {
     marginTop: 8,
     fontSize: 26,
@@ -349,14 +339,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 16,
   },
-
-  logo: {
-    width: 160,
-    height: 50,
-    resizeMode: "contain",
-  },
   newWorkspaceBtn: {
-    // Drop shadow for a "floating" effect
     shadowColor: "#2563EB",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -377,5 +360,61 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.3,
     textTransform: 'uppercase', // Professional look
+  },
+  headerGradient: { 
+    paddingTop: 12, 
+    paddingBottom: 34, 
+    borderBottomLeftRadius: 36, 
+    borderBottomRightRadius: 36 
+  },
+  headerContent: { 
+    paddingHorizontal: 24 
+  },
+  headerTopRow: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  brandingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logo: { 
+    width: 38, 
+    height: 38, 
+    resizeMode: "contain" 
+  },
+  brandText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  brandTextAccent: {
+    color: '#3B82F6', // Primary Blue
+  },
+  creditPill: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    backgroundColor: "rgba(255, 255, 255, 0.12)", 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: "rgba(255, 255, 255, 0.2)" 
+  },
+  creditText: { 
+    color: "#FDE68A", 
+    fontSize: 13, 
+    fontWeight: "700", 
+    marginLeft: 6 
+  },
+  welcomeText: { 
+    fontSize: 26, 
+    fontWeight: "800", 
+    color: "#FFFFFF", 
+    letterSpacing: -0.5 
   },
 });

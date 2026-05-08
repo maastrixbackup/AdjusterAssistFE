@@ -72,7 +72,7 @@ export default function HomeScreen() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
-  const logo = require("../../assets/images/AdjusterAssist1.png");
+  const logo = require("../../assets/images/header-icon.png");
 
   // React Query for Subscription Status
   const { data: status } = useQuery({
@@ -82,11 +82,11 @@ export default function HomeScreen() {
   });
 
   // React Query for Files
-  const { 
-    data: files = [], 
-    isLoading, 
-    refetch, 
-    isRefetching 
+  const {
+    data: files = [],
+    isLoading,
+    refetch,
+    isRefetching
   } = useQuery({
     queryKey: ["myFiles", token],
     queryFn: async () => {
@@ -185,16 +185,22 @@ export default function HomeScreen() {
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
 
-      <LinearGradient colors={["#165bb6", "#02305f"]} style={styles.headerGradient}>
+      <LinearGradient colors={["#001529", "#003366"]} style={styles.headerGradient}>
         <SafeAreaView edges={["top"]} style={styles.headerContent}>
           <View style={styles.headerTopRow}>
-            <Image source={logo} style={styles.logo} />
+            <View style={styles.brandingContainer}>
+              <Image source={logo} style={styles.logo} />
+              <Text style={styles.brandText}>
+                Adjuster<Text style={styles.brandTextAccent}>Assist</Text>
+              </Text>
+            </View>
+
+            {/* Credit Pill */}
             <Pressable onPress={() => router.push("/settings")} style={styles.creditPill}>
               <Ionicons name="sparkles" size={14} color="#FDE68A" />
               <Text style={styles.creditText}>{status?.subscription?.remaining ?? 0}</Text>
             </Pressable>
           </View>
-
           <Text style={styles.welcomeText}>Claims Workspace</Text>
           <Text style={styles.welcomeSub}>Manage claim workspaces efficiently.</Text>
 
@@ -210,11 +216,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-            <RefreshControl 
-                refreshing={isRefetching} 
-                onRefresh={refetch} 
-                tintColor="#165bb6" 
-            />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor="#165bb6"
+          />
         }
       >
         <View style={styles.bodyWrapper}>
@@ -237,7 +243,7 @@ export default function HomeScreen() {
           </Pressable>
 
           {mostRecentFile && (
-            <Pressable 
+            <Pressable
               style={({ pressed }) => [styles.lastDraftCard, pressed && styles.pressed]}
               onPress={() => navigateToChat(mostRecentFile)}
             >
@@ -252,7 +258,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <View style={styles.recentActionCircle}>
-                    <Ionicons name="play" size={16} color="#FFF" style={{ marginLeft: 2 }} />
+                  <Ionicons name="play" size={16} color="#FFF" style={{ marginLeft: 2 }} />
                 </View>
               </View>
             </Pressable>
@@ -261,17 +267,17 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Active Workspaces</Text>
             <Pressable onPress={() => router.push("/workspaces")}>
-                <Text style={styles.viewAllText}>See All</Text>
+              <Text style={styles.viewAllText}>See All</Text>
             </Pressable>
           </View>
 
           {recentClaims.length > 0 ? recentClaims.map((file) => (
-              <WorkspaceItem 
-                key={file.id} 
-                file={file} 
-                onPress={() => navigateToChat(file)} 
-                getStyle={getStatusStyle} 
-              />
+            <WorkspaceItem
+              key={file.id}
+              file={file}
+              onPress={() => navigateToChat(file)}
+              getStyle={getStatusStyle}
+            />
           )) : (
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={48} color="#CBD5E1" />
@@ -281,11 +287,11 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <CreateWorkspaceModal 
-        isVisible={isCreateModalVisible} 
-        onClose={() => setIsCreateModalVisible(false)} 
-        onSuccess={handleWorkspaceCreated} 
-        token={token} 
+      <CreateWorkspaceModal
+        isVisible={isCreateModalVisible}
+        onClose={() => setIsCreateModalVisible(false)}
+        onSuccess={handleWorkspaceCreated}
+        token={token}
       />
     </View>
   );
@@ -297,10 +303,10 @@ const styles = StyleSheet.create({
   headerGradient: { paddingTop: 12, paddingBottom: 34, borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
   headerContent: { paddingHorizontal: 24 },
   headerTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  logo: { width: 150, height: 45, resizeMode: "contain" },
+  logo: { width: 45, height: 45, resizeMode: "contain" },
   creditPill: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255, 255, 255, 0.15)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.2)" },
   creditText: { color: "#FDE68A", fontSize: 13, fontWeight: "700", marginLeft: 6 },
-  welcomeText: { fontSize: 26, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5 },
+  welcomeText: { fontSize: 26, fontWeight: "800", color: "#FFFFFF", letterSpacing: -0.5, marginTop: 10 },
   welcomeSub: { fontSize: 14, color: "rgba(255,255,255,0.7)", marginTop: 4, marginBottom: 24 },
   statsRow: { flexDirection: "row", gap: 12 },
   statCard: { flex: 1, backgroundColor: "rgba(255, 255, 255, 0.1)", padding: 16, borderRadius: 22, alignItems: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.15)" },
@@ -347,4 +353,18 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   emptyStateText: { color: '#94A3B8', marginTop: 12, fontWeight: '600' },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
+  brandingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8, // Adds consistent spacing between logo and text
+  },
+  brandText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  brandTextAccent: {
+    color: '#3B82F6', // "Assist" in Primary Blue
+  },
 });
