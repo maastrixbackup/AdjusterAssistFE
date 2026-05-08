@@ -43,12 +43,15 @@ type MenuLinkProps = {
   color: string;
   isLast?: boolean;
   onPress?: () => void;
+  isToggle?: boolean;
+  toggleValue?: boolean;
+  onToggleChange?: (val: boolean) => void;
 };
 
 export default function SettingsScreen() {
   const { token, email, logout } = useAuth();
   const queryClient = useQueryClient();
-
+  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [busyCheckout, setBusyCheckout] = useState(false);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -61,6 +64,7 @@ export default function SettingsScreen() {
     is_signature_enabled: false,
     signature_name: "",
     signature_designation: "",
+    push_enabled: true,
   });
 
   const { data: subscriptionData, isLoading: isSubLoading, refetch: refetchSub } = useQuery({
@@ -76,37 +80,51 @@ export default function SettingsScreen() {
   });
 
   const { mutate: updateProfile, isPending: isUpdating } = useMutation({
-    // Inside your mutation function
     mutationFn: async (payload: any) => {
-      const formData = new FormData();
+    const formData = new FormData();
 
-      // ONLY append if values are truthy
-      if (payload.name) formData.append('name', payload.name);
-      if (payload.phone) formData.append('phone', payload.phone.toString());
-      if (payload.company) formData.append('company', payload.company);
+    // 1. Only append basic strings if they are provided
+    if (payload.name !== undefined) formData.append('name', payload.name);
+    if (payload.phone !== undefined) formData.append('phone', payload.phone.toString());
+    if (payload.company !== undefined) formData.append('company', payload.company);
+    
+    if (payload.push_enabled !== undefined) {
+      console.log("Appending push_enabled to formData:", payload.push_enabled);
+      formData.append('push_enabled', String(payload.push_enabled));
+    }
+    
+    if (payload.is_signature_enabled !== undefined) {
       formData.append('is_signature_enabled', String(payload.is_signature_enabled));
-      formData.append('signature_details', JSON.stringify({
-        name: payload.signature_name,
-        designation: payload.signature_designation,
-        company: payload.company,
-      }));
+    }
 
-      if (payload.avatar_url && payload.avatar_url.startsWith('file://')) {
-        const filename = payload.avatar_url.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename || '');
-        const type = match ? `image/${match[1]}` : `image/jpeg`;
+    // 3. Conditional Signature Details
+    // Only send this if we are actually trying to update signature info
+    if (payload.signature_name || payload.signature_designation) {
+       formData.append('signature_details', JSON.stringify({
+         name: payload.signature_name,
+         designation: payload.signature_designation,
+         company: payload.company || "", 
+       }));
+    }
 
-        formData.append('avatar', {
-          uri: payload.avatar_url,
-          name: filename || 'upload.jpg',
-          type,
-        } as any);
-      }
-      return updateUserProfile(formData, token!);
-    },
+    // 4. Avatar Logic (already fine, but wrap in check)
+    if (payload.avatar_url?.startsWith('file://')) {
+      const filename = payload.avatar_url.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename || '');
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      formData.append('avatar', {
+        uri: payload.avatar_url,
+        name: filename || 'upload.jpg',
+        type,
+      } as any);
+    }
+
+    return updateUserProfile(formData, token!);
+  },
 
     onSuccess: () => {
-      toast.success("Profile updated successfully 🚀");
+      toast.success("Profile updated successfully");
       setEditModalVisible(false);
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
@@ -197,6 +215,7 @@ export default function SettingsScreen() {
                         is_signature_enabled: profileData?.user.is_signature_enabled || false,
                         signature_name: profileData?.user.signature_details?.name || profileData?.user.name || "",
                         signature_designation: profileData?.user.signature_details?.designation || "",
+                        push_enabled: profileData?.user.push_enabled || false,
                       });
                       setEditModalVisible(true);
                     }}
@@ -296,7 +315,16 @@ export default function SettingsScreen() {
 
         <Text style={styles.menuTitle}>Preferences</Text>
         <View style={styles.menuContainer}>
-          <MenuLink icon="notifications-outline" label="Notifications" color="#64748B" />
+          <MenuLink icon="notifications-outline" label="Notifications" color="#64748B"
+            isToggle={true}
+            toggleValue={isNotificationsEnabled}
+            onToggleChange={(val) => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setIsNotificationsEnabled(val);
+              updateProfile({
+                push_enabled: val,
+              });
+            }} />
           <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" />
           <MenuLink
             icon="log-out-outline"
@@ -472,16 +500,40 @@ export default function SettingsScreen() {
   );
 }
 
-function MenuLink({ icon, label, color, isLast, onPress }: MenuLinkProps): ReactElement {
+function MenuLink({
+  icon, label, color, isLast, onPress, isToggle, toggleValue, onToggleChange
+}: MenuLinkProps): ReactElement {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#F1F5F9' }]}>
+    <Pressable
+      onPress={isToggle ? undefined : onPress}
+      style={({ pressed }) => [
+        styles.menuItem,
+        (!isToggle && pressed) && { backgroundColor: '#F1F5F9' }
+      ]}
+    >
       <View style={styles.menuLeft}>
         <View style={[styles.menuIconBg, { backgroundColor: color + '12' }]}>
           <Ionicons name={icon} size={18} color={color} />
         </View>
-        <Text style={[styles.menuLabel, { color: color === '#EF4444' ? color : '#334155' }]}>{label}</Text>
+        <Text style={[styles.menuLabel, { color: color === '#EF4444' ? color : '#334155' }]}>
+          {label}
+        </Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+
+      {/* Conditionally render Switch or Chevron */}
+      {isToggle ? (
+        <Switch
+          trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
+          thumbColor={toggleValue ? "#2563EB" : "#F4F3F4"}
+          onValueChange={onToggleChange}
+          value={toggleValue}
+          // Ensure the switch doesn't look cramped on small screens
+          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+        />
+      ) : (
+        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+      )}
+
       {!isLast && <View style={styles.menuDivider} />}
     </Pressable>
   );
@@ -556,8 +608,8 @@ const styles = StyleSheet.create({
   menuDivider: { position: 'absolute', bottom: 0, left: 65, right: 0, height: 1, backgroundColor: '#F8FAFC' },
 
   footerSection: { marginTop: 40, marginBottom: 80, alignItems: 'center' },
-  versionText: { fontSize: 10, fontWeight: '700', color: '#CBD5E1', letterSpacing: 1.5 },
-  powerText: { fontSize: 12, fontWeight: '600', color: '#94A3B8', marginTop: 4 },
+  versionText: { fontSize: 10, fontWeight: '700', color: '#81a3cc', letterSpacing: 1.5 },
+  powerText: { fontSize: 12, fontWeight: '600', color: '#596474', marginTop: 4 },
 
   editIcon: {
     position: "absolute",
