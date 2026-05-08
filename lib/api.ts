@@ -641,6 +641,14 @@ export type UpdateUserResponse = {
     company?: string;
     avatar_url?: string;
     expo_push_token?: string;
+    is_signature_enabled?: boolean;
+    signature_details?: {
+      name?: string;
+      designation?: string;
+      company?: string;
+      phone?: string;
+      email?: string;
+    };
   };
 };
 

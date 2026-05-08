@@ -18,6 +18,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View
@@ -55,8 +56,11 @@ export default function SettingsScreen() {
   const [form, setForm] = useState({
     name: "",
     phone: "",
-    company: "",
     avatar_url: "",
+    company: "",
+    is_signature_enabled: false,
+    signature_name: "",
+    signature_designation: "",
   });
 
   const { data: subscriptionData, isLoading: isSubLoading, refetch: refetchSub } = useQuery({
@@ -80,6 +84,12 @@ export default function SettingsScreen() {
       if (payload.name) formData.append('name', payload.name);
       if (payload.phone) formData.append('phone', payload.phone.toString());
       if (payload.company) formData.append('company', payload.company);
+      formData.append('is_signature_enabled', String(payload.is_signature_enabled));
+      formData.append('signature_details', JSON.stringify({
+        name: payload.signature_name,
+        designation: payload.signature_designation,
+        company: payload.company,
+      }));
 
       if (payload.avatar_url && payload.avatar_url.startsWith('file://')) {
         const filename = payload.avatar_url.split('/').pop();
@@ -184,6 +194,9 @@ export default function SettingsScreen() {
                         phone: profileData?.user.phone?.toString() || "",
                         company: profileData?.user.company || "",
                         avatar_url: profileData?.user.avatar_url || "",
+                        is_signature_enabled: profileData?.user.is_signature_enabled || false,
+                        signature_name: profileData?.user.signature_details?.name || profileData?.user.name || "",
+                        signature_designation: profileData?.user.signature_details?.designation || "",
                       });
                       setEditModalVisible(true);
                     }}
@@ -306,12 +319,11 @@ export default function SettingsScreen() {
         animationType="slide" // Slide is generally smoother for bottom sheets
         onRequestClose={() => setEditModalVisible(false)}
       >
-        {/* Move BlurView here so it doesn't re-calculate with keyboard */}
         <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
 
         <KeyboardAvoidingView
           // Use 'padding' for iOS and 'undefined' for Android to avoid double-resizing
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalOverlay}
           // This offset helps if you have a header or tabs
           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
@@ -330,16 +342,11 @@ export default function SettingsScreen() {
                 <Ionicons name="close" size={24} color="#94A3B8" />
               </Pressable>
             </View>
-
-            {/* 
-         Change: Use 'keyboardShouldPersistTaps' 
-         Change: Ensure ScrollView has 'flexGrow: 1' in contentContainerStyle
-      */}
             <ScrollView
               showsVerticalScrollIndicator={false}
               bounces={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ flexGrow: 1 }}
+              contentContainerStyle={{ paddingBottom: 40 }}
             >
               <View style={styles.modalAvatarSection}>
                 <Pressable onPress={pickImage} style={styles.modalAvatarContainer}>
@@ -380,16 +387,53 @@ export default function SettingsScreen() {
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Company</Text>
-                <TextInput
-                  placeholder="Organization name"
-                  value={form.company}
-                  onChangeText={(text) => setForm({ ...form, company: text })}
-                  style={styles.input}
-                  placeholderTextColor="#94A3B8"
+              <View style={styles.divider} />
+
+              <View style={styles.signatureHeader}>
+                <View>
+                  <Text style={styles.inputLabel}>Email Signature</Text>
+                  <Text style={styles.modalAvatarSub}>Append details to external drafts</Text>
+                </View>
+                <Switch
+                  trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
+                  thumbColor={form.is_signature_enabled ? "#2563EB" : "#F4F3F4"}
+                  onValueChange={(val) => setForm({ ...form, is_signature_enabled: val })}
+                  value={form.is_signature_enabled}
                 />
               </View>
+
+              {form.is_signature_enabled && (
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Signature Name</Text>
+                    <TextInput
+                      placeholder="Name in signature"
+                      value={form.signature_name}
+                      onChangeText={(text) => setForm({ ...form, signature_name: text })}
+                      style={styles.input}
+                    />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Company</Text>
+                    <TextInput
+                      placeholder="Organization name"
+                      value={form.company}
+                      onChangeText={(text) => setForm({ ...form, company: text })}
+                      style={styles.input}
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Designation</Text>
+                    <TextInput
+                      placeholder="e.g. Senior Adjuster"
+                      value={form.signature_designation}
+                      onChangeText={(text) => setForm({ ...form, signature_designation: text })}
+                      style={styles.input}
+                    />
+                  </View>
+                </View>
+              )}
 
               <Pressable
                 onPress={() =>
@@ -398,6 +442,9 @@ export default function SettingsScreen() {
                     phone: form.phone ? Number(form.phone) : undefined,
                     company: form.company || undefined,
                     avatar_url: form.avatar_url || undefined,
+                    is_signature_enabled: form.is_signature_enabled,
+                    signature_name: form.signature_name,
+                    signature_designation: form.signature_designation,
                   })
                 }
                 disabled={isUpdating}
@@ -483,7 +530,7 @@ const styles = StyleSheet.create({
   usageTitle: { fontSize: 14, fontWeight: '700', color: '#64748B' },
   usageValue: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
   usageTotal: { color: '#CBD5E1', fontWeight: '500' },
-  progressTrack: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 10, overflow: 'hidden' },
+  progressTrack: { height: 8, backgroundColor: '#aec5db', borderRadius: 10, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 10 },
   infoPill: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: '#FFFBEB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start', gap: 6 },
   infoPillText: { fontSize: 12, fontWeight: '700', color: '#B45309' },
@@ -537,7 +584,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     // Fix: Setting a minHeight or avoiding overly restrictive maxHeights 
     // helps the ScrollView calculate space better.
-    minHeight: 400,
+    maxHeight: '90%',
     width: '100%',
   },
   modalDragHandle: {
@@ -629,4 +676,11 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   saveText: { color: "#FFF", fontWeight: "800", fontSize: 16 },
+  signatureHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
 });
