@@ -173,7 +173,7 @@ export default function SettingsScreen() {
 
       <View style={styles.headerContainer}>
         <LinearGradient
-          colors={["#1E40AF", "#1E3A8A", "#172554"]}
+          colors={["#001529", "#003366"]}
           style={styles.headerGradient}
         >
           <SafeAreaView edges={["top"]}>
@@ -490,8 +490,8 @@ function MenuLink({ icon, label, color, isLast, onPress }: MenuLinkProps): React
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F8FAFC" },
   headerContainer: {
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
     overflow: 'hidden',
     backgroundColor: '#1E3A8A'
   },
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   saveBtn: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#003366",
     padding: 18,
     borderRadius: 16,
     alignItems: "center",
