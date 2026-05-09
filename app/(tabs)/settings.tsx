@@ -34,6 +34,7 @@ import {
   upgradeSubscription
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get('window');
 
@@ -55,6 +56,7 @@ export default function SettingsScreen() {
   const [busyCheckout, setBusyCheckout] = useState(false);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
+  const router = useRouter();
 
   const [form, setForm] = useState({
     name: "",
@@ -81,50 +83,49 @@ export default function SettingsScreen() {
 
   const { mutate: updateProfile, isPending: isUpdating } = useMutation({
     mutationFn: async (payload: any) => {
-    const formData = new FormData();
+      const formData = new FormData();
 
-    // 1. Only append basic strings if they are provided
-    if (payload.name !== undefined) formData.append('name', payload.name);
-    if (payload.phone !== undefined) formData.append('phone', payload.phone.toString());
-    if (payload.company !== undefined) formData.append('company', payload.company);
-    
-    if (payload.push_enabled !== undefined) {
-      console.log("Appending push_enabled to formData:", payload.push_enabled);
-      formData.append('push_enabled', String(payload.push_enabled));
-    }
-    
-    if (payload.is_signature_enabled !== undefined) {
-      formData.append('is_signature_enabled', String(payload.is_signature_enabled));
-    }
+      // 1. Only append basic strings if they are provided
+      if (payload.name !== undefined) formData.append('name', payload.name);
+      if (payload.phone !== undefined) formData.append('phone', payload.phone.toString());
+      if (payload.company !== undefined) formData.append('company', payload.company);
 
-    // 3. Conditional Signature Details
-    // Only send this if we are actually trying to update signature info
-    if (payload.signature_name || payload.signature_designation) {
-       formData.append('signature_details', JSON.stringify({
-         name: payload.signature_name,
-         designation: payload.signature_designation,
-         company: payload.company || "", 
-       }));
-    }
+      if (payload.push_enabled !== undefined) {
+        console.log("Appending push_enabled to formData:", payload.push_enabled);
+        formData.append('push_enabled', String(payload.push_enabled));
+      }
 
-    // 4. Avatar Logic (already fine, but wrap in check)
-    if (payload.avatar_url?.startsWith('file://')) {
-      const filename = payload.avatar_url.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename || '');
-      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      if (payload.is_signature_enabled !== undefined) {
+        formData.append('is_signature_enabled', String(payload.is_signature_enabled));
+      }
 
-      formData.append('avatar', {
-        uri: payload.avatar_url,
-        name: filename || 'upload.jpg',
-        type,
-      } as any);
-    }
+      // 3. Conditional Signature Details
+      // Only send this if we are actually trying to update signature info
+      if (payload.signature_name || payload.signature_designation) {
+        formData.append('signature_details', JSON.stringify({
+          name: payload.signature_name,
+          designation: payload.signature_designation,
+          company: payload.company || "",
+        }));
+      }
 
-    return updateUserProfile(formData, token!);
-  },
+      // 4. Avatar Logic (already fine, but wrap in check)
+      if (payload.avatar_url?.startsWith('file://')) {
+        const filename = payload.avatar_url.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename || '');
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        formData.append('avatar', {
+          uri: payload.avatar_url,
+          name: filename || 'upload.jpg',
+          type,
+        } as any);
+      }
+
+      return updateUserProfile(formData, token!);
+    },
 
     onSuccess: () => {
-      toast.success("Profile updated successfully");
       setEditModalVisible(false);
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
@@ -149,11 +150,7 @@ export default function SettingsScreen() {
 
     if (!result.canceled) {
       const asset = result.assets[0];
-
-      // Set the local state so the UI updates immediately
       setForm({ ...form, avatar_url: asset.uri });
-
-      // We will handle the actual upload inside the updateProfile mutation
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
@@ -325,7 +322,10 @@ export default function SettingsScreen() {
                 push_enabled: val,
               });
             }} />
-          <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" />
+          <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/privacy");
+          }} />
           <MenuLink
             icon="log-out-outline"
             label="Sign Out"

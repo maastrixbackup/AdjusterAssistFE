@@ -158,7 +158,7 @@ const responseTypeLabels: Record<string, string> = {
  * Core API Helper
  */
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 async function apiRequest<T>(
   path: string,
@@ -657,7 +657,6 @@ export async function updateUserProfile(
   payload: UpdateUserPayload | FormData,
   token: string,
 ): Promise<UpdateUserResponse> {
-  console.log("Updating user profile with payload:", payload);
   const isFormData = payload instanceof FormData;
   return apiRequest<UpdateUserResponse>(
     "/user/update",

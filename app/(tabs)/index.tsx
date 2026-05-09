@@ -226,9 +226,8 @@ export default function HomeScreen() {
         <View style={styles.bodyWrapper}>
           <Pressable
             style={({ pressed }) => [styles.primaryActionBtn, pressed && styles.pressed]}
-            onPress={() => setIsCreateModalVisible(true)}
-          >
-            <LinearGradient colors={["#297afc", "#165bb6"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryActionGradient}>
+            onPress={() => setIsCreateModalVisible(true)}>
+            <LinearGradient colors={["#004ac0", "#002657"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryActionGradient}>
               <View style={styles.primaryActionLeft}>
                 <View style={styles.iconCircle}>
                   <Ionicons name="add" size={24} color="#FFF" />
@@ -328,7 +327,7 @@ const styles = StyleSheet.create({
   livePulse: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 8 },
   lastDraftLabel: { fontSize: 11, fontWeight: "800", color: "#64748B", letterSpacing: 1 },
   lastDraftTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
-  recentActionCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#3B82F6", justifyContent: "center", alignItems: "center" },
+  recentActionCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#0559e0", justifyContent: "center", alignItems: "center" },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingHorizontal: 4 },
   sectionTitle: { fontSize: 20, fontWeight: "800", color: "#1E293B", letterSpacing: -0.3 },
   viewAllText: { fontSize: 14, color: "#3B82F6", fontWeight: "700" },

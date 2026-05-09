@@ -115,6 +115,7 @@ function NavigationGuard() {
     >
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="aiChat" options={{ headerShown: false }} />
+      <Stack.Screen name="privacy" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

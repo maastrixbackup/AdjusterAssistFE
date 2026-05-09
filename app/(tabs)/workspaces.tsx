@@ -236,7 +236,6 @@ export default function WorkspacesScreen() {
         onClose={() => setCreateModalVisible(false)}
         token={token}
         onSuccess={(newFile) => {
-          // Add the new file to the top of your list
           queryClient.invalidateQueries({ queryKey: ["workspaces"] }); // Fixed: Trigger fresh sync
           setCreateModalVisible(false);
         }}
