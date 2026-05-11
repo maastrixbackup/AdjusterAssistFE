@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "914319643876",
-    "project_id": "adjusterassist-a31a3",
-    "storage_bucket": "adjusterassist-a31a3.firebasestorage.app"
+    "project_number": "235856607526",
+    "project_id": "adjusterassist-e6b9a",
+    "storage_bucket": "adjusterassist-e6b9a.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:914319643876:android:ab1e880e22ec0d8f09c8f1",
+        "mobilesdk_app_id": "1:235856607526:android:23dfe600697e01a49b29e7",
         "android_client_info": {
           "package_name": "com.adjusterassist.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAbCgDFt3I22HLfPmkhQzNKYEaeCA-4gJg"
+          "current_key": "AIzaSyADBgasQjpE39s0fXG-vP0HRwh_XLP_-kU"
         }
       ],
       "services": {

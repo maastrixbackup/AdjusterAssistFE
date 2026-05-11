@@ -80,7 +80,7 @@ export async function registerAndSendPushToken(
       throw new Error(data.error || "Failed to save token");
     }
 
-    // showToast?.("Push token saved");
+    showToast?.("Push token saved");
   } catch (err: any) {
     console.log("registerAndSendPushToken error:", err);
     showToast?.(`Error: ${err.message}`);
