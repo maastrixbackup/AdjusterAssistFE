@@ -3,6 +3,7 @@ import { ChatTimelineCard } from "@/components/ChatTimelineCard";
 import { WorkspaceMetaModal } from "@/components/WorkspaceMetaModal";
 import {
     ClaimFile,
+    deleteDraft,
     generateResponse,
     generateVariant,
     getDraftsByFile,
@@ -147,10 +148,11 @@ interface TurnRowProps {
     onQuickAction: (action: string, draftId: number, content: string) => void;
     onRefinement: (option: string, originalContent: string, parentId: number) => void;
     onShare: (content: string) => void;
+    onDelete: () => void;
 }
 
 const TurnRow = React.memo(
-    ({ item, loadingCardId, onQuickAction, onRefinement, onShare }: TurnRowProps) => (
+    ({ item, loadingCardId, onQuickAction, onRefinement, onShare, onDelete }: TurnRowProps) => (
         <View style={styles.turnGroup}>
             <ChatTimelineCard
                 category="USER INPUT"
@@ -183,6 +185,7 @@ const TurnRow = React.memo(
                     onRefinement(option, item.ai_response || "", item.id)
                 }
                 onSharePress={() => onShare(item.ai_response || "")}
+                onDeletePress={onDelete}
                 isLoading={loadingCardId === item.id}
             />
             <ChatTimelineCard
@@ -501,6 +504,21 @@ export default function AiChatScreen() {
         }
     }, []);
 
+    const handleDeleteDraft = useCallback(async (draftId: number) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        try {
+            const response = await deleteDraft(token!, draftId);
+            if (response.success) {
+                toast.success("Message deleted");
+                setChatHistory((prev) => prev.filter((item) => item.id !== draftId));
+                queryClient.invalidateQueries({ queryKey: ["drafts", fileId] });
+            }
+        } catch (error: any) {
+            toast.error(error?.message || "Failed to delete");
+        }
+    }, [token, fileId, queryClient]);
+
     // ─── Memoised renderItem — stable reference, only re-renders changed rows ─
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
@@ -510,10 +528,13 @@ export default function AiChatScreen() {
                 onQuickAction={handleQuickAction}
                 onRefinement={handleRefinement}
                 onShare={onShare}
+                onDelete={() => handleDeleteDraft(item.id)}
             />
         ),
-        [loadingCardId, handleQuickAction, handleRefinement, onShare],
+        [loadingCardId, handleQuickAction, handleRefinement, onShare, handleDeleteDraft],
     );
+
+
 
     // ─── Memoised keyboard interpolation ─────────────────────────────────────
     const dynamicBottomPadding = useMemo(
@@ -581,7 +602,7 @@ export default function AiChatScreen() {
                             Adjuster<Text style={styles.logoTextAccent}>Assist</Text>
                         </Text>
                         <TouchableOpacity activeOpacity={0.6}>
-                            {credits !== undefined && (
+                            {userCredits !== undefined && (
                                 <Pressable onPress={() => router.push("/settings")}>
                                     <View
                                         style={{
@@ -594,7 +615,7 @@ export default function AiChatScreen() {
                                         }}
                                     >
                                         <Ionicons name="sparkles" size={14} color="#FDE68A" />
-                                        <Text style={styles.creditText}>{userCredits ?? 0}</Text>
+                                        <Text style={styles.creditText}>{userCredits}</Text>
                                     </View>
                                 </Pressable>
                             )}
@@ -792,22 +813,22 @@ const styles = StyleSheet.create({
         marginLeft: 6,
     },
     disclaimerContainer: {
-    padding: 20,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  disclaimerText: {
-    fontSize: 12,
-    color: "#64748B",
-    lineHeight: 18,
-    flex: 1,
-    fontStyle: "italic",
-  },
+        padding: 20,
+        backgroundColor: "#F1F5F9",
+        borderRadius: 12,
+        marginHorizontal: 16,
+        marginBottom: 20,
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 10,
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+    },
+    disclaimerText: {
+        fontSize: 12,
+        color: "#64748B",
+        lineHeight: 18,
+        flex: 1,
+        fontStyle: "italic",
+    },
 });

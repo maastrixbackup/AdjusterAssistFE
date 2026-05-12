@@ -29,6 +29,7 @@ interface ChatTimelineCardProps {
   onActionPress?: (action: string) => void;
   onRefinementPress?: (option: string) => void;
   onSharePress?: () => void;
+  onDeletePress?: () => void;
   imageInput?: string;
   documentInput?: string;
   isLoading?: boolean; // ← NEW: triggers skeleton
@@ -299,6 +300,7 @@ export const ChatTimelineCard = ({
   onActionPress,
   onRefinementPress,
   onSharePress,
+  onDeletePress,
   imageInput,
   documentInput,
   isLoading = false, // ← NEW
@@ -480,13 +482,18 @@ export const ChatTimelineCard = ({
             </View>
             <View style={styles.rightFooterGroup}>
               {isAI && (
-                <TouchableOpacity
-                  onPress={onSharePress}
-                  style={styles.shareBtn}
-                  activeOpacity={0.6}
-                >
-                  <Feather name="share-2" size={18} color="#3B82F6" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                  <TouchableOpacity
+                    onPress={onSharePress}
+                    style={styles.shareBtn}
+                    activeOpacity={0.6}
+                  >
+                    <Feather name="share-2" size={18} color="#3B82F6" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={onDeletePress} activeOpacity={0.6}>
+                    <Feather name="trash-2" size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               )}
               <Text style={styles.timeText}>{timeAgo}</Text>
             </View>
