@@ -104,7 +104,7 @@ const transformDraft = (draft: any) => ({
     output_format: draft.content_type,
     next_step_suggestion: draft.next_step_suggestion,
     responseUsed: draft.response_used || false,
-    doccuments_url: draft.doccuments_url,
+    documents_url: draft.documents_url,
     image_input_url: draft.image_input_url,
     quick_actions: DEFAULT_QUICK_ACTIONS,
     refinement: DEFAULT_REFINEMENT_OPTIONS,
@@ -159,7 +159,7 @@ const TurnRow = React.memo(
                 color="#94A3B8"
                 quickActions={["Copy"]}
                 imageInput={item?.image_input_url}
-                documentInput={item?.doccuments_url}
+                documentInput={item?.documents_url}
                 timeAgo={getFormattedTime(item.created_at)}
                 onActionPress={(action: string) =>
                     onQuickAction(action, item.id, item.user_input || "")
@@ -263,19 +263,42 @@ export default function AiChatScreen() {
         mutationFn: (updatedData: Partial<ClaimFile>) =>
             updateFile(token!, Number(fileId), updatedData),
         onMutate: async (updatedData) => {
+            // 1. Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ["file", fileId] });
-            const previous = queryClient.getQueryData(["file", fileId]);
+            await queryClient.cancelQueries({ queryKey: ["files"] }); // Cancel the main list too
+
+            // 2. Snapshot the current data
+            const previousFile = queryClient.getQueryData(["file", fileId]);
+            const previousList = queryClient.getQueryData(["files"]);
+
+            // 3. Optimistically update the individual file detail
             queryClient.setQueryData(["file", fileId], (old: any) =>
                 old ? { ...old, ...updatedData } : old,
             );
-            return { previous };
+
+            // 4. Optimistically update the file inside the global list
+            queryClient.setQueryData(["files"], (old: any) => {
+                if (!old || !old.files) return old;
+                return {
+                    ...old,
+                    files: old.files.map((f: any) =>
+                        f.id === Number(fileId) ? { ...f, ...updatedData } : f
+                    )
+                };
+            });
+
+            return { previousFile, previousList };
         },
         onSuccess: () => {
             toast.success("Workspace updated successfully");
+            // Refetch in background to ensure we are synced with DB
             queryClient.invalidateQueries({ queryKey: ["file", fileId] });
+            queryClient.invalidateQueries({ queryKey: ["files"] });
         },
         onError: (_err, _vars, context: any) => {
-            queryClient.setQueryData(["file", fileId], context?.previous);
+            // Rollback on error
+            queryClient.setQueryData(["file", fileId], context?.previousFile);
+            queryClient.setQueryData(["files"], context?.previousList);
             toast.error("Failed to update workspace");
         },
     });
@@ -333,7 +356,7 @@ export default function AiChatScreen() {
                         quick_actions: DEFAULT_QUICK_ACTIONS,
                         refinement: DEFAULT_REFINEMENT_OPTIONS,
                         created_at: result.createdAt,
-                        doccuments_url: result.doccuments_url,
+                        documents_url: result.documents_url,
                         image_input_url: result.image_input_url,
                     };
                     setChatHistory((prev) => [newInteraction, ...prev]);
@@ -521,8 +544,12 @@ export default function AiChatScreen() {
 
     // ─── Derived display values ───────────────────────────────────────────────
     const displayClientName = useMemo(
-        () => clientName || currentWorkspace?.client_name,
-        [clientName, currentWorkspace?.client_name],
+        () => currentWorkspace?.client_name || clientName,
+        [currentWorkspace?.client_name, clientName],
+    );
+    const displayClaimNumber = useMemo(
+        () => currentWorkspace?.claim_number || claimNumber,
+        [currentWorkspace?.claim_number, claimNumber],
     );
 
     return (
@@ -579,7 +606,7 @@ export default function AiChatScreen() {
                             <View style={styles.claimBadge}>
                                 <View style={styles.pulseDot} />
                                 <Text style={styles.claimNoText}>
-                                    {claimNumber || "New Workspace"}
+                                    {displayClaimNumber || "New Workspace"}
                                 </Text>
                             </View>
                             <Text style={styles.clientText}>{displayClientName}</Text>
@@ -764,4 +791,23 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         marginLeft: 6,
     },
+    disclaimerContainer: {
+    padding: 20,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: "#64748B",
+    lineHeight: 18,
+    flex: 1,
+    fontStyle: "italic",
+  },
 });

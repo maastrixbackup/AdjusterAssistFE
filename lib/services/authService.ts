@@ -1,11 +1,12 @@
 import { apiRequest } from "@/lib/services/apiClient";
 import { removeToken, saveToken } from "@/lib/utils/storage";
 
+// UPDATED: id is now a string (UUID)
 type AuthApiResponse = {
   success: boolean;
   message: string;
   user: {
-    id: number;
+    id: string; // Changed from number to string
     name: string;
     email: string;
   };
@@ -17,6 +18,9 @@ export type AuthSession = {
   email: string;
 };
 
+/**
+ * Handle Login
+ */
 export async function loginUser(
   email: string,
   password: string,
@@ -26,13 +30,17 @@ export async function loginUser(
     password,
   });
 
-  if (response.token) {
+  // Ensure we persist the Supabase JWT
+  if (response.success && response.token) {
     await saveToken(response.token);
   }
 
   return response;
 }
 
+/**
+ * Handle Signup
+ */
 export async function signupUser(
   name: string,
   email: string,
@@ -46,9 +54,17 @@ export async function signupUser(
     password,
   });
 
+  // If your signup automatically logs the user in
+  if (response.success && response.token) {
+    await saveToken(response.token);
+  }
+
   return response;
 }
 
+/**
+ * Helper: Login and return session details
+ */
 export async function loginWithEmail(
   email: string,
   password: string,
@@ -60,6 +76,9 @@ export async function loginWithEmail(
   };
 }
 
+/**
+ * Helper: Simple Signup wrapper
+ */
 export async function signupWithEmail(
   name: string,
   email: string,
@@ -69,6 +88,9 @@ export async function signupWithEmail(
   await signupUser(name, email, role, password);
 }
 
+/**
+ * Password Management
+ */
 export async function requestPasswordReset(email: string): Promise<void> {
   await apiRequest("/auth/forgot-password", "POST", { email });
 }
@@ -92,6 +114,9 @@ export async function resetPassword(
   });
 }
 
+/**
+ * Clear Local Storage / Logout
+ */
 export async function logoutUser(): Promise<void> {
   await removeToken();
 }

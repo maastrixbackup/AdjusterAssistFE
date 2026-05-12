@@ -9,7 +9,7 @@ type AuthApiResponse = {
   success: boolean;
   message: string;
   user: {
-    id: number;
+    id: string;
     name: string;
     email: string;
     role: string;
@@ -19,8 +19,8 @@ type AuthApiResponse = {
 
 export interface ClaimFile {
   // Primary Identifiers
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   claim_number: string;
   name?: string; // Optional display name
 
@@ -71,7 +71,7 @@ export interface CreateFileRequest {
 export interface RecentDraft {
   id: number;
   file_id: number;
-  user_id: number;
+  user_id: string;
   draft_type: string;
   content: string;
   created_at: string;
@@ -82,7 +82,7 @@ export interface RecentDraft {
 export interface ClaimMessage {
   id: number;
   workspace_id: number;
-  user_id: number;
+  user_id: string;
   user_input: string;
   ai_response: string;
   content_type: string; // e.g., 'email_insured', 'file_note'
@@ -90,7 +90,7 @@ export interface ClaimMessage {
   next_step_suggestion?: string;
   activity_type?: string;
   image_input_url?: string | null;
-  doccuments_url?: string | null;
+  documents_url?: string | null;
   quick_actions?: string[]; // JSONB maps to string array
   response_used: boolean;
   metadata?: any;
@@ -115,7 +115,7 @@ export interface GenerateResponseResult {
   createdAt?: string;
 
   image_input_url?: string | null;
-  doccuments_url?: string | null;
+  documents_url?: string | null;
 }
 
 export type GenerateNextStepRequest = {
@@ -157,8 +157,17 @@ const responseTypeLabels: Record<string, string> = {
 /**
  * Core API Helper
  */
+// Color constants for terminal
+const colors = {
+  reset: "\x1b[0m",
+  blue: "\x1b[34m",
+  green: "\x1b[32m",
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  bold: "\x1b[1m",
+};
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
+const DEBUG_MODE = false; // Set to true to see logs during development
 
 async function apiRequest<T>(
   path: string,
@@ -166,47 +175,72 @@ async function apiRequest<T>(
   token?: string,
 ): Promise<T> {
   if (!API_BASE_URL) {
-    throw new Error("Missing API_BASE_URL");
+    throw new Error("Missing API_BASE_URL configuration.");
   }
 
   const url = `${API_BASE_URL}${path}`;
+
+  // 1. Detect body type
   const isFormData = init.body instanceof FormData;
-  const headers: any = {
+
+  // 2. Build Headers
+  const headers: Record<string, string> = {
+    // Only add JSON content-type if NOT sending a file/FormData
     ...(!isFormData && { "Content-Type": "application/json" }),
 
-    // 2. Add Auth token
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    // Add Bearer token if provided
+    ...(token && { Authorization: `Bearer ${token}` }),
 
-    // 3. Add any other custom headers
-    ...(init.headers ?? {}),
+    // Spread any custom headers passed in 'init' (this allows overrides)
+    ...(init.headers as Record<string, string>),
   };
 
+  // 3. Debug Request Log
   if (DEBUG_MODE) {
-    console.log(`%c [API REQUEST] ${init.method || "GET"} -> ${url}`);
+    const method = init.method || "GET";
+    console.log(
+      `${colors.bold}${colors.blue}[API REQUEST] ${method} -> ${url}${colors.reset}`,
+    );
+    if (init.body && !isFormData) {
+      console.log("Payload:", JSON.parse(init.body as string));
+    }
   }
 
   try {
-    const response = await fetch(url, { ...init, headers });
+    const response = await fetch(url, {
+      ...init,
+      headers,
+    });
+
     const json = await response.json().catch(() => ({}));
 
+    // 4. Debug Response Log
     if (DEBUG_MODE) {
-      console.log(`%c [API RESPONSE] ${response.status} <- ${path}`, json);
+      const color = response.ok ? colors.green : colors.red;
+      console.log(
+        `${colors.bold}${color}[API RESPONSE] ${response.status} <- ${path}${colors.reset}`,
+        json,
+      );
     }
 
     if (!response.ok) {
+      // Use backend message or fallback to status text
       throw new Error(
-        json?.message || `Request failed with status ${response.status}`,
+        json?.message || `Error ${response.status}: ${response.statusText}`,
       );
     }
 
     return json as T;
-  } catch (error) {
-    /// Screen error
-    // console.error(`%c [API ERROR] ${path}:`, error);
+  } catch (error: any) {
+    if (DEBUG_MODE) {
+      console.log(
+        `${colors.bold}${colors.red}[API ERROR] ${path}:${colors.reset}`,
+        error.message,
+      );
+    }
     throw error;
   }
 }
-
 /* --- Auth Actions --- */
 
 export async function loginWithEmail(
@@ -267,18 +301,6 @@ export const createFile = async (
   }
 };
 
-export async function getFileDrafts(
-  token: string,
-  fileId: number,
-): Promise<ClaimMessage[]> {
-  const res = await apiRequest<{ success: boolean; drafts: ClaimMessage[] }>(
-    `/files/${fileId}/drafts`,
-    { method: "GET" },
-    token,
-  );
-  return res.drafts || [];
-}
-
 export async function generateResponse(
   token: string,
   payload: GenerateResponseRequest | FormData,
@@ -295,7 +317,7 @@ export async function generateResponse(
       next_step_suggestion: string;
       created_at: string;
       image_input_url?: string | null;
-      doccuments_url?: string | null;
+      documents_url?: string | null;
     };
   }>(
     "/drafts/generate",
@@ -323,7 +345,7 @@ export async function generateResponse(
   }
 
   return {
-    id: res.data.id, // Map the ID from the JSON data
+    id: res.data.id,
     output_format: res.data.output_format,
     responseTypeLabel:
       responseTypeLabels[res.data.output_format] || res.data.output_format,
@@ -333,7 +355,7 @@ export async function generateResponse(
     nextStep: res.data.next_step_suggestion,
     createdAt: res.data.created_at,
 
-    doccuments_url: res.data.doccuments_url,
+    documents_url: res.data.documents_url,
     image_input_url: res.data.image_input_url,
   };
 }
@@ -552,10 +574,6 @@ export const AllDraftsofUser = async (
   return response.data || []; // Return the .data array
 };
 
-/**
- * Sends the Expo Push Token to the backend.
- * The backend handles user identification via the JWT in the Authorization header.
- */
 export async function savePushToken(
   pushToken: string,
   token: string,
@@ -631,7 +649,7 @@ export type UpdateUserPayload = {
 export type UpdateUserResponse = {
   message: string;
   user: {
-    id: number;
+    id: string;
     name: string;
     email: string;
     role: string;

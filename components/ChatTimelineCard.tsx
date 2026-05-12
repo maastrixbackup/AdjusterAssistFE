@@ -365,12 +365,6 @@ export const ChatTimelineCard = ({
                   {category.toUpperCase()}
                 </Text>
               </View>
-              {isAI && (<View style={[styles.badge]}>
-                <Text style={[styles.badgeText, { color: color }]}>
-                  {actualTime ? actualTime : timeAgo}
-                </Text>
-              </View>)}
-
             </View>
 
 
@@ -396,6 +390,13 @@ export const ChatTimelineCard = ({
               )}
             </View>
           </View>
+          {isAI && (
+            <View style={[styles.badge, { backgroundColor: 'transparent', paddingHorizontal: 0 }]}>
+              <Text style={[styles.badgeText, { color: '#0457d3', fontWeight: '800' }]}>
+                {actualTime ? actualTime : timeAgo}
+              </Text>
+            </View>
+          )}
 
           {title && <Text style={styles.cardTitle}>{title}</Text>}
 
@@ -623,7 +624,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     justifyContent: "space-between",
   },
-  badgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  badgeText: { fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
   arrowIcon: { opacity: 0.5 },
   dot: { width: 4, height: 4, borderRadius: 2 },
   cardTitle: { fontSize: 15, fontWeight: "700", color: "#0F172A", marginBottom: 2 },

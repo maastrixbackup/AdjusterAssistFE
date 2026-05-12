@@ -239,6 +239,11 @@ export const ChatInputSection = ({
           { paddingBottom: Animated.add(keyboardOffset, dynamicBottomPadding) },
         ]}
       >
+        <View style={styles.miniDisclaimer}>
+     <Text style={styles.miniDisclaimerText}>
+       AI-assisted drafts only. Review and verify all outputs before use. AdjusterAssist does not make coverage, payment, legal, or claim decisions.
+     </Text>
+  </View>
         {selectedAttachments.length > 0 && (
           <ScrollView
             horizontal
@@ -502,5 +507,17 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     minHeight:300,
     textAlignVertical: 'top',
+  },
+  miniDisclaimer: {
+    paddingVertical: 6,
+    backgroundColor: "rgba(248, 250, 252, 0.9)",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  miniDisclaimerText: {
+    fontSize: 12,
+    color: "#697483",
+    textAlign: "center",
   },
 });

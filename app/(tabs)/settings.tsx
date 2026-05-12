@@ -301,8 +301,8 @@ export default function SettingsScreen() {
               <LinearGradient colors={["#1E293B", "#0F172A"]} style={styles.upgradeGradient}>
                 {busyCheckout ? <ActivityIndicator color="#FFF" size="small" /> : (
                   <>
-                    <Text style={styles.upgradeBtnText}>Upgrade Performance</Text>
-                    <Ionicons name="sparkles" size={16} color="#FBBF24" />
+                    <Text style={styles.upgradeBtnText}>Upgrade</Text>
+                    {/* <Ionicons name="sparkles" size={16} color="#FBBF24" /> */}
                   </>
                 )}
               </LinearGradient>
