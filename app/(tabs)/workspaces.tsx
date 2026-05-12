@@ -24,6 +24,7 @@ import FileWorkspaceItem from "@/components/FileWorkspaceItem";
 import {
   deleteFile,
   getMyFiles,
+  getSubscriptionStatus,
   updateFile
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
@@ -63,6 +64,11 @@ export default function WorkspacesScreen() {
       refetch();
     }, [refetch])
   );
+  const { data: status } = useQuery({
+    queryKey: ["subscriptionStatus", token],
+    queryFn: () => getSubscriptionStatus(token!),
+    enabled: !!token,
+  });
 
   const getStatusStyle = useCallback((value?: string) => {
     const statusValue = value?.toLowerCase();
@@ -211,7 +217,8 @@ export default function WorkspacesScreen() {
                 params: {
                   fileId: item.id,
                   claimNumber: item.claim_number || `CLM-${item.id}`,
-                  clientName: item.client_name
+                  clientName: item.client_name,
+                  credits: status?.subscription?.remaining ?? 0,
                 },
               })
             }

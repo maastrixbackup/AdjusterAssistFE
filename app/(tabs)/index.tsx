@@ -38,7 +38,7 @@ const StatCard = memo(({ label, val, active }: any) => (
 StatCard.displayName = "StatCard";
 
 // Memoized Workspace Card for the list
-const WorkspaceItem = memo(({ file, status, onPress, getStyle }: any) => {
+const WorkspaceItem = memo(({ file, onPress, getStyle }: any) => {
   const statusStyle = getStyle(file.status);
   return (
     <Pressable style={({ pressed }) => [styles.workspaceCard, pressed && styles.pressed]} onPress={onPress}>
