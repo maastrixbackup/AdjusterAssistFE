@@ -405,7 +405,7 @@ export default function AiChatScreen() {
                                     ? {
                                         ...item,
                                         ai_response: result.data.ai_response,
-                                        output_format: variantLabel,
+                                        output_format: result.data.output_format,
                                         next_step_suggestion: result.data.next_step_suggestion,
                                         updated_at: result.updated_at,
                                     }
@@ -578,8 +578,6 @@ export default function AiChatScreen() {
         ),
         [loadingCardId, handleQuickAction, handleRefinement, onShare, handleDeleteDraft, handleAttachmentPress],
     );
-
-
 
     // ─── Memoised keyboard interpolation ─────────────────────────────────────
     const dynamicBottomPadding = useMemo(
