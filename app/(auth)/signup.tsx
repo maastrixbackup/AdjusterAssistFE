@@ -34,7 +34,7 @@ export default function SignupScreen() {
   const [role, setRole] = useState<RoleType>("ca");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,6 +60,12 @@ export default function SignupScreen() {
       return;
     }
 
+    if (!acceptedPolicy) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      toast.error("Privacy Policy", { description: "You must accept the privacy policy to continue." });
+      return;
+    }
+
     const passwordError = validatePassword(password);
     if (passwordError) {
       setError(passwordError);
@@ -75,7 +81,7 @@ export default function SignupScreen() {
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    toast.promise(signup(name, email, role, password), {
+    toast.promise(signup(name, email, role, password, acceptedPolicy), {
       loading: "Creating account...",
       success: () => {
         setTimeout(() => router.replace("/login"), 1500);
@@ -98,18 +104,27 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: Platform.OS === "ios" ? 100 : 60 }]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
           {/* ══ ARC HEADER ══════════════════════════════════════════ */}
-          <View style={[styles.arcHeader, { height: height * 0.3 }]}>
+          <View
+            style={[
+              styles.arcHeader,
+              { height: Math.max(180, height * 0.25) }
+            ]}
+          >
             <LinearGradient colors={["#276bbd", "#1e40af", "#172554"]} style={StyleSheet.absoluteFill} />
-            
+
             <View style={[styles.bubble, { top: -30, right: -30, width: 180, height: 180 }]} />
-            
+
             <SafeAreaView style={styles.headerContent}>
               <View style={styles.logoContainer}>
                 <Image source={logoImg} style={logoStyle} />
@@ -122,7 +137,7 @@ export default function SignupScreen() {
           {/* ══ FORM BODY ════════════════════════════════════════════════ */}
           <View style={[styles.body, { marginTop: -40 }]}>
             <View style={[styles.card, isTablet && { maxWidth: 500, alignSelf: 'center' }]}>
-              
+
               {/* ROLE SELECTION */}
               <Text style={styles.fieldLabel}>I AM A...</Text>
               <View style={styles.roleRow}>
@@ -139,7 +154,13 @@ export default function SignupScreen() {
                     style={[styles.roleButton, role === item.id && styles.roleActive]}
                   >
                     <Feather name={item.icon as any} size={14} color={role === item.id ? "#fff" : "#64748B"} />
-                    <Text style={[styles.roleText, role === item.id && styles.roleTextActive]}>{item.label}</Text>
+                    <Text style={[
+                      styles.roleText,
+                      role === item.id && styles.roleTextActive,
+                      { fontSize: width < 380 ? 10 : 12 } // <--- Add this line here
+                    ]}>
+                      {item.label}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -215,12 +236,30 @@ export default function SignupScreen() {
                   />
                 </View>
               </View>
+              {/* PRIVACY POLICY CHECKBOX */}
+              <View style={styles.privacyWrapper}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setAcceptedPolicy(!acceptedPolicy);
+                  }}
+                  style={[styles.checkbox, acceptedPolicy && styles.checkboxChecked]}
+                >
+                  {acceptedPolicy && <Feather name="check" size={12} color="#fff" />}
+                </Pressable>
 
+                <View style={styles.privacyTextContainer}>
+                  <Text style={styles.footerText}>I agree to the </Text>
+                  <Pressable onPress={() => router.push("/privacy")}>
+                    <Text style={styles.link}>Privacy Policy</Text>
+                  </Pressable>
+                </View>
+              </View>
               {error && <Text style={styles.errorText}>{error}</Text>}
 
-              <Pressable 
-                style={({ pressed }) => [styles.button, pressed && { transform: [{ scale: 0.98 }] }]} 
-                onPress={handleSignup} 
+              <Pressable
+                style={({ pressed }) => [styles.button, pressed && { transform: [{ scale: 0.98 }] }]}
+                onPress={handleSignup}
                 disabled={loading}
               >
                 <LinearGradient colors={["#1e40af", "#1e3a8a"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btnInner}>
@@ -250,15 +289,7 @@ export default function SignupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-  scroll: { flexGrow: 1 },
-  
-  // Header
-  arcHeader: {
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    overflow: "hidden",
-    justifyContent: 'center',
-  },
+  scroll: { flexGrow: 1, backgroundColor: "#fff" },
   bubble: { position: "absolute", borderRadius: 999, backgroundColor: "rgba(255,255,255,0.05)" },
   headerContent: { paddingHorizontal: 30, alignItems: 'center' },
   logoContainer: {
@@ -273,7 +304,7 @@ const styles = StyleSheet.create({
   arcSub: { fontSize: 13, color: "rgba(255,255,255,0.6)", textAlign: 'center' },
 
   // Form Body
-  body: { flex: 1, paddingHorizontal: 20, paddingBottom: 40 },
+  body: { flex: 1, paddingHorizontal: 20, paddingBottom: 40, marginTop: -30, },
   card: {
     backgroundColor: '#fff',
     borderRadius: 30,
@@ -284,23 +315,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fieldLabel: { fontSize: 10, fontWeight: "800", color: "#94A3B8", letterSpacing: 1, marginBottom: 8, marginLeft: 4, textTransform: 'uppercase' },
-  
-  // Role Selector
-  roleRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  roleButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
   roleActive: { backgroundColor: "#2d4cb1", borderColor: "#1e40af" },
-  roleText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  // roleText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
   roleTextActive: { color: "#fff" },
 
   // Inputs
@@ -318,9 +334,9 @@ const styles = StyleSheet.create({
   },
   inputActive: { borderColor: "#1e40af", backgroundColor: "#fff" },
   input: { flex: 1, color: "#0f172a", fontSize: 14, fontWeight: '500' },
-  
+
   errorText: { color: "#ef4444", fontSize: 12, textAlign: 'center', fontWeight: '600', marginBottom: 15 },
-  
+
   // Button
   button: { borderRadius: 20, overflow: "hidden", marginTop: 10, marginBottom: 20 },
   btnInner: { height: 60, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
@@ -330,4 +346,65 @@ const styles = StyleSheet.create({
   footer: { flexDirection: "row", justifyContent: "center" },
   footerText: { color: "#64748B", fontSize: 13 },
   link: { color: "#1e40af", fontSize: 13, fontWeight: "800" },
+  arcHeader: {
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    overflow: "hidden",
+    justifyContent: 'center',
+    // height: height * 0.25,
+    minHeight: 180,
+  },
+
+  // NEW: Privacy Styles
+  privacyWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  checkboxChecked: {
+    backgroundColor: '#1e40af',
+    borderColor: '#1e40af',
+  },
+  privacyTextContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap', // Important for small screens
+    flex: 1,
+  },
+
+  // FIX: Improved RoleRow for narrow screens
+  roleRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 20,
+    width: '100%'
+  },
+  roleButton: {
+    flex: 1,
+    paddingVertical: 12, // Use padding instead of fixed height
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  roleText: {
+    // fontSize: width < 380 ? 10 : 12, // Smaller font for narrow devices
+    fontWeight: "600",
+    color: "#64748B"
+  },
 });

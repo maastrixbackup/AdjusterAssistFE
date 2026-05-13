@@ -104,7 +104,7 @@ export const ChatInputSection = ({
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'], // Correct modern array format
-        allowsMultipleSelection: isMultiple,
+        allowsMultipleSelection: false,
         quality: 0.8,
         selectionLimit: isMultiple ? 10 : 1, // Optional: safety limit
       });
@@ -122,7 +122,7 @@ export const ChatInputSection = ({
         }));
 
         setSelectedAttachments(prev => [...prev, ...newImages]);
-        toast.success(`${newImages.length} image(s) added`);
+        // toast.success(`${newImages.length} image(s) added`);
       } else {
         console.log('User cancelled or no assets found');
       }
@@ -159,7 +159,7 @@ export const ChatInputSection = ({
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'text/plain',
         ],
-        multiple: true,
+        multiple: false,
         copyToCacheDirectory: true,
       });
 
