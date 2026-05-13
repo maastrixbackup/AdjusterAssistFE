@@ -110,12 +110,14 @@ export interface GenerateResponseResult {
   responseText: string;
   user_input: string;
   fileId: number | string;
-  nextStep?: string;
+  next_step_suggestion?: string;
   logId?: number;
   createdAt?: string;
 
-  image_input_url?: string | null;
-  documents_url?: string | null;
+  attachments?: {
+    image?: { available: boolean; fileName: string } | null;
+    document?: { available: boolean; fileName: string } | null;
+  };
 }
 
 export type GenerateNextStepRequest = {
@@ -177,21 +179,11 @@ async function apiRequest<T>(
   if (!API_BASE_URL) {
     throw new Error("Missing API_BASE_URL configuration.");
   }
-
   const url = `${API_BASE_URL}${path}`;
-
-  // 1. Detect body type
   const isFormData = init.body instanceof FormData;
-
-  // 2. Build Headers
   const headers: Record<string, string> = {
-    // Only add JSON content-type if NOT sending a file/FormData
     ...(!isFormData && { "Content-Type": "application/json" }),
-
-    // Add Bearer token if provided
     ...(token && { Authorization: `Bearer ${token}` }),
-
-    // Spread any custom headers passed in 'init' (this allows overrides)
     ...(init.headers as Record<string, string>),
   };
 
@@ -316,8 +308,11 @@ export async function generateResponse(
       output_format: string;
       next_step_suggestion: string;
       created_at: string;
-      image_input_url?: string | null;
-      documents_url?: string | null;
+      attachments: {
+        // Added
+        image: { available: boolean; fileName: string } | null;
+        document: { available: boolean; fileName: string } | null;
+      };
     };
   }>(
     "/drafts/generate",
@@ -352,11 +347,9 @@ export async function generateResponse(
     responseText: res.data.ai_response,
     user_input: res.data.user_input,
     fileId: extractedFileId,
-    nextStep: res.data.next_step_suggestion,
+    next_step_suggestion: res.data.next_step_suggestion,
     createdAt: res.data.created_at,
-
-    documents_url: res.data.documents_url,
-    image_input_url: res.data.image_input_url,
+    attachments: res.data.attachments,
   };
 }
 
@@ -695,3 +688,21 @@ export async function getProfile(token: string): Promise<UpdateUserResponse> {
     token,
   );
 }
+
+export const getAttachmentPreview = async (
+  token: string,
+  messageId: number,
+  type: "image" | "document",
+): Promise<{ success: boolean; signedUrl: string }> => {
+  try {
+    const response = await apiRequest<{
+      success: boolean;
+      signedUrl: string;
+    }>(`/drafts/${messageId}/attachments/${type}`, { method: "GET" }, token);
+
+    return response;
+  } catch (error) {
+    console.error(`Error fetching ${type} preview:`, error);
+    throw error;
+  }
+};

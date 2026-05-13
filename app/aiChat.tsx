@@ -6,6 +6,7 @@ import {
     deleteDraft,
     generateResponse,
     generateVariant,
+    getAttachmentPreview,
     getDraftsByFile,
     getFileById,
     refineResponse,
@@ -28,6 +29,7 @@ import {
     Easing,
     FlatList,
     Keyboard,
+    Linking,
     Platform,
     Pressable,
     Share,
@@ -105,8 +107,10 @@ const transformDraft = (draft: any) => ({
     output_format: draft.content_type,
     next_step_suggestion: draft.next_step_suggestion,
     responseUsed: draft.response_used || false,
-    documents_url: draft.documents_url,
-    image_input_url: draft.image_input_url,
+    attachments: draft.attachments || {
+        image: null,
+        document: null
+    },
     quick_actions: DEFAULT_QUICK_ACTIONS,
     refinement: DEFAULT_REFINEMENT_OPTIONS,
     created_at: draft.created_at,
@@ -140,8 +144,6 @@ function useKeyboardOffset() {
     return offset;
 }
 
-// ─── Memoized Turn Row ────────────────────────────────────────────────────────
-// Extracted so React.memo can bail out when item/callbacks haven't changed
 interface TurnRowProps {
     item: any;
     loadingCardId: number | null;
@@ -149,10 +151,11 @@ interface TurnRowProps {
     onRefinement: (option: string, originalContent: string, parentId: number) => void;
     onShare: (content: string) => void;
     onDelete: () => void;
+    onAttachmentPress: (messageId: number, type: 'image' | 'document') => void;
 }
 
 const TurnRow = React.memo(
-    ({ item, loadingCardId, onQuickAction, onRefinement, onShare, onDelete }: TurnRowProps) => (
+    ({ item, loadingCardId, onQuickAction, onRefinement, onShare, onDelete, onAttachmentPress }: TurnRowProps) => (
         <View style={styles.turnGroup}>
             <ChatTimelineCard
                 category="USER INPUT"
@@ -160,12 +163,12 @@ const TurnRow = React.memo(
                 content={item.user_input}
                 color="#94A3B8"
                 quickActions={["Copy"]}
-                imageInput={item?.image_input_url}
-                documentInput={item?.documents_url}
                 timeAgo={getFormattedTime(item.created_at)}
+                attachments={item.attachments}
                 onActionPress={(action: string) =>
                     onQuickAction(action, item.id, item.user_input || "")
                 }
+                onAttachmentPress={(type) => onAttachmentPress(item.id, type)}
             />
             <ChatTimelineCard
                 category="AI RESPONSE"
@@ -354,13 +357,12 @@ export default function AiChatScreen() {
                         user_input: inputText.trim(),
                         ai_response: result.responseText,
                         output_format: result.output_format,
-                        next_step_suggestion: result.nextStep,
+                        next_step_suggestion: result.next_step_suggestion,
                         responseUsed: false,
                         quick_actions: DEFAULT_QUICK_ACTIONS,
                         refinement: DEFAULT_REFINEMENT_OPTIONS,
                         created_at: result.createdAt,
-                        documents_url: result.documents_url,
-                        image_input_url: result.image_input_url,
+                        attachments: result.attachments,
                     };
                     setChatHistory((prev) => [newInteraction, ...prev]);
                     setUserCredits((prev) => Math.max(0, prev - 1));
@@ -504,21 +506,63 @@ export default function AiChatScreen() {
         }
     }, []);
 
-    const handleDeleteDraft = useCallback(async (draftId: number) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const handleDeleteDraft = useCallback((draftId: number) => {
+        const toastId = toast.warning("Delete this message?", {
+            description: "This action cannot be undone.",
 
-        try {
-            const response = await deleteDraft(token!, draftId);
-            if (response.success) {
-                toast.success("Message deleted");
-                setChatHistory((prev) => prev.filter((item) => item.id !== draftId));
-                queryClient.invalidateQueries({ queryKey: ["drafts", fileId] });
-            }
-        } catch (error: any) {
-            toast.error(error?.message || "Failed to delete");
-        }
+            action: {
+                label: "Delete",
+                onClick: async () => {
+                    // Close confirmation toast immediately
+                    toast.dismiss(toastId);
+
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+                    try {
+                        const response = await deleteDraft(token!, draftId);
+
+                        if (response.success) {
+                            toast.success("Message deleted");
+
+                            setChatHistory((prev) =>
+                                prev.filter((item) => item.id !== draftId)
+                            );
+
+                            queryClient.invalidateQueries({
+                                queryKey: ["drafts", fileId],
+                            });
+                        }
+                    } catch (error: any) {
+                        toast.error(error?.message || "Failed to delete");
+                    }
+                },
+            },
+
+            cancel: {
+                label: "Cancel",
+                onClick: () => {
+                    toast.dismiss(toastId);
+                },
+            },
+        });
     }, [token, fileId, queryClient]);
 
+    const handleAttachmentPress = useCallback(async (messageId: number, type: 'image' | 'document') => {
+        try {
+            const response = await getAttachmentPreview(token!, messageId, type);
+            if (response.success && response.signedUrl) {
+                // Open the URL (Image preview or Browser for PDF)
+                if (type === 'image') {
+                    // Use a light box or Linking
+                    Linking.openURL(response.signedUrl);
+                } else {
+                    Linking.openURL(response.signedUrl);
+                }
+            }
+        } catch (error) {
+            toast.error("Could not generate preview link");
+        }
+    }, [token]);
     // ─── Memoised renderItem — stable reference, only re-renders changed rows ─
     const renderItem = useCallback(
         ({ item }: { item: any }) => (
@@ -529,9 +573,10 @@ export default function AiChatScreen() {
                 onRefinement={handleRefinement}
                 onShare={onShare}
                 onDelete={() => handleDeleteDraft(item.id)}
+                onAttachmentPress={handleAttachmentPress}
             />
         ),
-        [loadingCardId, handleQuickAction, handleRefinement, onShare, handleDeleteDraft],
+        [loadingCardId, handleQuickAction, handleRefinement, onShare, handleDeleteDraft, handleAttachmentPress],
     );
 
 

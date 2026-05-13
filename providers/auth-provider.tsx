@@ -12,9 +12,9 @@ import {
   loginWithEmail,
   logoutUser,
   requestPasswordReset,
-  verifyPasswordResetOtp as verifyOtpForPasswordReset,
   resetPassword as resetUserPassword,
   signupWithEmail,
+  verifyPasswordResetOtp as verifyOtpForPasswordReset,
 } from "@/lib/services/authService";
 
 type AuthContextValue = {
@@ -28,6 +28,7 @@ type AuthContextValue = {
     email: string,
     role: string,
     password: string,
+    acceptedPolicy: boolean,
   ) => Promise<void>;
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;

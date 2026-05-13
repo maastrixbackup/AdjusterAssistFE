@@ -5,14 +5,13 @@ import Markdown from 'react-native-markdown-display';
 import {
   Animated,
   Image,
-  Linking,
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 interface ChatTimelineCardProps {
@@ -30,8 +29,11 @@ interface ChatTimelineCardProps {
   onRefinementPress?: (option: string) => void;
   onSharePress?: () => void;
   onDeletePress?: () => void;
-  imageInput?: string;
-  documentInput?: string;
+  attachments?: {
+    image?: { available: boolean; fileName: string } | null;
+    document?: { available: boolean; fileName: string } | null;
+  };
+  onAttachmentPress?: (type: 'image' | 'document', url: string) => void;
   isLoading?: boolean; // ← NEW: triggers skeleton
 }
 
@@ -301,13 +303,13 @@ export const ChatTimelineCard = ({
   onRefinementPress,
   onSharePress,
   onDeletePress,
-  imageInput,
-  documentInput,
+  onAttachmentPress,
+  attachments,
   isLoading = false, // ← NEW
 }: ChatTimelineCardProps) => {
   const [showRefinements, setShowRefinements] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
-
+  const [imageError, setImageError] = useState(false);
   const animatedValue = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -402,36 +404,68 @@ export const ChatTimelineCard = ({
 
           {title && <Text style={styles.cardTitle}>{title}</Text>}
 
-          {(imageInput || documentInput) && (
+          {attachments && (attachments.image?.available || attachments.document?.available) && (
             <View style={styles.premiumAttachmentSection}>
-              {imageInput && (
+
+              {/* Image Preview Case */}
+              {attachments.image?.available && (
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => Linking.openURL(imageInput)}
-                  style={styles.premiumImageBadge}
+                  onPress={() =>
+                    onAttachmentPress?.(
+                      "image",
+                      attachments.image!.fileName
+                    )
+                  }
+                  style={styles.premiumImageContainer}
                 >
-                  <Image
-                    source={{ uri: imageInput }}
-                    style={styles.imageThumbnail}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.maximizeHint}>
-                    <Feather name="maximize-2" size={8} color="#FFF" />
+                  <View style={styles.premiumImageBadge}>
+                    {!imageError ? (
+                      <Image
+                        source={{ uri: attachments.image.fileName }}
+                        style={styles.imageThumbnail}
+                        resizeMode="cover"
+                        onError={() => setImageError(true)}
+                      />
+                    ) : (
+                      <View style={styles.imageFallback}>
+                        <Feather name="image" size={22} color="#64748B" />
+                      </View>
+                    )}
+
+                    <View style={styles.maximizeHint}>
+                      <Feather name="maximize-2" size={8} color="#FFF" />
+                    </View>
                   </View>
+
+                  <Text
+                    style={styles.imageFileName}
+                    numberOfLines={1}
+                  >
+                    {attachments.image.fileName.split("/").pop()}
+                  </Text>
                 </TouchableOpacity>
               )}
 
-              {documentInput && (
+              {/* Document Case */}
+              {attachments.document?.available && (
                 <TouchableOpacity
                   style={styles.premiumDocBadge}
-                  onPress={() => Linking.openURL(documentInput)}
+                  onPress={() =>
+                    onAttachmentPress?.(
+                      "document",
+                      attachments.document!.fileName
+                    )
+                  }
                 >
                   <View style={styles.premiumIconCircle}>
                     <Feather name="file-text" size={13} color="#004B93" />
                   </View>
+
                   <Text style={styles.premiumDocText} numberOfLines={1}>
-                    Evidence File
+                    {attachments.document.fileName.split("/").pop()}
                   </Text>
+
                   <Feather name="external-link" size={11} color="#94A3B8" />
                 </TouchableOpacity>
               )}
@@ -832,6 +866,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 6,
   },
+
+  premiumImageContainer: {
+  alignItems: "center",
+  maxWidth: 90,
+},
+
+imageFallback: {
+  width: "100%",
+  height: "100%",
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "#F1F5F9",
+},
+
+imageFileName: {
+  marginTop: 4,
+  fontSize: 11,
+  fontWeight: "600",
+  color: "#475569",
+  textAlign: "center",
+},
 });
 
 const markdownStyles = {
