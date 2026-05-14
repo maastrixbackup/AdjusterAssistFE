@@ -6,6 +6,10 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "adjusterassist",
+    "notifications": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#0B3C7A"
+    },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

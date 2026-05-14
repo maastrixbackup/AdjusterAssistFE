@@ -23,6 +23,8 @@ type AuthContextValue = {
   token: string | null;
   email: string | null;
   login: (email: string, password: string) => Promise<void>;
+  hasSeenOnboarding: boolean;         
+  completeOnboarding: () => Promise<void>;
   signup: (
     name: string,
     email: string,
@@ -70,21 +72,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const session = await loadSession();
+      const [session, onboarded] = await Promise.all([
+        loadSession(),
+        AsyncStorage.getItem("@has_seen_onboarding"),
+      ]);
       if (!mounted) return;
       if (session) {
         setToken(session.token);
         setEmail(session.email);
       }
+      setHasSeenOnboarding(onboarded === "true");
       setIsHydrated(true);
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -93,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(token),
       token,
       email,
+      hasSeenOnboarding,
       async login(inputEmail: string, password: string) {
         const session = await loginWithEmail(inputEmail, password);
         setToken(session.token);
@@ -112,6 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await saveSession(null);
         await logoutUser();
       },
+      async completeOnboarding() {
+        await AsyncStorage.setItem("@has_seen_onboarding", "true");
+        setHasSeenOnboarding(true); // ✅ instant state update, no re-read needed
+      },
       logout() {
         setToken(null);
         setEmail(null);
@@ -121,7 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         void AsyncStorage.removeItem("@session_saved_drafts_data");
         void AsyncStorage.removeItem("@session_saved_drafts");
-      
+
+        // void AsyncStorage.removeItem("@has_seen_onboarding");
+
         // 3. Call the API logout if necessary
         void logoutUser();
       },
@@ -135,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await resetUserPassword(inputEmail, otp, newPassword);
       },
     }),
-    [email, isHydrated, token],
+    [email, isHydrated, token, hasSeenOnboarding],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
