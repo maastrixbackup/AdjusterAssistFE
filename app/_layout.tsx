@@ -1,7 +1,6 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { registerAndSendPushToken } from "@/lib/notifications/registerForPushToken";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DarkTheme,
   DefaultTheme,
@@ -12,7 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -20,7 +19,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { toast, Toaster } from "sonner-native";
 
 export const unstable_settings = {
-  initialRouteName: "login",
+  initialRouteName: "onboarding",
 };
 
 Notifications.setNotificationHandler({
@@ -32,23 +31,21 @@ Notifications.setNotificationHandler({
   }),
 });
 
+Notifications.setNotificationChannelAsync("default", {
+  name: "default",
+  importance: Notifications.AndroidImportance.MAX,
+  sound: null,
+});
+
 function NavigationGuard() {
-  const { isAuthenticated, isHydrated } = useAuth();
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(
-    null
-  );
+  const { isAuthenticated, isHydrated, hasSeenOnboarding } = useAuth(); // ✅ from context
   const segments = useSegments();
   const router = useRouter();
-  const hasNavigated = useRef(false);
+
+  // NO useState, NO useEffect for reading AsyncStorage — context handles it
 
   useEffect(() => {
-    AsyncStorage.getItem("@has_seen_onboarding")
-      .then((value) => setHasSeenOnboarding(value === "true"))
-      .catch(() => setHasSeenOnboarding(false));
-  }, []);
-
-  useEffect(() => {
-    if (!isHydrated || hasSeenOnboarding === null) return;
+    if (!isHydrated) return;
 
     const rootSegment = segments[0];
     const inAuthGroup = rootSegment === "(auth)" || rootSegment === "login";
@@ -58,39 +55,25 @@ function NavigationGuard() {
       rootSegment === "aiChat";
     const inOnboardingGroup = rootSegment === "onboarding";
 
-    if (!hasSeenOnboarding && !inOnboardingGroup) {
-      if (!hasNavigated.current) {
-        hasNavigated.current = true;
-        router.replace("/onboarding");
-      }
+    if (!hasSeenOnboarding) {
+      if (!inOnboardingGroup) router.replace("/onboarding");
       return;
     }
 
-    if (inOnboardingGroup) {
-      hasNavigated.current = false;
+    if (isAuthenticated) {
+      if (inAuthGroup || inOnboardingGroup) router.replace("/(tabs)");
       return;
     }
 
-    if (hasSeenOnboarding && !isAuthenticated && inProtectedGroup) {
-      router.replace("/(auth)/login");
+    if (!isAuthenticated) {
+      if (inProtectedGroup || inOnboardingGroup) router.replace("/(auth)/login");
       return;
-    }
-
-    if (isAuthenticated && (inAuthGroup || inOnboardingGroup)) {
-      router.replace("/(tabs)");
     }
   }, [isAuthenticated, isHydrated, hasSeenOnboarding, segments]);
 
-  if (!isHydrated || hasSeenOnboarding === null) {
+  if (!isHydrated) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#0B3C7A",
-        }}
-      >
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0B3C7A" }}>
         <ActivityIndicator size="large" color="#FFFFFF" />
       </View>
     );
@@ -119,18 +102,9 @@ function NavigationGuard() {
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/signup" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="(auth)/reset-password"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="(auth)/forgot-password"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="(auth)/verify-otp"
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/verify-otp" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -165,7 +139,10 @@ export default function RootLayout() {
 
 // Defined inside layout, but BELOW the provider
 function AppContent() {
+  const router = useRouter();
+
   const { isAuthenticated, token } = useAuth();
+
   const showToast = (
     msg: string,
     type: "success" | "error" | "warning" = "success"
@@ -174,18 +151,63 @@ function AppContent() {
       case "error":
         toast.error(msg);
         break;
+
       case "warning":
         toast.warning(msg);
         break;
+
       default:
         toast.success(msg);
     }
   };
 
+  // Push token registration
   useEffect(() => {
     if (!isAuthenticated || !token) return;
-    registerAndSendPushToken(token, showToast);
+
+    registerAndSendPushToken(
+      token,
+      showToast
+    );
   }, [isAuthenticated, token]);
+
+  // Notification click listener
+  useEffect(() => {
+
+    // Handle app opened from terminated state
+    const lastNotificationResponse =
+      Notifications.getLastNotificationResponse();
+
+    if (lastNotificationResponse) {
+
+      setTimeout(() => {
+        router.replace("/(tabs)");
+      }, 500);
+
+    }
+
+    // Handle notification tap while app in background
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+
+          console.log(
+            "Notification tapped:",
+            response
+          );
+
+          setTimeout(() => {
+            router.replace("/(tabs)");
+          }, 100);
+
+        }
+      );
+
+    return () => {
+      subscription.remove();
+    };
+
+  }, []);
 
   return (
     <>

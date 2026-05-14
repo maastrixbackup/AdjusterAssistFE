@@ -1,5 +1,5 @@
+import { useAuth } from "@/providers/auth-provider";
 import { Feather } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics'; // Recommended for premium feel
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -59,12 +59,13 @@ export default function OnboardingScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatRef = useRef<FlatList>(null);
   // const fadeAnim = useRef(new Animated.Value(1)).current;
+  const { completeOnboarding } = useAuth();
 
   const logoImg = require("../assets/images/AdjusterAssist1.png");
 
-  const completeOnboarding = async () => {
+  const completeOnboardingHandler = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await AsyncStorage.setItem("@has_seen_onboarding", "true");
+    await completeOnboarding(); // ✅ sets state instantly in context
     router.replace("/(auth)/login");
   };
 
@@ -74,7 +75,7 @@ export default function OnboardingScreen() {
       const next = activeIndex + 1;
       flatRef.current?.scrollToIndex({ index: next, animated: true });
     } else {
-      completeOnboarding();
+      completeOnboardingHandler();
     }
   };
 
@@ -140,11 +141,11 @@ export default function OnboardingScreen() {
               <Text style={styles.skip}>Skip for now</Text>
             </Pressable>
           )} */}
-       
-            <Pressable onPress={completeOnboarding} style={styles.skipWrap}>
-              <Text style={styles.skip}>Skip for now</Text>
-            </Pressable>
-          
+
+          <Pressable onPress={completeOnboardingHandler} style={styles.skipWrap}>
+            <Text style={styles.skip}>Skip for now</Text>
+          </Pressable>
+
         </View>
       </SafeAreaView>
     </View>
