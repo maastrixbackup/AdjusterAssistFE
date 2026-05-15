@@ -31,14 +31,14 @@ Notifications.setNotificationHandler({
   }),
 });
 
-Notifications.setNotificationChannelAsync("default", {
-  name: "default",
-  importance: Notifications.AndroidImportance.MAX,
-  sound: null,
-});
+// Notifications.setNotificationChannelAsync("default", {
+//   name: "default",
+//   importance: Notifications.AndroidImportance.MAX,
+//   sound: null,
+// });
 
 function NavigationGuard() {
-  const { isAuthenticated, isHydrated, hasSeenOnboarding } = useAuth(); // ✅ from context
+  const { isAuthenticated, isHydrated, hasSeenOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 

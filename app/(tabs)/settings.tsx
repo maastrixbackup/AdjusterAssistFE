@@ -27,6 +27,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import {
   getProfile,
   getSubscriptionStatus,
@@ -57,6 +58,11 @@ export default function SettingsScreen() {
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
   const router = useRouter();
+  const [isNotificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState({
+    claimUpdates: true,
+    weeklySummary: false,
+  });
 
   const [form, setForm] = useState({
     name: "",
@@ -153,6 +159,23 @@ export default function SettingsScreen() {
       setForm({ ...form, avatar_url: asset.uri });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+  };
+
+  const handleContactSupport = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL('mailto:support@adjusterassist.com?subject=Support Request');
+  };
+
+  const handleRateApp = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Replace with your actual store IDs
+    const itunesItemId = 'YOUR_ID';
+    const androidPackageName = 'com.adjusterassist.app';
+
+    // eslint-disable-next-line no-unused-expressions
+    Platform.OS === 'ios'
+      ? Linking.openURL(`itms-apps://itunes.apple.com/app/viewContentsUserReviews/id${itunesItemId}?action=write-review`)
+      : Linking.openURL(`market://details?id=${androidPackageName}`);
   };
 
   const onUpgrade = async () => {
@@ -312,20 +335,41 @@ export default function SettingsScreen() {
 
         <Text style={styles.menuTitle}>Preferences</Text>
         <View style={styles.menuContainer}>
-          <MenuLink icon="notifications-outline" label="Notifications" color="#64748B"
-            isToggle={true}
-            toggleValue={isNotificationsEnabled}
-            onToggleChange={(val) => {
+          <MenuLink
+            icon="notifications-outline"
+            label="Notifications"
+            color="#3B82F6"
+            onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setIsNotificationsEnabled(val);
-              updateProfile({
-                push_enabled: val,
-              });
-            }} />
+              setNotificationModalVisible(!isNotificationModalVisible);
+            }}
+          />
+          {isNotificationModalVisible && (
+            <View style={styles.inlineSettingsWrapper}>
+              <NotificationSettings
+                preferences={notifPrefs}
+                onUpdate={(key: any, val: any) => {
+                  setNotifPrefs((prev) => ({ ...prev, [key]: val }));
+                  // Logic to update server
+                  // updateProfile({ [key]: val });
+                }}
+              />
+            </View>
+          )}
+
           <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/privacy");
           }} />
+
+          <MenuLink
+            icon="star-outline"
+            label="Rate the App"
+            color="#EC4899" // Pink
+            isLast
+            onPress={handleRateApp}
+          />
+
           <MenuLink
             icon="log-out-outline"
             label="Sign Out"
@@ -334,6 +378,7 @@ export default function SettingsScreen() {
             onPress={() => setLogoutModalVisible(true)}
           />
         </View>
+
 
         <View style={styles.footerSection}>
           <Text style={styles.versionText}>VERSION 1.6.0 DEVELOPMENT</Text>
@@ -501,41 +546,36 @@ export default function SettingsScreen() {
 }
 
 function MenuLink({
-  icon, label, color, isLast, onPress, isToggle, toggleValue, onToggleChange
+  icon,
+  label,
+  color,
+  isLast,
+  onPress,
 }: MenuLinkProps): ReactElement {
   return (
-    <Pressable
-      onPress={isToggle ? undefined : onPress}
-      style={({ pressed }) => [
-        styles.menuItem,
-        (!isToggle && pressed) && { backgroundColor: '#F1F5F9' }
-      ]}
-    >
-      <View style={styles.menuLeft}>
-        <View style={[styles.menuIconBg, { backgroundColor: color + '12' }]}>
-          <Ionicons name={icon} size={18} color={color} />
+    <View>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.menuItem,
+          pressed && { backgroundColor: '#F1F5F9' }
+        ]}
+      >
+        <View style={styles.menuLeft}>
+          <View style={[styles.menuIconBg, { backgroundColor: color + '15' }]}>
+            <Ionicons name={icon} size={18} color={color} />
+          </View>
+          <Text style={[styles.menuLabel, { color: color === '#EF4444' ? color : '#334155' }]}>
+            {label}
+          </Text>
         </View>
-        <Text style={[styles.menuLabel, { color: color === '#EF4444' ? color : '#334155' }]}>
-          {label}
-        </Text>
-      </View>
 
-      {/* Conditionally render Switch or Chevron */}
-      {isToggle ? (
-        <Switch
-          trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
-          thumbColor={toggleValue ? "#2563EB" : "#F4F3F4"}
-          onValueChange={onToggleChange}
-          value={toggleValue}
-          // Ensure the switch doesn't look cramped on small screens
-          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-        />
-      ) : (
         <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-      )}
+      </Pressable>
 
+      {/* Premium Divider Logic: Doesn't show on the last item of a group */}
       {!isLast && <View style={styles.menuDivider} />}
-    </Pressable>
+    </View>
   );
 }
 
@@ -734,5 +774,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     paddingHorizontal: 4,
+  },
+  inlineSettingsWrapper: {
+    backgroundColor: '#F8FAFC', // Light grey to distinguish from the main menu
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 10,
   },
 });
