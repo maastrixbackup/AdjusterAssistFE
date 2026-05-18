@@ -362,6 +362,11 @@ export default function SettingsScreen() {
             router.push("/privacy");
           }} />
 
+          <MenuLink icon="bar-chart-outline" label="Usage history" color="#64748B" onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/usage-history");
+          }} />
+
           <MenuLink
             icon="star-outline"
             label="Rate the App"

@@ -169,7 +169,7 @@ const colors = {
   bold: "\x1b[1m",
 };
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true; // Set to true to see logs during development
+const DEBUG_MODE = false; // Set to true to see logs during development
 
 async function apiRequest<T>(
   path: string,
