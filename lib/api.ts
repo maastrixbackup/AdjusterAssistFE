@@ -169,7 +169,7 @@ const colors = {
   bold: "\x1b[1m",
 };
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false; // Set to true to see logs during development
+const DEBUG_MODE = true; // Set to true to see logs during development
 
 async function apiRequest<T>(
   path: string,
@@ -251,10 +251,11 @@ export async function signupWithEmail(
   email: string,
   role: string,
   password: string,
+  acceptedPolicy: boolean,
 ): Promise<AuthSession> {
   const data = await apiRequest<AuthApiResponse>("/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ name, email, role, password }),
+    body: JSON.stringify({ name, email, role, password, acceptedPolicy }),
   });
   return { token: data.token, email: data.user.email };
 }
@@ -706,3 +707,21 @@ export const getAttachmentPreview = async (
     throw error;
   }
 };
+
+export interface ResendVerificationPayload {
+  email: string;
+}
+
+export interface ResendVerificationResponse {
+  success: boolean;
+  message: string;
+}
+
+export async function resendVerificationEmail(
+  payload: ResendVerificationPayload,
+): Promise<ResendVerificationResponse> {
+  return apiRequest<ResendVerificationResponse>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

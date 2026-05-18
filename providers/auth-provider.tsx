@@ -109,8 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         inputEmail: string,
         role: string,
         password: string,
+        acceptedPolicy: boolean,
       ) {
-        await signupWithEmail(name, inputEmail, role, password);
+        await signupWithEmail(name, inputEmail, role, password, acceptedPolicy);
         // Usually, after signup, we keep them logged out until they verify or login manually
         setToken(null);
         setEmail(null);
