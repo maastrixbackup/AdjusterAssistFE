@@ -88,7 +88,7 @@ const RenderInput = React.memo(({
             placeholder={placeholder}
             placeholderTextColor="#94A3B8"
             autoCapitalize="sentences"
-            selectionColor="#4F46E5"
+            selectionColor="#0a2a81"
         />
     </View>
 ));
@@ -221,7 +221,7 @@ const FileWorkspaceItem = React.memo(({ item, onPress, onUpdate, onDelete, getSt
                                     <MaterialCommunityIcons 
                                         name={item.status?.toLowerCase() === 'closed' ? "folder-lock-outline" : "folder-open"} 
                                         size={26} 
-                                        color={item.status?.toLowerCase() === 'closed' ? "#64748B" : "#4F46E5"} 
+                                        color={item.status?.toLowerCase() === 'closed' ? "#64748B" : "#1856ff"} 
                                     />
                                 </LinearGradient>
                             </View>
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     statusDot: { width: 4, height: 4, borderRadius: 2, marginRight: 5 },
     miniBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.3 },
     metaDivider: { marginHorizontal: 6, color: '#CBD5E1', fontSize: 10 },
-    stageText: { fontSize: 11, color: '#4F46E5', fontWeight: '700' },
+    stageText: { fontSize: 11, color: '#0a2a81', fontWeight: '700' },
     dateText: { fontSize: 11, color: '#7f8c9e', fontWeight: '500' },
     
     overlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'flex-end' },
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', 
         borderRadius: 14, padding: 14, fontSize: 15, color: '#1E293B', fontWeight: '500'
     },
-    saveBtn: { backgroundColor: '#0636a5', padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+    saveBtn: { backgroundColor: '#0a2a81', padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
     saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
     saveBtnDisabled: { backgroundColor: '#94A3B8', shadowOpacity: 0 }
 });

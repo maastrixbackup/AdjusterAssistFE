@@ -46,16 +46,18 @@ export async function signupUser(
   email: string,
   role: string,
   password: string,
+  acceptedPolicy: boolean,
 ): Promise<AuthApiResponse> {
   const response = await apiRequest<AuthApiResponse>("/auth/signup", "POST", {
     name,
     email,
     role,
     password,
+    acceptedPolicy,
   });
 
-  // If your signup automatically logs the user in
   if (response.success && response.token) {
+    console.log("Signup successful, saving token...", response.token);
     await saveToken(response.token);
   }
 
@@ -84,8 +86,9 @@ export async function signupWithEmail(
   email: string,
   role: string,
   password: string,
+  acceptedPolicy: boolean,
 ): Promise<void> {
-  await signupUser(name, email, role, password);
+  await signupUser(name, email, role, password, acceptedPolicy);
 }
 
 /**

@@ -39,6 +39,7 @@ export default function SignupScreen() {
   const [focused, setFocused] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
 
   const logoImg = require("../../assets/images/AdjusterAssist1.png");
 
@@ -84,12 +85,17 @@ export default function SignupScreen() {
     toast.promise(signup(name, email, role, password, acceptedPolicy), {
       loading: "Creating account...",
       success: () => {
-        setTimeout(() => router.replace("/login"), 1500);
-        return "Account created! Redirecting...";
-      },
-      error: () => {
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        );
+        setVerificationEmailSent(true);
         setLoading(false);
-        return "Signup failed. Try again.";
+        return "Verification email sent. Please check your inbox.";
+      },
+      error: (err:any) => {
+        setLoading(false);
+        console.error("Signup error:", err);
+        return err.message.charAt(0).toUpperCase() + err.message.slice(1) || "An error occurred during signup.";
       },
     });
   }
@@ -279,6 +285,40 @@ export default function SignupScreen() {
                 </Pressable>
               </View>
 
+              {
+                verificationEmailSent && (
+                  <View style={styles.verifyBox}>
+
+                    <Feather
+                      name="mail"
+                      size={22}
+                      color="#1e40af"
+                    />
+
+                    <Text style={styles.verifyTitle}>
+                      Verify Your Email
+                    </Text>
+
+                    <Text style={styles.verifyText}>
+                      We sent a verification link to{" "}
+                      <Text style={{ fontWeight: "700" }}>
+                        {email}
+                      </Text>
+                    </Text>
+
+                    <Pressable
+                      style={styles.verifyLoginButton}
+                      onPress={() => router.replace("/login")}
+                    >
+                      <Text style={styles.verifyLoginText}>
+                        Go To Login
+                      </Text>
+                    </Pressable>
+
+                  </View>
+                )
+              }
+
             </View>
           </View>
         </ScrollView>
@@ -407,4 +447,42 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#64748B"
   },
+  verifyBox: {
+  marginTop: 10,
+  marginBottom: 20,
+  padding: 18,
+  borderRadius: 18,
+  backgroundColor: "#EFF6FF",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: "#BFDBFE",
+},
+
+verifyTitle: {
+  marginTop: 10,
+  fontSize: 16,
+  fontWeight: "800",
+  color: "#1E3A8A",
+},
+
+verifyText: {
+  marginTop: 6,
+  fontSize: 13,
+  color: "#475569",
+  textAlign: "center",
+  lineHeight: 20,
+},
+
+verifyLoginButton: {
+  marginTop: 16,
+  backgroundColor: "#1E40AF",
+  paddingHorizontal: 18,
+  paddingVertical: 10,
+  borderRadius: 12,
+},
+
+verifyLoginText: {
+  color: "#fff",
+  fontWeight: "700",
+},
 });

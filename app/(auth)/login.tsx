@@ -1,3 +1,4 @@
+import { resendVerificationEmail } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
@@ -33,6 +34,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   const logoImg = require("../../assets/images/AdjusterAssist1.png");
 
@@ -50,6 +53,12 @@ export default function LoginScreen() {
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, isHydrated]);
+
+  useEffect(() => {
+    if (showResend) {
+      setShowResend(false);
+    }
+  }, [email, password]);
 
   if (!isHydrated || isAuthenticated) {
     return (
@@ -77,19 +86,31 @@ export default function LoginScreen() {
     }
 
     try {
-      // We wrap the login call in toast.promise for the UI, 
-      // but we await it to trigger Haptics based on the result.
       await toast.promise(login(email.trim(), password), {
         loading: "Verifying credentials...",
         success: (data) => {
-          // SUCCESS HAPTIC
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setShowResend(false);
           return "Welcome back!";
         },
-        error: (err) => {
+        error: (err: any) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          return err instanceof Error ? err.message : "Invalid credentials";
-        },
+        
+          // Safely extract the custom data keys sent from your backend Express API
+          const errorTarget = err?.response?.data || err?.data || err ;
+          const errorCode = errorTarget?.code;
+          const errorMessage = errorTarget?.message || "Invalid credentials";
+
+          console.log("🔍 Handled UI Response Target:", { errorCode, errorMessage });
+
+          // Clear tracking matches perfectly against our new structural code
+          if (errorCode === "EMAIL_NOT_VERIFIED" || errorMessage.includes("verify your email")) {
+            setShowResend(true);
+            return "Please verify your email before signing in.";
+          }
+
+          return errorMessage;
+        }
       });
 
       // iOS Keyboard dismissal often feels smoother after the transition starts
@@ -99,6 +120,71 @@ export default function LoginScreen() {
 
     } catch (error) {
       console.error("Login attempt failed", error);
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!email.trim()) {
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error
+      );
+
+      toast.error("Email Required", {
+        description:
+          "Please enter your email address first.",
+      });
+
+      return;
+    }
+
+    try {
+      setResendLoading(true);
+
+      Haptics.impactAsync(
+        Haptics.ImpactFeedbackStyle.Soft
+      );
+
+      await toast.promise(
+        resendVerificationEmail({
+          email: email.trim(),
+        }),
+        {
+          loading: "Sending verification email...",
+
+          success: (data) => {
+            Haptics.notificationAsync(
+              Haptics.NotificationFeedbackType.Success
+            );
+
+            return (
+              data?.message ||
+              "Verification email sent successfully."
+            );
+          },
+
+          error: (err: any) => {
+            Haptics.notificationAsync(
+              Haptics.NotificationFeedbackType.Error
+            );
+
+            return (
+              err?.message ||
+              "Failed to resend verification email."
+            );
+          },
+        }
+      );
+
+    } catch (error) {
+      console.error(
+        "Resend verification failed:",
+        error
+      );
+
+    } finally {
+
+      setResendLoading(false);
+
     }
   }
 
@@ -214,6 +300,23 @@ export default function LoginScreen() {
                   </View>
                 </LinearGradient>
               </Pressable>
+
+              {showResend && (
+                <View style={styles.verifyBox}>
+                  <Text style={styles.verifyText}>
+                    Your email address is not verified yet.
+                  </Text>
+                  <Pressable
+                    style={[styles.resendButton, resendLoading && { opacity: 0.6 }]}
+                    onPress={handleResendVerification}
+                    disabled={resendLoading}
+                  >
+                    <Text style={styles.resendText}>
+                      {resendLoading ? "Sending verification link..." : "Resend Verification Email"}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>Don&apos;t have an account? </Text>
@@ -371,5 +474,28 @@ const styles = StyleSheet.create({
     color: "#1e40af",
     fontSize: 14,
     fontWeight: "800",
+  },
+  resendButton: {
+    marginTop: -10,
+    marginBottom: 20,
+    alignItems: "center",
+  },
+
+  resendText: {
+    color: "#1e40af",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  verifyBox: {
+    marginTop: -5,
+    marginBottom: 20,
+    alignItems: "center",
+  },
+
+  verifyText: {
+    color: "#64748B",
+    fontSize: 13,
+    marginBottom: 8,
+    textAlign: "center",
   },
 });

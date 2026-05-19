@@ -3,25 +3,25 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, Tabs } from "expo-router";
 import { useEffect } from "react";
 import { Platform, StyleSheet } from "react-native";
- 
+
 import { HapticTab } from "@/components/haptic-tab";
 import { useAuth } from "@/providers/auth-provider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
- 
+
 export default function TabLayout() {
   const { isHydrated, isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
- 
+
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
       router.replace("/login");
     }
   }, [isAuthenticated, isHydrated]);
- 
+
   if (!isHydrated || !isAuthenticated) {
     return null;
   }
- 
+
   return (
     <Tabs
       backBehavior="history"
@@ -48,7 +48,7 @@ export default function TabLayout() {
           backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
           borderTopColor: "#E2E8F0",
- 
+
           ...Platform.select({
             ios: {
               shadowColor: "#000",
@@ -79,15 +79,15 @@ export default function TabLayout() {
           ),
         }}
       />
- 
+
       <Tabs.Screen
         name="workspaces"
         options={{
-          headerShown:false,
+          headerShown: false,
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               size={26}
-             name={focused ? "briefcase" : "briefcase-outline"}
+              name={focused ? "briefcase" : "briefcase-outline"}
               color={color}
             />
           ),
@@ -108,11 +108,21 @@ export default function TabLayout() {
           ),
         }}
       />
-      
+      <Tabs.Screen
+        name="usage-history"
+        options={{
+          href: null, // Hides it from the bottom tab bar rendering list
+          headerShown: false,
+          headerTitle: "Usage History",
+          headerTintColor: "#0F172A",
+          headerStyle: { backgroundColor: "#fff" },
+        }}
+      />
+
     </Tabs>
   );
 }
- 
+
 const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
@@ -129,4 +139,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
- 

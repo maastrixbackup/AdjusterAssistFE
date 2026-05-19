@@ -251,10 +251,11 @@ export async function signupWithEmail(
   email: string,
   role: string,
   password: string,
+  acceptedPolicy: boolean,
 ): Promise<AuthSession> {
   const data = await apiRequest<AuthApiResponse>("/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ name, email, role, password }),
+    body: JSON.stringify({ name, email, role, password, acceptedPolicy }),
   });
   return { token: data.token, email: data.user.email };
 }
@@ -706,3 +707,21 @@ export const getAttachmentPreview = async (
     throw error;
   }
 };
+
+export interface ResendVerificationPayload {
+  email: string;
+}
+
+export interface ResendVerificationResponse {
+  success: boolean;
+  message: string;
+}
+
+export async function resendVerificationEmail(
+  payload: ResendVerificationPayload,
+): Promise<ResendVerificationResponse> {
+  return apiRequest<ResendVerificationResponse>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
