@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
   secureBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, gap: 4 },
   secureText: { fontSize: 10, fontWeight: '800', color: '#16A34A' },
 
-  usageWrapper: { marginBottom: 20 },
+  usageWrapper: { marginBottom: 0 },
   usageHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   usageTitle: { fontSize: 14, fontWeight: '700', color: '#64748B' },
   usageValue: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
