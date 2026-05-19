@@ -168,7 +168,6 @@ export default function SettingsScreen() {
 
   const handleRateApp = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Replace with your actual store IDs
     const itunesItemId = 'YOUR_ID';
     const androidPackageName = 'com.adjusterassist.app';
 
@@ -373,6 +372,14 @@ export default function SettingsScreen() {
             color="#EC4899" // Pink
             isLast
             onPress={handleRateApp}
+          />
+
+          <MenuLink
+            icon="call-outline"
+            label="Contact Support"
+            color="#2035f3" 
+            isLast
+            onPress={handleContactSupport}
           />
 
           <MenuLink

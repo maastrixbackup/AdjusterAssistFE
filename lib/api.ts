@@ -725,3 +725,36 @@ export async function resendVerificationEmail(
     body: JSON.stringify(payload),
   });
 }
+
+export interface UsageHistoryResponse {
+  success: boolean;
+  meta: {
+    runInPeriod: number;
+    remaining: number;
+    nextRenewal: string;
+    planStatus: string;
+  };
+  transactions: {
+    id: string;
+    title: string;
+    workspace: string;
+    cost: string;
+    timestamp: string;
+  }[];
+}
+
+export const getCreditUsageHistory = async (
+  token: string,
+  range: "24h" | "week" | "month" | "year" | "all" = "all",
+): Promise<UsageHistoryResponse> => {
+  try {
+    return await apiRequest<UsageHistoryResponse>(
+      `/subscriptions/history?range=${range}`,
+      { method: "GET" },
+      token,
+    );
+  } catch (error) {
+    console.error(`Error fetching credit usage history (${range}):`, error);
+    throw error;
+  }
+};
