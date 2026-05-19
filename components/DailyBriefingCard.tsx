@@ -400,7 +400,7 @@ function BriefingModal({
               </View>
               <View>
                 <Text style={modalStyles.greeting}>
-                  {greeting} 👋
+                  {greeting}, {displayName}👋
                 </Text>
                 <Text style={modalStyles.dateLabel}>{todayLabel}</Text>
               </View>
