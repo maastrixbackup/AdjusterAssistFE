@@ -163,7 +163,7 @@ export default function SettingsScreen() {
 
   const handleContactSupport = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Linking.openURL('mailto:support@adjusterassist.com?subject=Support Request');
+    Linking.openURL('mailto:info@adjusterassistapp.com?subject=Support Request');
   };
 
   const handleRateApp = () => {
@@ -394,6 +394,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footerSection}>
           <Text style={styles.versionText}>VERSION 1.6.0 DEVELOPMENT</Text>
+          <Text style={styles.versionText}>Effective Date: May 20, 2026</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence</Text>
         </View>
       </ScrollView>
@@ -653,7 +654,7 @@ const styles = StyleSheet.create({
 
   menuTitle: { fontSize: 11, fontWeight: '800', color: '#94A3B8', marginTop: 32, marginBottom: 12, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1.2 },
   menuContainer: { backgroundColor: '#FFF', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#F1F5F9' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 15 },
   menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   menuIconBg: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { fontSize: 15, fontWeight: '600' },
