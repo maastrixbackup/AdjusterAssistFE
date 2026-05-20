@@ -18,6 +18,7 @@ import { RefreshControl, ScrollView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
+import { DailyBriefing } from "@/components/DailyBriefingCard";
 import {
   ClaimFile,
   getMyFiles,
@@ -69,7 +70,7 @@ const WorkspaceItem = memo(({ file, onPress, getStyle }: any) => {
 WorkspaceItem.displayName = "WorkspaceItem";
 
 export default function HomeScreen() {
-  const { token } = useAuth();
+  const { token, email } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const logo = require("../../assets/images/header-icon.png");
@@ -285,6 +286,12 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
+
+      <DailyBriefing
+        files={files}
+        credits={status?.subscription?.remaining ?? 0}
+        userName={email ?? undefined}
+      />
 
       <CreateWorkspaceModal
         isVisible={isCreateModalVisible}
