@@ -12,9 +12,7 @@ import {
   loginWithEmail,
   logoutUser,
   requestPasswordReset,
-  resetPassword as resetUserPassword,
   signupWithEmail,
-  verifyPasswordResetOtp as verifyOtpForPasswordReset,
 } from "@/lib/services/authService";
 import { supabase } from "@/lib/supabase";
 import * as Linking from "expo-linking";
@@ -37,12 +35,6 @@ type AuthContextValue = {
   ) => Promise<void>;
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;
-  verifyPasswordResetOtp: (email: string, otp: string) => Promise<void>;
-  resetPassword: (
-    email: string,
-    otp: string,
-    newPassword: string,
-  ) => Promise<void>;
 };
 
 const SESSION_KEY = "adjusterassist_session_v1";
@@ -76,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -122,59 +115,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async completeOnboarding() {
         await AsyncStorage.setItem("@has_seen_onboarding", "true");
-        setHasSeenOnboarding(true); // ✅ instant state update, no re-read needed
+        setHasSeenOnboarding(true);
       },
       logout() {
         setToken(null);
         setEmail(null);
-
-        // 1. Clear the Auth Session (Token/Email)
         void saveSession(null);
-
         void AsyncStorage.removeItem("@session_saved_drafts_data");
         void AsyncStorage.removeItem("@session_saved_drafts");
-
-        // void AsyncStorage.removeItem("@has_seen_onboarding");
-
-        // 3. Call the API logout if necessary
         void logoutUser();
       },
       async sendPasswordReset(inputEmail: string) {
+        // Triggers the Supabase recovery email containing your deep link configuration URL
         await requestPasswordReset(inputEmail);
-      },
-      async verifyPasswordResetOtp(inputEmail: string, otp: string) {
-        await verifyOtpForPasswordReset(inputEmail, otp);
-      },
-      async resetPassword(inputEmail: string, otp: string, newPassword: string) {
-        await resetUserPassword(inputEmail, otp, newPassword);
       },
     }),
     [email, isHydrated, token, hasSeenOnboarding],
   );
+
   useEffect(() => {
-    // Handle app opened from email link
     const handleDeepLink = async (url: string | null) => {
       if (!url) return;
-
       const parsed = Linking.parse(url);
-
-      // Supabase sends tokens in hash fragment
       const hash = url.split("#")[1];
-
       if (!hash) return;
-
       const params = new URLSearchParams(hash);
-
       const access_token = params.get("access_token");
       const refresh_token = params.get("refresh_token");
       const type = params.get("type");
 
-      // PASSWORD RECOVERY FLOW
-      if (
-        type === "recovery" &&
-        access_token &&
-        refresh_token
-      ) {
+      if (type === "recovery" && access_token && refresh_token) {
+        // Inject token pair directly into Supabase client memory space
         const { error } = await supabase.auth.setSession({
           access_token,
           refresh_token,
@@ -182,14 +153,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!error) {
           router.replace("/reset-password");
+        } else {
+          console.error("Failed mounting temporary recovery session context:", error.message);
         }
       }
     };
 
-    // App already opened from link
+    // App already closed but woke up due to dynamic link action click
     Linking.getInitialURL().then(handleDeepLink);
 
-    // App opened while running
+    // App actively running in task background states
     const subscription = Linking.addEventListener(
       "url",
       ({ url }) => {
@@ -201,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.remove();
     };
   }, []);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

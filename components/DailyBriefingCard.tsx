@@ -1,6 +1,7 @@
 // components/DailyBriefing.tsx
-// Draggable floating button + slide-up briefing card
-// Fixed: no mixed useNativeDriver errors
+// Draggable floating button — iOS-level smooth feel
+// Time-based color: warm yellow/orange in day, deep blue at night
+// Improved glow, spring physics, and haptics
 
 import { ClaimFile } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
+  Easing,
   Modal,
   PanResponder,
   Pressable,
@@ -24,6 +26,64 @@ const BTN_SIZE = 54;
 const EDGE_MARGIN = 16;
 const TAB_BAR_HEIGHT = 80;
 
+// ─── Time-based color theme ───────────────────────────────────────────────────
+
+type TimeTheme = {
+  gradientColors: [string, string];
+  glowColor: string;
+  iconName: keyof typeof Ionicons.glyphMap;
+  label: string;
+};
+
+function getTimeTheme(hasUrgent: boolean): TimeTheme {
+  if (hasUrgent) {
+    return {
+      gradientColors: ["#F59E0B", "#EF4444"],
+      glowColor: "rgba(245,158,11,0.5)",
+      iconName: "alert-circle",
+      label: "urgent",
+    };
+  }
+
+  const h = new Date().getHours();
+
+  // Dawn 5–7
+  if (h >= 5 && h < 7) return {
+    gradientColors: ["#F97316", "#FB923C"],
+    glowColor: "rgba(249,115,22,0.45)",
+    iconName: "partly-sunny-outline",
+    label: "dawn",
+  };
+  // Morning 7–12
+  if (h >= 7 && h < 12) return {
+    gradientColors: ["#F59E0B", "#FBBF24"],
+    glowColor: "rgba(245,158,11,0.45)",
+    iconName: "sunny",
+    label: "morning",
+  };
+  // Afternoon 12–17
+  if (h >= 12 && h < 17) return {
+    gradientColors: ["#F97316", "#EAB308"],
+    glowColor: "rgba(249,115,22,0.4)",
+    iconName: "sunny-outline",
+    label: "afternoon",
+  };
+  // Evening 17–20
+  if (h >= 17 && h < 20) return {
+    gradientColors: ["#F97316", "#DC2626"],
+    glowColor: "rgba(249,115,22,0.4)",
+    iconName: "partly-sunny-outline",
+    label: "evening",
+  };
+  // Night 20–5
+  return {
+    gradientColors: ["#1D4ED8", "#0F172A"],
+    glowColor: "rgba(29,78,216,0.5)",
+    iconName: "moon",
+    label: "night",
+  };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDaysSince(dateStr?: string): number {
@@ -33,9 +93,10 @@ function getDaysSince(dateStr?: string): number {
 
 function getGreeting(): string {
   const h = new Date().getHours();
-  if (h < 12) return "Good Morning";
-  if (h < 17) return "Good Afternoon";
-  return "Good Evening";
+  if (h >= 5 && h < 12) return "Good Morning";
+  if (h >= 12 && h < 17) return "Good Afternoon";
+  if (h >= 17 && h < 21) return "Good Evening";
+  return "Working Late";
 }
 
 function getTodayLabel(): string {
@@ -120,7 +181,7 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
       icon: "flash-outline",
       color: "#F59E0B",
       bg: "rgba(245,158,11,0.15)",
-      text: `${credits} credits remaining — running low. Consider upgrading.`,
+      text: `${credits} credits remaining. Consider upgrading.`,
       priority: 1,
     });
   }
@@ -168,6 +229,7 @@ export function DailyBriefing({ files, credits, userName }: Props) {
 
   const lines = buildBriefingLines(files, credits);
   const hasUrgent = lines.some((l) => l.priority === 0 || l.priority === 2);
+  const theme = getTimeTheme(hasUrgent);
 
   return (
     <>
@@ -177,6 +239,7 @@ export function DailyBriefing({ files, credits, userName }: Props) {
           setModalVisible(true);
         }}
         hasUrgent={hasUrgent}
+        theme={theme}
         bottomBound={insets.bottom + TAB_BAR_HEIGHT}
       />
       <BriefingModal
@@ -189,84 +252,189 @@ export function DailyBriefing({ files, credits, userName }: Props) {
         userName={userName}
         credits={credits}
         totalFiles={files.length}
+        theme={theme}
       />
     </>
   );
 }
 
 // ─── Draggable Button ─────────────────────────────────────────────────────────
-// KEY FIX: position uses useNativeDriver: false only
-// scale/opacity/pulse use useNativeDriver: true on SEPARATE Animated.Values
 
 function DraggableButton({
   onPress,
   hasUrgent,
+  theme,
   bottomBound,
 }: {
   onPress: () => void;
   hasUrgent: boolean;
+  theme: TimeTheme;
   bottomBound: number;
 }) {
   const initX = SW - BTN_SIZE - EDGE_MARGIN;
   const initY = SH - bottomBound - BTN_SIZE - EDGE_MARGIN;
 
-  // NON-NATIVE: position (layout driven, cannot use native driver)
+  // NON-NATIVE: position
   const posX = useRef(new Animated.Value(initX)).current;
   const posY = useRef(new Animated.Value(initY)).current;
 
-  // NATIVE: visual-only animations (scale, opacity, pulse, glow)
+  // NATIVE: visuals only
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current; // subtle icon wobble on grab
   const trailAnim = useRef(new Animated.Value(0)).current;
 
-  // Track current position in a plain ref (not animated)
   const currentPos = useRef({ x: initX, y: initY });
   const dragStartTime = useRef(0);
   const dragDistance = useRef(0);
-  const isDragging = useRef(false);
 
-  // Urgent pulse — NATIVE driver ✅
+  // Idle breathe — very subtle, iOS-like
+  useEffect(() => {
+    if (!hasUrgent) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.04,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1.0,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.6,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.1,
+            duration: 2200,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, []);
+
+  // Urgent pulse — faster, more intense
   useEffect(() => {
     if (hasUrgent) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.1, duration: 800, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1.0, duration: 800, useNativeDriver: true }),
-        ])
-      ).start();
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-          Animated.timing(glowAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
-      pulseAnim.setValue(1);
-      glowAnim.setValue(0);
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.12,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1.0,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.25,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
     }
   }, [hasUrgent]);
 
-  const snapToEdge = (x: number, y: number) => {
-    const snapX = x + BTN_SIZE / 2 < SW / 2 ? EDGE_MARGIN : SW - BTN_SIZE - EDGE_MARGIN;
+  const snapToEdge = (x: number, y: number, velocityX = 0) => {
+    // Use velocity to determine snap side if near center
+    let snapX: number;
+    const center = x + BTN_SIZE / 2;
+    if (Math.abs(center - SW / 2) < 60) {
+      // Near center — use velocity to decide
+      snapX = velocityX >= 0
+        ? SW - BTN_SIZE - EDGE_MARGIN
+        : EDGE_MARGIN;
+    } else {
+      snapX = center < SW / 2 ? EDGE_MARGIN : SW - BTN_SIZE - EDGE_MARGIN;
+    }
+
     const minY = 80;
     const maxY = SH - bottomBound - BTN_SIZE - EDGE_MARGIN;
     const clampedY = Math.max(minY, Math.min(maxY, y));
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // NON-NATIVE: position snap
+    // Smooth iOS-style spring snap
     Animated.parallel([
-      Animated.spring(posX, { toValue: snapX, tension: 120, friction: 8, useNativeDriver: false }),
-      Animated.spring(posY, { toValue: clampedY, tension: 120, friction: 8, useNativeDriver: false }),
+      Animated.spring(posX, {
+        toValue: snapX,
+        tension: 180,
+        friction: 14,
+        useNativeDriver: false,
+      }),
+      Animated.spring(posY, {
+        toValue: clampedY,
+        tension: 180,
+        friction: 14,
+        useNativeDriver: false,
+      }),
     ]).start();
 
-    // NATIVE: scale reset
-    Animated.spring(scaleAnim, { toValue: 1, tension: 120, friction: 8, useNativeDriver: true }).start();
-    Animated.timing(opacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    // Scale bounce back
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      tension: 200,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(opacityAnim, {
+      toValue: 1,
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+
+    // Snap wobble
+    Animated.sequence([
+      Animated.timing(rotateAnim, {
+        toValue: snapX === EDGE_MARGIN ? -1 : 1,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.spring(rotateAnim, {
+        toValue: 0,
+        tension: 200,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     currentPos.current = { x: snapX, y: clampedY };
   };
@@ -275,27 +443,58 @@ function DraggableButton({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
+        Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
 
       onPanResponderGrant: () => {
-        isDragging.current = false;
         dragStartTime.current = Date.now();
         dragDistance.current = 0;
 
-        // NATIVE: grab feedback
-        Animated.spring(scaleAnim, { toValue: 1.15, tension: 200, friction: 6, useNativeDriver: true }).start();
-        Animated.timing(opacityAnim, { toValue: 0.85, duration: 100, useNativeDriver: true }).start();
+        // iOS press-down: scale up + slight opacity
+        Animated.spring(scaleAnim, {
+          toValue: 1.18,
+          tension: 280,
+          friction: 7,
+          useNativeDriver: true,
+        }).start();
 
-        // Trail ripple — NATIVE
+        Animated.timing(opacityAnim, {
+          toValue: 0.88,
+          duration: 80,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+
+        // Grab wobble
+        Animated.sequence([
+          Animated.timing(rotateAnim, {
+            toValue: 0.8,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotateAnim, {
+            toValue: -0.8,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotateAnim, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]).start();
+
+        // Trail burst
         trailAnim.setValue(0);
-        Animated.timing(trailAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+        Animated.timing(trailAnim, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
       },
 
       onPanResponderMove: (_, g) => {
-        isDragging.current = true;
         dragDistance.current = Math.sqrt(g.dx * g.dx + g.dy * g.dy);
-
-        // NON-NATIVE: move position
         posX.setValue(currentPos.current.x + g.dx);
         posY.setValue(currentPos.current.y + g.dy);
       },
@@ -304,91 +503,145 @@ function DraggableButton({
         const elapsed = Date.now() - dragStartTime.current;
         const moved = dragDistance.current;
 
-        if (elapsed < 250 && moved < 10) {
-          // It's a tap — reset visuals and fire onPress
-          Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 6, useNativeDriver: true }).start();
-          Animated.timing(opacityAnim, { toValue: 1, duration: 100, useNativeDriver: true }).start();
+        if (elapsed < 200 && moved < 8) {
+          // Tap: quick spring back + fire
+          Animated.spring(scaleAnim, {
+            toValue: 0.94,
+            tension: 400,
+            friction: 6,
+            useNativeDriver: true,
+          }).start(() => {
+            Animated.spring(scaleAnim, {
+              toValue: 1,
+              tension: 300,
+              friction: 8,
+              useNativeDriver: true,
+            }).start();
+          });
+
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+          }).start();
+
           onPress();
           return;
         }
 
-        // It's a drag — snap to edge
-        const newX = currentPos.current.x + g.dx;
-        const newY = currentPos.current.y + g.dy;
-        snapToEdge(newX, newY);
+        // Drag release: snap with velocity
+        snapToEdge(
+          currentPos.current.x + g.dx,
+          currentPos.current.y + g.dy,
+          g.vx
+        );
       },
 
       onPanResponderTerminate: (_, g) => {
-        const newX = currentPos.current.x + g.dx;
-        const newY = currentPos.current.y + g.dy;
-        snapToEdge(newX, newY);
+        snapToEdge(
+          currentPos.current.x + (g.dx || 0),
+          currentPos.current.y + (g.dy || 0)
+        );
       },
     })
   ).current;
 
   const glowOpacity = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.15, 0.55],
+    outputRange: [0, 1],
+  });
+
+  const glowScale = pulseAnim.interpolate({
+    inputRange: [1, 1.12],
+    outputRange: [1, 1.3],
   });
 
   const trailScale = trailAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 2.4],
+    outputRange: [0.8, 2.8],
   });
   const trailOpacity = trailAnim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0.45, 0.15, 0],
+    inputRange: [0, 0.3, 1],
+    outputRange: [0.5, 0.2, 0],
+  });
+
+  const rotate = rotateAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ["-8deg", "0deg", "8deg"],
   });
 
   return (
-    // Outer view: NON-NATIVE (handles position via left/top)
     <Animated.View
       style={[fabStyles.positionLayer, { left: posX, top: posY }]}
       {...panResponder.panHandlers}
     >
-      {/* Trail — NATIVE (scale + opacity only) */}
+      {/* Outer glow halo — expands with pulse */}
       <Animated.View
-        style={[
-          fabStyles.trail,
-          { transform: [{ scale: trailScale }], opacity: trailOpacity },
-        ]}
         pointerEvents="none"
+        style={[
+          fabStyles.glowHalo,
+          {
+            backgroundColor: theme.glowColor,
+            opacity: glowOpacity,
+            transform: [{ scale: glowScale }],
+          },
+        ]}
       />
 
-      {/* Glow ring — NATIVE */}
+      {/* Drag trail burst */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          fabStyles.trail,
+          {
+            backgroundColor: theme.glowColor,
+            transform: [{ scale: trailScale }],
+            opacity: trailOpacity,
+          },
+        ]}
+      />
+
+      {/* Inner glow ring (urgent only) */}
       {hasUrgent && (
         <Animated.View
-          style={[fabStyles.glowRing, { opacity: glowOpacity }]}
           pointerEvents="none"
+          style={[
+            fabStyles.urgentRing,
+            { opacity: glowOpacity },
+          ]}
         />
       )}
 
-      {/* Button — NATIVE (scale + opacity) */}
+      {/* Button face — scale + rotate (NATIVE) */}
       <Animated.View
         style={[
           fabStyles.btnWrapper,
           {
-            transform: [{ scale: Animated.multiply(scaleAnim, pulseAnim) }],
+            transform: [
+              { scale: Animated.multiply(scaleAnim, pulseAnim) },
+              { rotate },
+            ],
             opacity: opacityAnim,
           },
         ]}
       >
         <LinearGradient
-          colors={hasUrgent ? ["#F59E0B", "#EF4444"] : ["#1D4ED8", "#0F2D6B"]}
+          colors={theme.gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={fabStyles.gradient}
         >
-          <View style={fabStyles.shine} />
-          <Ionicons
-            name={hasUrgent ? "alert-circle" : "sunny"}
-            size={22}
-            color="#FFFFFF"
-          />
+          {/* Top shine gloss */}
+          <View style={fabStyles.shineTop} />
+          {/* Bottom reflection */}
+          <View style={fabStyles.shineBottom} />
+
+          <Ionicons name={theme.iconName} size={22} color="#FFFFFF" />
         </LinearGradient>
 
         {hasUrgent && <View style={fabStyles.dot} />}
 
+        {/* Drag hint dots */}
         <View style={fabStyles.dragDots}>
           {[0, 1, 2].map((i) => (
             <View key={i} style={fabStyles.dragDot} />
@@ -408,6 +661,7 @@ function BriefingModal({
   userName,
   credits,
   totalFiles,
+  theme,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -415,23 +669,49 @@ function BriefingModal({
   userName?: string;
   credits: number;
   totalFiles: number;
+  theme: TimeTheme;
 }) {
-  // NATIVE: slide + backdrop (translateY and opacity only)
   const slideAnim = useRef(new Animated.Value(SH)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.96)).current;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
-        Animated.timing(backdropAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 70,
+          friction: 12,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 10,
+          useNativeDriver: true,
+        }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, { toValue: SH, duration: 300, useNativeDriver: true }),
-        Animated.timing(backdropAnim, { toValue: 0, duration: 260, useNativeDriver: true }),
+        Animated.timing(slideAnim, {
+          toValue: SH,
+          duration: 280,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropAnim, {
+          toValue: 0,
+          duration: 240,
+          useNativeDriver: true,
+        }),
       ]).start(() => setMounted(false));
     }
   }, [visible]);
@@ -443,12 +723,22 @@ function BriefingModal({
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
+      {/* Backdrop */}
       <Animated.View style={[mStyles.backdrop, { opacity: backdropAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
+      {/* Card */}
       <Animated.View
-        style={[mStyles.cardWrapper, { transform: [{ translateY: slideAnim }] }]}
+        style={[
+          mStyles.cardWrapper,
+          {
+            transform: [
+              { translateY: slideAnim },
+              { scale: scaleAnim },
+            ],
+          },
+        ]}
       >
         <LinearGradient
           colors={["#080F1E", "#0C1E3E", "#080F1E"]}
@@ -456,16 +746,22 @@ function BriefingModal({
           end={{ x: 1, y: 1 }}
           style={mStyles.card}
         >
-          <View style={mStyles.shimmerLine} />
+          {/* Top shimmer accent — uses theme color */}
+          <View style={[mStyles.shimmerLine, { backgroundColor: theme.glowColor }]} />
+
+          {/* Handle */}
           <View style={mStyles.handle} />
 
+          {/* Header */}
           <View style={mStyles.header}>
             <View style={mStyles.headerLeft}>
               <LinearGradient
-                colors={["#F59E0B", "#F97316"]}
+                colors={theme.gradientColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={mStyles.sunIcon}
               >
-                <Ionicons name="sunny" size={18} color="#fff" />
+                <Ionicons name={theme.iconName} size={18} color="#fff" />
               </LinearGradient>
               <View style={{ flex: 1 }}>
                 <Text style={mStyles.greeting}>
@@ -479,6 +775,7 @@ function BriefingModal({
             </Pressable>
           </View>
 
+          {/* Stats */}
           <View style={mStyles.statsRow}>
             <StatPill label="Claims" value={totalFiles} icon="layers-outline" color="#3B82F6" />
             <StatPill label="Credits" value={credits} icon="flash-outline" color="#F59E0B" />
@@ -509,8 +806,10 @@ function BriefingModal({
 // ─── Stat Pill ────────────────────────────────────────────────────────────────
 
 function StatPill({ label, value, icon, color }: {
-  label: string; value: number;
-  icon: keyof typeof Ionicons.glyphMap; color: string;
+  label: string;
+  value: number;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
 }) {
   return (
     <View style={[spStyles.pill, { borderColor: `${color}28` }]}>
@@ -527,18 +826,33 @@ function StatPill({ label, value, icon, color }: {
 
 function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(14)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 380, delay: 180 + index * 85, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 9, delay: 180 + index * 85, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: 160 + index * 80,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 90,
+        friction: 10,
+        delay: 160 + index * 80,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
   return (
     <Animated.View
-      style={[rStyles.row, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+      style={[
+        rStyles.row,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+      ]}
     >
       <View style={[rStyles.iconWrap, { backgroundColor: line.bg }]}>
         <Ionicons name={line.icon} size={15} color={line.color} />
@@ -551,30 +865,38 @@ function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const fabStyles = StyleSheet.create({
-  // NON-NATIVE layer — handles position
   positionLayer: {
     position: "absolute",
     width: BTN_SIZE,
     height: BTN_SIZE,
     zIndex: 9999,
   },
+  // Large soft outer glow — breathes with pulse
+  glowHalo: {
+    position: "absolute",
+    width: BTN_SIZE + 32,
+    height: BTN_SIZE + 32,
+    borderRadius: (BTN_SIZE + 32) / 2,
+    top: -16,
+    left: -16,
+  },
   trail: {
     position: "absolute",
     width: BTN_SIZE,
     height: BTN_SIZE,
     borderRadius: BTN_SIZE / 2,
-    backgroundColor: "rgba(59,130,246,0.3)",
   },
-  glowRing: {
+  urgentRing: {
     position: "absolute",
-    width: BTN_SIZE + 20,
-    height: BTN_SIZE + 20,
-    borderRadius: (BTN_SIZE + 20) / 2,
-    top: -10,
-    left: -10,
-    backgroundColor: "rgba(245,158,11,0.35)",
+    width: BTN_SIZE + 14,
+    height: BTN_SIZE + 14,
+    borderRadius: (BTN_SIZE + 14) / 2,
+    top: -7,
+    left: -7,
+    borderWidth: 1.5,
+    borderColor: "rgba(245,158,11,0.6)",
+    backgroundColor: "transparent",
   },
-  // NATIVE layer — handles scale + opacity
   btnWrapper: {
     position: "absolute",
     width: BTN_SIZE,
@@ -586,22 +908,32 @@ const fabStyles = StyleSheet.create({
     borderRadius: BTN_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 14,
-    shadowColor: "#1D4ED8",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
+    elevation: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 16,
     overflow: "hidden",
   },
-  shine: {
+  shineTop: {
     position: "absolute",
     top: 5,
     left: 10,
-    width: BTN_SIZE * 0.5,
+    width: BTN_SIZE * 0.52,
     height: BTN_SIZE * 0.22,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    transform: [{ rotate: "-20deg" }],
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    transform: [{ rotate: "-22deg" }],
+  },
+  shineBottom: {
+    position: "absolute",
+    bottom: 7,
+    right: 8,
+    width: BTN_SIZE * 0.25,
+    height: BTN_SIZE * 0.12,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    transform: [{ rotate: "-22deg" }],
   },
   dot: {
     position: "absolute",
@@ -616,7 +948,7 @@ const fabStyles = StyleSheet.create({
   },
   dragDots: {
     position: "absolute",
-    bottom: 7,
+    bottom: 6,
     left: 0,
     right: 0,
     flexDirection: "row",
@@ -627,14 +959,14 @@ const fabStyles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "rgba(255,255,255,0.3)",
   },
 });
 
 const mStyles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.62)",
     zIndex: 998,
   },
   cardWrapper: {
@@ -655,16 +987,16 @@ const mStyles = StyleSheet.create({
   card: {
     paddingTop: 12,
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingBottom: 44,
   },
   shimmerLine: {
     position: "absolute",
     top: 0,
-    left: "15%",
-    right: "15%",
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    left: "20%",
+    right: "20%",
+    height: 1.5,
     borderRadius: 1,
+    opacity: 0.5,
   },
   handle: {
     width: 42,
@@ -687,8 +1019,8 @@ const mStyles = StyleSheet.create({
     flex: 1,
   },
   sunIcon: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",

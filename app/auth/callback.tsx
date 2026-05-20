@@ -37,7 +37,6 @@ export default function CallbackScreen() {
                         router.replace("/login");
                     }, 1800);
                 }
-
             } catch (error) {
 
                 console.error(
