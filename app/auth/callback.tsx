@@ -38,7 +38,6 @@ export default function CallbackScreen() {
                     }, 1800);
                 }
             } catch (error) {
-
                 console.error(
                     "Callback session error:",
                     error
