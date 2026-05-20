@@ -1,8 +1,8 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -19,34 +19,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-import { useAuth } from "@/providers/auth-provider";
+import { supabase } from "@/lib/supabase";
 import { StatusBar } from "expo-status-bar";
 
 export default function ResetPasswordScreen() {
-  const { resetPassword } = useAuth();
   const { width, height } = useWindowDimensions();
   const isTablet = width > 768;
-
-  const params = useLocalSearchParams<{
-    email?: string;
-    otp?: string;
-    verified?: string;
-  }>();
-
-  const email = useMemo(() => {
-    if (Array.isArray(params.email)) return (params.email[0] ?? "").toLowerCase();
-    return (params.email ?? "").toLowerCase();
-  }, [params.email]);
-
-  const otp = useMemo(() => {
-    if (Array.isArray(params.otp)) return params.otp[0] ?? "";
-    return params.otp ?? "";
-  }, [params.otp]);
-
-  const verified = useMemo(() => {
-    if (Array.isArray(params.verified)) return params.verified[0] === "1";
-    return params.verified === "1";
-  }, [params.verified]);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,51 +46,60 @@ export default function ResetPasswordScreen() {
     return null;
   };
 
-  async function handleResetPassword() {
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedOtp = otp.trim();
+  useEffect(() => {
+    checkRecoverySession();
+  }, []);
 
-    if (!verified || !normalizedEmail || !normalizedOtp) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      toast.error("Session Expired", {
-        description: "Please verify OTP again before resetting your password.",
-      });
-      router.replace({
-        pathname: "/verify-otp",
-        params: normalizedEmail ? { email: normalizedEmail } : undefined,
-      });
-      return;
+  async function checkRecoverySession() {
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session) {
+      toast.error("Invalid or expired reset link.");
+      router.replace("/forgot-password");
     }
-
+  }
+  async function handleResetPassword() {
     const passwordError = validatePassword(newPassword);
     if (passwordError) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      toast.error("Weak Password", { description: passwordError });
+      toast.error("Weak Password", {
+        description: passwordError,
+      });
       return;
     }
-
     if (newPassword !== confirmPassword) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      toast.error("Password Mismatch", { description: "Passwords do not match." });
+      toast.error("Password Mismatch", {
+        description:
+          "Passwords do not match.",
+      });
       return;
     }
-
     try {
       setLoading(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      await toast.promise(
-        resetPassword(normalizedEmail, normalizedOtp, newPassword),
-        {
-          loading: "Updating your password...",
-          success: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setTimeout(() => router.replace("/login"), 1500);
-            return "Password updated! Redirecting...";
-          },
-          error: (err) => err instanceof Error ? err.message : "Unable to reset password",
-        }
+      Haptics.impactAsync(
+        Haptics.ImpactFeedbackStyle.Medium
       );
+      const { error } =
+        await supabase.auth.updateUser({
+          password: newPassword,
+        });
+      if (error) {
+        throw error;
+      }
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      );
+      toast.success(
+        "Password updated successfully."
+      );
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1500);
+    } catch (error: any) {
+      toast.error("Reset Failed", {
+        description:
+          error.message ||
+          "Unable to update password.",
+      });
     } finally {
       setLoading(false);
     }
@@ -149,7 +136,7 @@ export default function ResetPasswordScreen() {
           {/* ══ MAIN CARD ════════════════════════════════════════════ */}
           <View style={[styles.body, { marginTop: -40 }]}>
             <View style={[styles.card, isTablet && { maxWidth: 450, alignSelf: 'center' }]}>
-              
+
               <View style={styles.iconCircle}>
                 <MaterialCommunityIcons name="lock-reset" size={32} color="#1e40af" />
               </View>
@@ -217,10 +204,9 @@ export default function ResetPasswordScreen() {
                   )}
                 </LinearGradient>
               </TouchableOpacity>
-
               <View style={styles.footer}>
-                <TouchableOpacity onPress={() => router.replace({ pathname: "/verify-otp", params: email ? { email } : undefined })}>
-                  <Text style={styles.backText}>Return to Verification</Text>
+                <TouchableOpacity onPress={() => router.replace("/login")}>
+                  <Text style={styles.backText}>Back to Login</Text>
                 </TouchableOpacity>
               </View>
 

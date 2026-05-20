@@ -37,29 +37,41 @@ export default function ForgotPasswordScreen() {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning
+      );
+
       toast.error("Email Required", {
-        description: "Please enter your registered email address.",
+        description:
+          "Please enter your registered email address.",
       });
+
       return;
     }
 
     try {
       setLoading(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      Haptics.impactAsync(
+        Haptics.ImpactFeedbackStyle.Medium
+      );
+
       await sendPasswordReset(normalizedEmail);
-      
-      toast.success("OTP Sent", {
-        description: "Check your inbox for the recovery code.",
+
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      );
+
+      toast.success("Reset Link Sent", {
+        description:
+          "Check your email for the password reset link.",
       });
 
-      router.push({
-        pathname: "/verify-otp",
-        params: { email: normalizedEmail },
-      });
-    } catch {
-      toast.error("Network Error", {
-        description: "Unable to send OTP. Please try again later.",
+    } catch (error: any) {
+      toast.error("Reset Failed", {
+        description:
+          error?.message ||
+          "Unable to send reset email.",
       });
     } finally {
       setLoading(false);
@@ -85,10 +97,10 @@ export default function ForgotPasswordScreen() {
               colors={["#276bbd", "#1e40af", "#172554"]}
               style={StyleSheet.absoluteFill}
             />
-            
+
             {/* Decorative Background Elements */}
             <View style={[styles.bubble, { top: -20, left: -20, width: 150, height: 150 }]} />
-            
+
             <SafeAreaView style={styles.headerContent}>
               <View style={styles.logoContainer}>
                 <Image
@@ -101,14 +113,14 @@ export default function ForgotPasswordScreen() {
                 />
               </View>
               <Text style={styles.arcTitle}>Recovery</Text>
-              <Text style={styles.arcSub}>Reset your password securely</Text>
+              <Text style={styles.arcSub}>Recover your password securely</Text>
             </SafeAreaView>
           </View>
 
           {/* ══ MAIN CARD ════════════════════════════════════════════ */}
-          <View style={[styles.body, { marginTop: -50 }]}>
+          <View style={[styles.body, { marginTop: -30 }]}>
             <View style={[styles.card, isTablet && { maxWidth: 450, alignSelf: 'center' }]}>
-              
+
               <View style={styles.iconCircle}>
                 <MaterialCommunityIcons
                   name="shield-refresh-outline"
@@ -120,7 +132,7 @@ export default function ForgotPasswordScreen() {
               <View style={styles.textGroup}>
                 <Text style={styles.title}>Forgot Password?</Text>
                 <Text style={styles.subtitle}>
-                  Enter your email and we&apos;ll send you an OTP to reset your account access.
+                  Enter your registered email and we&apos;ll send you a secure password reset link.
                 </Text>
               </View>
 
@@ -162,7 +174,7 @@ export default function ForgotPasswordScreen() {
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
                     <>
-                      <Text style={styles.buttonText}>Send OTP</Text>
+                      <Text style={styles.buttonText}>Send Reset Link</Text>
                       <View style={styles.btnArrow}>
                         <Feather name="arrow-right" size={16} color="#1e40af" />
                       </View>
@@ -172,7 +184,7 @@ export default function ForgotPasswordScreen() {
               </TouchableOpacity>
 
               <View style={styles.footer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => router.replace("/login")}
                   style={styles.backButton}
                 >
@@ -200,14 +212,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     justifyContent: 'center',
   },
-  bubble: { 
-    position: "absolute", 
-    borderRadius: 999, 
-    backgroundColor: "rgba(255,255,255,0.05)" 
+  bubble: {
+    position: "absolute",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)"
   },
-  headerContent: { 
-    paddingHorizontal: 30, 
-    alignItems: 'center' 
+  headerContent: {
+    paddingHorizontal: 30,
+    alignItems: 'center'
   },
   logoContainer: {
     marginBottom: 20,
@@ -217,17 +229,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  arcTitle: { 
-    fontSize: 28, 
-    fontWeight: "800", 
-    color: "#fff", 
-    letterSpacing: -0.5 
+  arcTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.5
   },
-  arcSub: { 
-    fontSize: 14, 
-    color: "rgba(255,255,255,0.6)", 
+  arcSub: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.6)",
     textAlign: 'center',
-    marginTop: 4 
+    marginTop: 4
   },
 
   // Body Section
