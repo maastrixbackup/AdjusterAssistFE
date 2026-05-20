@@ -313,7 +313,7 @@ function DraggableButton({
       Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
-            toValue: 0.6,
+            toValue: 0.5,
             duration: 2200,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
