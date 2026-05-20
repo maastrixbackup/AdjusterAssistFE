@@ -1,26 +1,30 @@
 // components/DailyBriefing.tsx
-// Floating accessibility button + slide-up briefing card
-// Usage: <DailyBriefing files={files} credits={credits} userName={email} />
+// Draggable floating button + slide-up briefing card
+// Fixed: no mixed useNativeDriver errors
 
-import { ClaimFile } from "@/lib/api"; // adjust if needed
+import { ClaimFile } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Dimensions,
+  Modal,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SW, height: SH } = Dimensions.get("window");
+const BTN_SIZE = 54;
+const EDGE_MARGIN = 16;
+const TAB_BAR_HEIGHT = 80;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDaysSince(dateStr?: string): number {
   if (!dateStr) return 0;
@@ -54,11 +58,9 @@ interface BriefingLine {
 
 function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[] {
   const lines: BriefingLine[] = [];
-
   const activeFiles = files.filter((f) => f.status?.toLowerCase() === "active");
   const draftFiles = files.filter((f) => f.status?.toLowerCase() === "draft");
 
-  // Active claims count
   if (activeFiles.length > 0) {
     lines.push({
       icon: "briefcase-outline",
@@ -72,7 +74,6 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
     });
   }
 
-  // Stale claims — not updated in 3+ days
   const stale = activeFiles
     .filter((f) => getDaysSince(f.last_activity_at || f.updated_at) >= 3)
     .sort(
@@ -93,7 +94,6 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
     });
   }
 
-  // Draft workspaces
   if (draftFiles.length > 0) {
     lines.push({
       icon: "document-text-outline",
@@ -107,7 +107,6 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
     });
   }
 
-  // Low credits
   if (credits <= 100) {
     lines.push({
       icon: "flash",
@@ -126,7 +125,6 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
     });
   }
 
-  // No activity today
   const touchedToday = files.filter(
     (f) => getDaysSince(f.last_activity_at || f.updated_at) === 0
   );
@@ -140,7 +138,6 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
     });
   }
 
-  // All good
   if (lines.length === 0) {
     lines.push({
       icon: "checkmark-circle-outline",
@@ -154,7 +151,7 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
   return lines.sort((a, b) => a.priority - b.priority);
 }
 
-// ─── Floating Button ──────────────────────────────────────────────────────────
+// ─── Main Export ──────────────────────────────────────────────────────────────
 
 interface Props {
   files: ClaimFile[];
@@ -164,38 +161,30 @@ interface Props {
 
 export function DailyBriefing({ files, credits, userName }: Props) {
   const insets = useSafeAreaInsets();
-  const [visible, setVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  // Only show button if user has files (drafts/active)
   const hasFiles = files && files.length > 0;
   if (!hasFiles) return null;
 
   const lines = buildBriefingLines(files, credits);
   const hasUrgent = lines.some((l) => l.priority === 0 || l.priority === 2);
 
-  const openCard = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setVisible(true);
-  };
-
-  const closeCard = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setVisible(false);
-  };
-
   return (
     <>
-      {/* Floating Button */}
-      <FloatingButton
-        onPress={openCard}
+      <DraggableButton
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setModalVisible(true);
+        }}
         hasUrgent={hasUrgent}
-        bottomOffset={insets.bottom + 90} // above tab bar
+        bottomBound={insets.bottom + TAB_BAR_HEIGHT}
       />
-
-      {/* Briefing Card Modal */}
       <BriefingModal
-        visible={visible}
-        onClose={closeCard}
+        visible={modalVisible}
+        onClose={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setModalVisible(false);
+        }}
         lines={lines}
         userName={userName}
         credits={credits}
@@ -205,79 +194,183 @@ export function DailyBriefing({ files, credits, userName }: Props) {
   );
 }
 
-// ─── Floating Button ──────────────────────────────────────────────────────────
+// ─── Draggable Button ─────────────────────────────────────────────────────────
+// KEY FIX: position uses useNativeDriver: false only
+// scale/opacity/pulse use useNativeDriver: true on SEPARATE Animated.Values
 
-function FloatingButton({
+function DraggableButton({
   onPress,
   hasUrgent,
-  bottomOffset,
+  bottomBound,
 }: {
   onPress: () => void;
   hasUrgent: boolean;
-  bottomOffset: number;
+  bottomBound: number;
 }) {
+  const initX = SW - BTN_SIZE - EDGE_MARGIN;
+  const initY = SH - bottomBound - BTN_SIZE - EDGE_MARGIN;
+
+  // NON-NATIVE: position (layout driven, cannot use native driver)
+  const posX = useRef(new Animated.Value(initX)).current;
+  const posY = useRef(new Animated.Value(initY)).current;
+
+  // NATIVE: visual-only animations (scale, opacity, pulse, glow)
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const trailAnim = useRef(new Animated.Value(0)).current;
 
+  // Track current position in a plain ref (not animated)
+  const currentPos = useRef({ x: initX, y: initY });
+  const dragStartTime = useRef(0);
+  const dragDistance = useRef(0);
+  const isDragging = useRef(false);
+
+  // Urgent pulse — NATIVE driver ✅
   useEffect(() => {
     if (hasUrgent) {
-      // Pulse animation for urgent state
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.08,
-            duration: 900,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 900,
-            useNativeDriver: true,
-          }),
+          Animated.timing(pulseAnim, { toValue: 1.1, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.0, duration: 800, useNativeDriver: true }),
         ])
       ).start();
-
       Animated.loop(
         Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 900,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 900,
-            useNativeDriver: true,
-          }),
+          Animated.timing(glowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(glowAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
         ])
       ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      glowAnim.stopAnimation();
+      pulseAnim.setValue(1);
+      glowAnim.setValue(0);
     }
   }, [hasUrgent]);
 
+  const snapToEdge = (x: number, y: number) => {
+    const snapX = x + BTN_SIZE / 2 < SW / 2 ? EDGE_MARGIN : SW - BTN_SIZE - EDGE_MARGIN;
+    const minY = 80;
+    const maxY = SH - bottomBound - BTN_SIZE - EDGE_MARGIN;
+    const clampedY = Math.max(minY, Math.min(maxY, y));
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // NON-NATIVE: position snap
+    Animated.parallel([
+      Animated.spring(posX, { toValue: snapX, tension: 120, friction: 8, useNativeDriver: false }),
+      Animated.spring(posY, { toValue: clampedY, tension: 120, friction: 8, useNativeDriver: false }),
+    ]).start();
+
+    // NATIVE: scale reset
+    Animated.spring(scaleAnim, { toValue: 1, tension: 120, friction: 8, useNativeDriver: true }).start();
+    Animated.timing(opacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+
+    currentPos.current = { x: snapX, y: clampedY };
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
+
+      onPanResponderGrant: () => {
+        isDragging.current = false;
+        dragStartTime.current = Date.now();
+        dragDistance.current = 0;
+
+        // NATIVE: grab feedback
+        Animated.spring(scaleAnim, { toValue: 1.15, tension: 200, friction: 6, useNativeDriver: true }).start();
+        Animated.timing(opacityAnim, { toValue: 0.85, duration: 100, useNativeDriver: true }).start();
+
+        // Trail ripple — NATIVE
+        trailAnim.setValue(0);
+        Animated.timing(trailAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+      },
+
+      onPanResponderMove: (_, g) => {
+        isDragging.current = true;
+        dragDistance.current = Math.sqrt(g.dx * g.dx + g.dy * g.dy);
+
+        // NON-NATIVE: move position
+        posX.setValue(currentPos.current.x + g.dx);
+        posY.setValue(currentPos.current.y + g.dy);
+      },
+
+      onPanResponderRelease: (_, g) => {
+        const elapsed = Date.now() - dragStartTime.current;
+        const moved = dragDistance.current;
+
+        if (elapsed < 250 && moved < 10) {
+          // It's a tap — reset visuals and fire onPress
+          Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 6, useNativeDriver: true }).start();
+          Animated.timing(opacityAnim, { toValue: 1, duration: 100, useNativeDriver: true }).start();
+          onPress();
+          return;
+        }
+
+        // It's a drag — snap to edge
+        const newX = currentPos.current.x + g.dx;
+        const newY = currentPos.current.y + g.dy;
+        snapToEdge(newX, newY);
+      },
+
+      onPanResponderTerminate: (_, g) => {
+        const newX = currentPos.current.x + g.dx;
+        const newY = currentPos.current.y + g.dy;
+        snapToEdge(newX, newY);
+      },
+    })
+  ).current;
+
   const glowOpacity = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
+    outputRange: [0.15, 0.55],
+  });
+
+  const trailScale = trailAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.4],
+  });
+  const trailOpacity = trailAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0.45, 0.15, 0],
   });
 
   return (
+    // Outer view: NON-NATIVE (handles position via left/top)
     <Animated.View
-      style={[
-        fabStyles.container,
-        { bottom: bottomOffset, transform: [{ scale: pulseAnim }] },
-      ]}
+      style={[fabStyles.positionLayer, { left: posX, top: posY }]}
+      {...panResponder.panHandlers}
     >
-      {/* Glow ring for urgent */}
+      {/* Trail — NATIVE (scale + opacity only) */}
+      <Animated.View
+        style={[
+          fabStyles.trail,
+          { transform: [{ scale: trailScale }], opacity: trailOpacity },
+        ]}
+        pointerEvents="none"
+      />
+
+      {/* Glow ring — NATIVE */}
       {hasUrgent && (
         <Animated.View
           style={[fabStyles.glowRing, { opacity: glowOpacity }]}
+          pointerEvents="none"
         />
       )}
 
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          fabStyles.btn,
-          pressed && { transform: [{ scale: 0.93 }] },
+      {/* Button — NATIVE (scale + opacity) */}
+      <Animated.View
+        style={[
+          fabStyles.btnWrapper,
+          {
+            transform: [{ scale: Animated.multiply(scaleAnim, pulseAnim) }],
+            opacity: opacityAnim,
+          },
         ]}
       >
         <LinearGradient
@@ -286,6 +379,7 @@ function FloatingButton({
           end={{ x: 1, y: 1 }}
           style={fabStyles.gradient}
         >
+          <View style={fabStyles.shine} />
           <Ionicons
             name={hasUrgent ? "alert-circle" : "sunny"}
             size={22}
@@ -293,9 +387,14 @@ function FloatingButton({
           />
         </LinearGradient>
 
-        {/* Notification dot */}
         {hasUrgent && <View style={fabStyles.dot} />}
-      </Pressable>
+
+        <View style={fabStyles.dragDots}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={fabStyles.dragDot} />
+          ))}
+        </View>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -317,7 +416,8 @@ function BriefingModal({
   credits: number;
   totalFiles: number;
 }) {
-  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  // NATIVE: slide + backdrop (translateY and opacity only)
+  const slideAnim = useRef(new Animated.Value(SH)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
 
@@ -325,115 +425,79 @@ function BriefingModal({
     if (visible) {
       setMounted(true);
       Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 65,
-          friction: 11,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropAnim, {
-          toValue: 1,
-          duration: 280,
-          useNativeDriver: true,
-        }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
+        Animated.timing(backdropAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_HEIGHT,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropAnim, {
-          toValue: 0,
-          duration: 280,
-          useNativeDriver: true,
-        }),
+        Animated.timing(slideAnim, { toValue: SH, duration: 300, useNativeDriver: true }),
+        Animated.timing(backdropAnim, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]).start(() => setMounted(false));
     }
   }, [visible]);
 
   if (!mounted) return null;
 
-  const greeting = getGreeting();
-  const todayLabel = getTodayLabel();
   const firstName = userName?.split("@")[0] || "there";
-  // Capitalize first letter
-  const displayName =
-    firstName.charAt(0).toUpperCase() + firstName.slice(1);
+  const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
-      <Animated.View
-        style={[modalStyles.backdrop, { opacity: backdropAnim }]}
-      >
+      <Animated.View style={[mStyles.backdrop, { opacity: backdropAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Card */}
       <Animated.View
-        style={[
-          modalStyles.cardWrapper,
-          { transform: [{ translateY: slideAnim }] },
-        ]}
+        style={[mStyles.cardWrapper, { transform: [{ translateY: slideAnim }] }]}
       >
         <LinearGradient
-          colors={["#0A1628", "#0D2347", "#0A1628"]}
+          colors={["#080F1E", "#0C1E3E", "#080F1E"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={modalStyles.card}
+          style={mStyles.card}
         >
-          {/* Handle bar */}
-          <View style={modalStyles.handle} />
+          <View style={mStyles.shimmerLine} />
+          <View style={mStyles.handle} />
 
-          {/* Header */}
-          <View style={modalStyles.header}>
-            <View style={modalStyles.headerLeft}>
-              <View style={modalStyles.sunIconWrap}>
-                <LinearGradient
-                  colors={["#F59E0B", "#F97316"]}
-                  style={modalStyles.sunIconGrad}
-                >
-                  <Ionicons name="sunny" size={18} color="#fff" />
-                </LinearGradient>
-              </View>
-              <View>
-                <Text style={modalStyles.greeting}>
-                  {greeting}, {displayName}👋
+          <View style={mStyles.header}>
+            <View style={mStyles.headerLeft}>
+              <LinearGradient
+                colors={["#F59E0B", "#F97316"]}
+                style={mStyles.sunIcon}
+              >
+                <Ionicons name="sunny" size={18} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={mStyles.greeting}>
+                  {getGreeting()}, {displayName} 👋
                 </Text>
-                <Text style={modalStyles.dateLabel}>{todayLabel}</Text>
+                <Text style={mStyles.dateLabel}>{getTodayLabel()}</Text>
               </View>
             </View>
-            <Pressable onPress={onClose} style={modalStyles.closeBtn} hitSlop={12}>
-              <Ionicons name="close" size={16} color="rgba(255,255,255,0.5)" />
+            <Pressable onPress={onClose} style={mStyles.closeBtn} hitSlop={12}>
+              <Ionicons name="close" size={15} color="rgba(255,255,255,0.5)" />
             </Pressable>
           </View>
 
-          {/* Stats row */}
-          <View style={modalStyles.statsRow}>
+          <View style={mStyles.statsRow}>
             <StatPill label="Claims" value={totalFiles} icon="layers-outline" color="#3B82F6" />
             <StatPill label="Credits" value={credits} icon="flash-outline" color="#F59E0B" />
           </View>
 
-          {/* Divider */}
-          <View style={modalStyles.divider} />
+          <View style={mStyles.divider} />
 
-          {/* Briefing label */}
-          <Text style={modalStyles.sectionLabel}>TODAY&apos;S BRIEFING</Text>
+          <Text style={mStyles.sectionLabel}>TODAY&apos;S BRIEFING</Text>
 
-          {/* Lines */}
-          <View style={modalStyles.linesContainer}>
+          <View style={mStyles.linesContainer}>
             {lines.map((line, i) => (
               <BriefingRow key={i} line={line} index={i} />
             ))}
           </View>
 
-          {/* Footer */}
-          <View style={modalStyles.footer}>
-            <Ionicons name="shield-checkmark-outline" size={12} color="rgba(255,255,255,0.25)" />
-            <Text style={modalStyles.footerText}>
-              AdjusterAssist · Auto-generated from your workspace data
+          <View style={mStyles.footer}>
+            <Ionicons name="shield-checkmark-outline" size={11} color="rgba(255,255,255,0.2)" />
+            <Text style={mStyles.footerText}>
+              Auto-generated from your workspace data
             </Text>
           </View>
         </LinearGradient>
@@ -444,63 +508,42 @@ function BriefingModal({
 
 // ─── Stat Pill ────────────────────────────────────────────────────────────────
 
-function StatPill({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: number;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
+function StatPill({ label, value, icon, color }: {
+  label: string; value: number;
+  icon: keyof typeof Ionicons.glyphMap; color: string;
 }) {
   return (
-    <View style={[statStyles.pill, { borderColor: `${color}30` }]}>
-      <View style={[statStyles.iconWrap, { backgroundColor: `${color}20` }]}>
+    <View style={[spStyles.pill, { borderColor: `${color}28` }]}>
+      <View style={[spStyles.iconWrap, { backgroundColor: `${color}1A` }]}>
         <Ionicons name={icon} size={13} color={color} />
       </View>
-      <Text style={statStyles.value}>{value}</Text>
-      <Text style={statStyles.label}>{label}</Text>
+      <Text style={spStyles.value}>{value}</Text>
+      <Text style={spStyles.label}>{label}</Text>
     </View>
   );
 }
 
-// ─── Single briefing row with staggered animation ─────────────────────────────
+// ─── Briefing Row ─────────────────────────────────────────────────────────────
 
 function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(12)).current;
+  const slideAnim = useRef(new Animated.Value(14)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 380,
-        delay: 200 + index * 90,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 80,
-        friction: 10,
-        delay: 200 + index * 90,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 380, delay: 180 + index * 85, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 9, delay: 180 + index * 85, useNativeDriver: true }),
     ]).start();
   }, []);
 
   return (
     <Animated.View
-      style={[
-        rowStyles.row,
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-      ]}
+      style={[rStyles.row, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
     >
-      <View style={[rowStyles.iconWrap, { backgroundColor: line.bg }]}>
+      <View style={[rStyles.iconWrap, { backgroundColor: line.bg }]}>
         <Ionicons name={line.icon} size={15} color={line.color} />
       </View>
-      <Text style={rowStyles.text}>{line.text}</Text>
+      <Text style={rStyles.text}>{line.text}</Text>
     </Animated.View>
   );
 }
@@ -508,53 +551,90 @@ function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const fabStyles = StyleSheet.create({
-  container: {
+  // NON-NATIVE layer — handles position
+  positionLayer: {
     position: "absolute",
-    right: 20,
-    zIndex: 999,
-    alignItems: "center",
-    justifyContent: "center",
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    zIndex: 9999,
+  },
+  trail: {
+    position: "absolute",
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    borderRadius: BTN_SIZE / 2,
+    backgroundColor: "rgba(59,130,246,0.3)",
   },
   glowRing: {
     position: "absolute",
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(245,158,11,0.3)",
+    width: BTN_SIZE + 20,
+    height: BTN_SIZE + 20,
+    borderRadius: (BTN_SIZE + 20) / 2,
+    top: -10,
+    left: -10,
+    backgroundColor: "rgba(245,158,11,0.35)",
   },
-  btn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    overflow: "hidden",
-    elevation: 12,
-    shadowColor: "#1D4ED8",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
+  // NATIVE layer — handles scale + opacity
+  btnWrapper: {
+    position: "absolute",
+    width: BTN_SIZE,
+    height: BTN_SIZE,
   },
   gradient: {
-    flex: 1,
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    borderRadius: BTN_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
+    elevation: 14,
+    shadowColor: "#1D4ED8",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    overflow: "hidden",
+  },
+  shine: {
+    position: "absolute",
+    top: 5,
+    left: 10,
+    width: BTN_SIZE * 0.5,
+    height: BTN_SIZE * 0.22,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    transform: [{ rotate: "-20deg" }],
   },
   dot: {
     position: "absolute",
-    top: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    top: 1,
+    right: 1,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
     backgroundColor: "#EF4444",
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: "#fff",
+  },
+  dragDots: {
+    position: "absolute",
+    bottom: 7,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 3,
+  },
+  dragDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.35)",
   },
 });
 
-const modalStyles = StyleSheet.create({
+const mStyles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     zIndex: 998,
   },
   cardWrapper: {
@@ -563,27 +643,36 @@ const modalStyles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 999,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
     overflow: "hidden",
-    elevation: 24,
+    elevation: 30,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
   },
   card: {
-    paddingTop: 14,
+    paddingTop: 12,
     paddingHorizontal: 24,
-    paddingBottom: 36,
+    paddingBottom: 40,
+  },
+  shimmerLine: {
+    position: "absolute",
+    top: 0,
+    left: "15%",
+    right: "15%",
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 1,
   },
   handle: {
-    width: 40,
+    width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.13)",
     alignSelf: "center",
-    marginBottom: 22,
+    marginBottom: 24,
   },
   header: {
     flexDirection: "row",
@@ -597,16 +686,12 @@ const modalStyles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  sunIconWrap: {
+  sunIcon: {
+    width: 42,
+    height: 42,
     borderRadius: 14,
-    overflow: "hidden",
-  },
-  sunIconGrad: {
-    width: 40,
-    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
   },
   greeting: {
     fontSize: 18,
@@ -616,7 +701,7 @@ const modalStyles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(255,255,255,0.38)",
     marginTop: 3,
     fontWeight: "500",
   },
@@ -624,7 +709,7 @@ const modalStyles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.07)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -635,19 +720,19 @@ const modalStyles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     marginBottom: 18,
   },
   sectionLabel: {
     fontSize: 10,
     fontWeight: "800",
-    color: "rgba(255,255,255,0.3)",
-    letterSpacing: 1.5,
+    color: "rgba(255,255,255,0.28)",
+    letterSpacing: 1.8,
     marginBottom: 14,
   },
   linesContainer: {
-    gap: 12,
-    marginBottom: 24,
+    gap: 13,
+    marginBottom: 26,
   },
   footer: {
     flexDirection: "row",
@@ -657,18 +742,18 @@ const modalStyles = StyleSheet.create({
   },
   footerText: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.2)",
+    color: "rgba(255,255,255,0.18)",
     fontWeight: "500",
   },
 });
 
-const statStyles = StyleSheet.create({
+const spStyles = StyleSheet.create({
   pill: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -688,12 +773,12 @@ const statStyles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.45)",
+    color: "rgba(255,255,255,0.4)",
     fontWeight: "600",
   },
 });
 
-const rowStyles = StyleSheet.create({
+const rStyles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "flex-start",

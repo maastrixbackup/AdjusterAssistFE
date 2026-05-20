@@ -16,6 +16,9 @@ import {
   signupWithEmail,
   verifyPasswordResetOtp as verifyOtpForPasswordReset,
 } from "@/lib/services/authService";
+import { supabase } from "@/lib/supabase";
+import * as Linking from "expo-linking";
+import { router } from "expo-router";
 
 type AuthContextValue = {
   isHydrated: boolean;
@@ -23,7 +26,7 @@ type AuthContextValue = {
   token: string | null;
   email: string | null;
   login: (email: string, password: string) => Promise<void>;
-  hasSeenOnboarding: boolean;         
+  hasSeenOnboarding: boolean;
   completeOnboarding: () => Promise<void>;
   signup: (
     name: string,
@@ -148,7 +151,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [email, isHydrated, token, hasSeenOnboarding],
   );
+  useEffect(() => {
+    // Handle app opened from email link
+    const handleDeepLink = async (url: string | null) => {
+      if (!url) return;
 
+      const parsed = Linking.parse(url);
+
+      // Supabase sends tokens in hash fragment
+      const hash = url.split("#")[1];
+
+      if (!hash) return;
+
+      const params = new URLSearchParams(hash);
+
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      const type = params.get("type");
+
+      // PASSWORD RECOVERY FLOW
+      if (
+        type === "recovery" &&
+        access_token &&
+        refresh_token
+      ) {
+        const { error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+
+        if (!error) {
+          router.replace("/reset-password");
+        }
+      }
+    };
+
+    // App already opened from link
+    Linking.getInitialURL().then(handleDeepLink);
+
+    // App opened while running
+    const subscription = Linking.addEventListener(
+      "url",
+      ({ url }) => {
+        handleDeepLink(url);
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
