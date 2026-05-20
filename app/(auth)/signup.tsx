@@ -55,7 +55,7 @@ export default function SignupScreen() {
   };
 
   async function handleSignup() {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       toast.error("Required Fields", { description: "Please fill in all details." });
       return;
@@ -82,22 +82,30 @@ export default function SignupScreen() {
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    toast.promise(signup(name, email, role, password, acceptedPolicy), {
-      loading: "Creating account...",
-      success: () => {
-        Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success
-        );
-        setVerificationEmailSent(true);
-        setLoading(false);
-        return "Verification email sent. Please check your inbox.";
-      },
-      error: (err:any) => {
-        setLoading(false);
-        console.error("Signup error:", err);
-        return err.message.charAt(0).toUpperCase() + err.message.slice(1) || "An error occurred during signup.";
-      },
-    });
+    try {
+      await toast.promise(
+        signup(name, email, role, password, acceptedPolicy),
+        {
+          loading: "Creating account...",
+          success: () => {
+            Haptics.notificationAsync(
+              Haptics.NotificationFeedbackType.Success
+            );
+            setVerificationEmailSent(true);
+            return "Verification email sent. Please check your inbox.";
+          },
+          error: (err: any) => {
+            console.error("Signup error:", err);
+            return (
+              err?.message ||
+              "An error occurred during signup."
+            );
+          },
+        }
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   const logoStyle = {
@@ -306,15 +314,6 @@ export default function SignupScreen() {
                       </Text>
                     </Text>
 
-                    <Pressable
-                      style={styles.verifyLoginButton}
-                      onPress={() => router.replace("/login")}
-                    >
-                      <Text style={styles.verifyLoginText}>
-                        Go To Login
-                      </Text>
-                    </Pressable>
-
                   </View>
                 )
               }
@@ -448,41 +447,41 @@ const styles = StyleSheet.create({
     color: "#64748B"
   },
   verifyBox: {
-  marginTop: 10,
-  marginBottom: 20,
-  padding: 18,
-  borderRadius: 18,
-  backgroundColor: "#EFF6FF",
-  alignItems: "center",
-  borderWidth: 1,
-  borderColor: "#BFDBFE",
-},
+    marginTop: 10,
+    marginBottom: 20,
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
 
-verifyTitle: {
-  marginTop: 10,
-  fontSize: 16,
-  fontWeight: "800",
-  color: "#1E3A8A",
-},
+  verifyTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E3A8A",
+  },
 
-verifyText: {
-  marginTop: 6,
-  fontSize: 13,
-  color: "#475569",
-  textAlign: "center",
-  lineHeight: 20,
-},
+  verifyText: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#475569",
+    textAlign: "center",
+    lineHeight: 20,
+  },
 
-verifyLoginButton: {
-  marginTop: 16,
-  backgroundColor: "#1E40AF",
-  paddingHorizontal: 18,
-  paddingVertical: 10,
-  borderRadius: 12,
-},
+  verifyLoginButton: {
+    marginTop: 16,
+    backgroundColor: "#1E40AF",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
 
-verifyLoginText: {
-  color: "#fff",
-  fontWeight: "700",
-},
+  verifyLoginText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
 });
