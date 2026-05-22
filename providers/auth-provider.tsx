@@ -14,9 +14,6 @@ import {
   requestPasswordReset,
   signupWithEmail,
 } from "@/lib/services/authService";
-import { supabase } from "@/lib/supabase";
-import * as Linking from "expo-linking";
-import { router } from "expo-router";
 
 type AuthContextValue = {
   isHydrated: boolean;
@@ -133,47 +130,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [email, isHydrated, token, hasSeenOnboarding],
   );
 
-  useEffect(() => {
-    const handleDeepLink = async (url: string | null) => {
-      if (!url) return;
-      const parsed = Linking.parse(url);
-      const hash = url.split("#")[1];
-      if (!hash) return;
-      const params = new URLSearchParams(hash);
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
-      const type = params.get("type");
+  // useEffect(() => {
+  //   const handleDeepLink = async (url: string | null) => {
+  //     if (!url) return;
+  //     const parsed = Linking.parse(url);
+  //     const hash = url.split("#")[1];
+  //     if (!hash) return;
+  //     const params = new URLSearchParams(hash);
+  //     const access_token = params.get("access_token");
+  //     const refresh_token = params.get("refresh_token");
+  //     const type = params.get("type");
 
-      if (type === "recovery" && access_token && refresh_token) {
-        // Inject token pair directly into Supabase client memory space
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
+  //     if (type === "recovery" && access_token && refresh_token) {
+  //       // Inject token pair directly into Supabase client memory space
+  //       const { error } = await supabase.auth.setSession({
+  //         access_token,
+  //         refresh_token,
+  //       });
 
-        if (!error) {
-          router.replace("/reset-password");
-        } else {
-          console.error("Failed mounting temporary recovery session context:", error.message);
-        }
-      }
-    };
+  //       if (!error) {
+  //         router.replace("/reset-password");
+  //       } else {
+  //         console.error("Failed mounting temporary recovery session context:", error.message);
+  //       }
+  //     }
+  //   };
 
-    // App already closed but woke up due to dynamic link action click
-    Linking.getInitialURL().then(handleDeepLink);
+  //   // App already closed but woke up due to dynamic link action click
+  //   Linking.getInitialURL().then(handleDeepLink);
 
-    // App actively running in task background states
-    const subscription = Linking.addEventListener(
-      "url",
-      ({ url }) => {
-        handleDeepLink(url);
-      }
-    );
+  //   // App actively running in task background states
+  //   const subscription = Linking.addEventListener(
+  //     "url",
+  //     ({ url }) => {
+  //       handleDeepLink(url);
+  //     }
+  //   );
 
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  //   return () => {
+  //     subscription.remove();
+  //   };
+  // }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

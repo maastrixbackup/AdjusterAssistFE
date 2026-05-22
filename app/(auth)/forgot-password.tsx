@@ -1,7 +1,9 @@
+import { useAuth } from "@/providers/auth-provider";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -18,9 +20,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
-
-import { useAuth } from "@/providers/auth-provider";
-import { StatusBar } from "expo-status-bar";
 
 export default function ForgotPasswordScreen() {
   const { width, height } = useWindowDimensions();
@@ -48,14 +47,11 @@ export default function ForgotPasswordScreen() {
 
       return;
     }
-
     try {
       setLoading(true);
-
       Haptics.impactAsync(
         Haptics.ImpactFeedbackStyle.Medium
       );
-
       await sendPasswordReset(normalizedEmail);
 
       Haptics.notificationAsync(

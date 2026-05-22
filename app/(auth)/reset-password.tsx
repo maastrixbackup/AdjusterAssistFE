@@ -1,7 +1,9 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,9 +21,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-import { supabase } from "@/lib/supabase";
-import { StatusBar } from "expo-status-bar";
-
 export default function ResetPasswordScreen() {
   const { width, height } = useWindowDimensions();
   const isTablet = width > 768;
@@ -32,8 +31,66 @@ export default function ResetPasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const logoImg = require("../../assets/images/AdjusterAssist1.png");
+  const deepLinkUrl = Linking.useURL();
+
+  useEffect(() => {
+    if (!deepLinkUrl) return;
+    console.log("Raw Incoming Deep Link URL:", deepLinkUrl);
+
+    try {
+      // Unify parsing for hash segments (#) or query strings (?)
+      const urlParts = deepLinkUrl.split("#")[1] || deepLinkUrl.split("?")[1];
+      
+      if (urlParts) {
+        const urlParams = new URLSearchParams(urlParts);
+        
+        // 1. Check for explicit error fields sent back by Supabase
+        const errorCode = urlParams.get("error_code");
+        const errorDescription = urlParams.get("error_description");
+
+        if (errorCode === "otp_expired" || errorCode === "access_denied") {
+          const cleanMessage = errorDescription 
+            ? errorDescription.replace(/\+/g, " ") 
+            : "This recovery link is invalid or has expired.";
+
+          toast.error("Link Expired", {
+            description: `${cleanMessage} Please request a new reset email.`,
+          });
+
+          // Guide them back automatically to generate a fresh request link
+          setTimeout(() => {
+            router.replace("/forgot-password");
+          }, 2500);
+          return;
+        }
+
+        // 2. Extract authorization payload token fields
+        const token = urlParams.get("access_token") || urlParams.get("token");
+
+        if (token) {
+          setAccessToken(token);
+          console.log("Token Successfully Prepared for Backend Transfer:", token.substring(0, 8) + "...");
+        } else {
+          toast.error("Invalid Link Structure", {
+            description: "Could not find an access_token or token parameter in this link.",
+          });
+        }
+      } else {
+        toast.error("Invalid Link", {
+          description: "This recovery link is missing routing parameter tokens.",
+        });
+      }
+    } catch (err) {
+      console.error("Deep Link Parsing Error:", err);
+      toast.error("Parsing Error", {
+        description: "Failed to extract security tokens from the link application context.",
+      });
+    }
+  }, [deepLinkUrl]);
 
   const validatePassword = (pass: string) => {
     const hasNumber = /\d/.test(pass);
@@ -46,59 +103,54 @@ export default function ResetPasswordScreen() {
     return null;
   };
 
-  useEffect(() => {
-    checkRecoverySession();
-  }, []);
-
-  async function checkRecoverySession() {
-    const { data } = await supabase.auth.getSession();
-
-    if (!data.session) {
-      toast.error("Invalid or expired reset link.");
-      router.replace("/forgot-password");
-    }
-  }
   async function handleResetPassword() {
     const passwordError = validatePassword(newPassword);
     if (passwordError) {
-      toast.error("Weak Password", {
-        description: passwordError,
-      });
+      toast.error("Weak Password", { description: passwordError });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("Password Mismatch", {
-        description:
-          "Passwords do not match.",
+      toast.error("Password Mismatch", { description: "Passwords do not match." });
+      return;
+    }
+    if (!accessToken) {
+      toast.error("Session Expired", { 
+        description: "Missing secure authentication session context. Please request a new email link." 
       });
       return;
     }
+
     try {
       setLoading(true);
-      Haptics.impactAsync(
-        Haptics.ImpactFeedbackStyle.Medium
-      );
-      const { error } =
-        await supabase.auth.updateUser({
-          password: newPassword,
-        });
-      if (error) {
-        throw error;
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const response = await fetch("https://adjusterassist-backend.onrender.com/api/v1/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          newPassword: newPassword,
+          accessToken: accessToken,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed changing credentials.");
       }
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success
-      );
-      toast.success(
-        "Password updated successfully."
-      );
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast.success("Password updated successfully.");
+      
       setTimeout(() => {
         router.replace("/login");
       }, 1500);
+
     } catch (error: any) {
       toast.error("Reset Failed", {
-        description:
-          error.message ||
-          "Unable to update password.",
+        description: error.message || "Unable to update password.",
       });
     } finally {
       setLoading(false);
@@ -108,22 +160,12 @@ export default function ResetPasswordScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ══ ARC HEADER ══════════════════════════════════════════ */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          
+          {/* Header */}
           <View style={[styles.arcHeader, { height: height * 0.32 }]}>
-            <LinearGradient
-              colors={["#276bbd", "#1e40af", "#172554"]}
-              style={StyleSheet.absoluteFill}
-            />
+            <LinearGradient colors={["#276bbd", "#1e40af", "#172554"]} style={StyleSheet.absoluteFill} />
             <SafeAreaView style={styles.headerContent}>
               <View style={styles.logoContainer}>
                 <Image source={logoImg} style={[styles.logo, { width: isTablet ? 240 : width * 0.45 }]} />
@@ -133,7 +175,7 @@ export default function ResetPasswordScreen() {
             </SafeAreaView>
           </View>
 
-          {/* ══ MAIN CARD ════════════════════════════════════════════ */}
+          {/* Input Fields Card */}
           <View style={[styles.body, { marginTop: -40 }]}>
             <View style={[styles.card, isTablet && { maxWidth: 450, alignSelf: 'center' }]}>
 
@@ -188,22 +230,12 @@ export default function ResetPasswordScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleResetPassword}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                <LinearGradient colors={["#1e40af", "#1e3a8a"]} style={styles.buttonInner}>
-                  {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Text style={styles.buttonText}>Save Password</Text>
-                    </>
-                  )}
+              <TouchableOpacity style={styles.button} onPress={handleResetPassword} disabled={loading || !accessToken} activeOpacity={0.8}>
+                <LinearGradient colors={loading || !accessToken ? ["#94a3b8", "#64748b"] : ["#1e40af", "#1e3a8a"]} style={styles.buttonInner}>
+                  {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Save Password</Text>}
                 </LinearGradient>
               </TouchableOpacity>
+              
               <View style={styles.footer}>
                 <TouchableOpacity onPress={() => router.replace("/login")}>
                   <Text style={styles.backText}>Back to Login</Text>
@@ -221,37 +253,27 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   scroll: { flexGrow: 1 },
-
-  // Header
   arcHeader: { borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: "hidden", justifyContent: 'center' },
   headerContent: { paddingHorizontal: 30, alignItems: 'center' },
   logoContainer: { marginBottom: 15, backgroundColor: 'rgba(255,255,255,0.1)', padding: 10, borderRadius: 20 },
   logo: { height: 40, resizeMode: "contain" },
   arcTitle: { fontSize: 26, fontWeight: "800", color: "#fff" },
   arcSub: { fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 4, textAlign: 'center' },
-
-  // Card
   body: { flex: 1, paddingHorizontal: 20, paddingBottom: 40 },
   card: { width: "100%", backgroundColor: "#FFF", borderRadius: 30, padding: 24, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 15, elevation: 5 },
   iconCircle: { width: 70, height: 70, borderRadius: 35, backgroundColor: "#F0F4FF", justifyContent: "center", alignItems: "center", alignSelf: "center", marginTop: -60, borderWidth: 6, borderColor: "#FFF" },
   textGroup: { marginTop: 15, marginBottom: 25, alignItems: 'center' },
   title: { fontSize: 22, color: "#0F172A", fontWeight: "800" },
   subtitle: { color: "#64748B", fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 8 },
-
-  // Form
   inputWrapper: { marginBottom: 16 },
   inputLabel: { fontSize: 10, fontWeight: "800", color: "#94A3B8", letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
   inputBox: { flexDirection: "row", alignItems: "center", borderRadius: 16, backgroundColor: "#F8FAFC", borderWidth: 1.5, borderColor: "#F1F5F9", paddingHorizontal: 16, height: 56 },
   inputActive: { borderColor: "#1e40af", backgroundColor: "#FFF" },
   input: { flex: 1, marginLeft: 12, color: "#0F172A", fontSize: 15 },
   eyeBtn: { padding: 4 },
-
-  // Button
   button: { borderRadius: 18, overflow: "hidden", marginTop: 10 },
   buttonInner: { height: 60, justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 12 },
   buttonText: { color: "#FFF", fontWeight: "800", fontSize: 16 },
-
-  // Footer
   footer: { marginTop: 25, alignItems: "center" },
   backText: { color: "#1e40af", fontWeight: "700", fontSize: 14 },
 });
