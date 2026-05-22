@@ -26,9 +26,7 @@ import { toast } from "sonner-native";
 export default function LoginScreen() {
   const { width, height } = useWindowDimensions();
   const isTablet = width > 768;
-
   const { isHydrated, isAuthenticated, login } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
