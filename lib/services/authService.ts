@@ -161,3 +161,24 @@ export async function requestPasswordReset(email: string): Promise<void> {
 export async function logoutUser(): Promise<void> {
   await removeToken();
 }
+
+export type RefreshSessionResponse = {
+  success: boolean;
+  access_token: string;
+  refresh_token: string;
+  expires_at?: number;
+  aal?: "aal1" | "aal2";
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+  };
+};
+
+export async function refreshSessionApi(
+  refresh_token: string,
+): Promise<RefreshSessionResponse> {
+  return apiRequest<RefreshSessionResponse>("/auth/refresh", "POST", {
+    refresh_token,
+  });
+}

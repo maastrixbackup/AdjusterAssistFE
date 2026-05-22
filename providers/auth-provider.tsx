@@ -14,17 +14,20 @@ import {
   loginWithEmail,
   logoutUser,
   MfaTempSession,
+  refreshSessionApi,
   requestPasswordReset,
   signupWithEmail,
 } from "@/lib/services/authService";
+import {
+  clearSessionTokens,
+  saveSessionTokens,
+} from "@/lib/utils/storage";
 
 type AalLevel = "aal1" | "aal2";
 
 type AuthContextValue = {
   isHydrated: boolean;
-  // true only after MFA completed
   isAuthenticated: boolean;
-  // true when user logged in but MFA not setup/completed
   needsMfaSetup: boolean;
 
   token: string | null;
@@ -32,14 +35,14 @@ type AuthContextValue = {
   refreshToken: string | null;
   email: string | null;
   aal: AalLevel | null;
-
   mfaTempSession: MfaTempSession | null;
-
   login: (email: string, password: string) => Promise<LoginResult>;
   completeMfaLogin: (session: AuthSession) => Promise<void>;
-
+  refreshAuthSession: () => Promise<string | null>;
+  updateMfaTempSession: (session: MfaTempSession) => void;
   hasSeenOnboarding: boolean;
   completeOnboarding: () => Promise<void>;
+
 
   signup: (
     name: string,
@@ -137,6 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAal(finalAal);
     setMfaTempSession(null);
 
+    await saveSessionTokens({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
     await saveSession({
       token: session.access_token,
       access_token: session.access_token,
@@ -146,7 +154,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       aal: finalAal,
     });
   }
-
   async function clearAuthState() {
     setToken(null);
     setAccessToken(null);
@@ -156,20 +163,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMfaTempSession(null);
 
     await saveSession(null);
+    await clearSessionTokens();
   }
 
   const isFullyAuthenticated = Boolean(accessToken && aal === "aal2");
   const needsMfaSetup = Boolean(
     mfaTempSession && !mfaTempSession.factor_id
   );
+  async function refreshAuthSessionInternal() {
+    if (!refreshToken) {
+      await clearAuthState();
+      await logoutUser();
+      return null;
+    }
 
+    try {
+      const response = await refreshSessionApi(refreshToken);
+
+      const newSession: AuthSession = {
+        token: response.access_token,
+        access_token: response.access_token,
+        refresh_token: response.refresh_token,
+        expires_at: response.expires_at,
+        email: response.user.email,
+        aal: response.aal || "aal1",
+      };
+
+      await persistAuthenticatedSession(newSession);
+
+      return response.access_token;
+    } catch {
+      await clearAuthState();
+      await logoutUser();
+      return null;
+    }
+  }
   const value = useMemo<AuthContextValue>(
     () => ({
       isHydrated,
-
       isAuthenticated: isFullyAuthenticated,
       needsMfaSetup,
-
       token,
       accessToken,
       refreshToken,
@@ -209,6 +242,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       },
 
+      async refreshAuthSession() {
+        return refreshAuthSessionInternal();
+      },
+
+      updateMfaTempSession(session: MfaTempSession) {
+        setMfaTempSession(session);
+        setEmail(session.email);
+        setAal("aal1");
+
+        setToken(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+      },
       async signup(
         name: string,
         inputEmail: string,

@@ -1,4 +1,8 @@
-import { challengeMFALogin, verifyMFALogin } from "@/lib/services/mfaService";
+import {
+    challengeMFALogin,
+    resetMFALogin,
+    verifyMFALogin,
+} from "@/lib/services/mfaService";
 import { useAuth } from "@/providers/auth-provider";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -10,6 +14,7 @@ import {
     ActivityIndicator,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     Pressable,
     ScrollView,
@@ -33,6 +38,11 @@ export default function MFALoginScreen() {
   const [focused, setFocused] = useState(false);
   const [loadingChallenge, setLoadingChallenge] = useState(false);
   const [loadingVerify, setLoadingVerify] = useState(false);
+
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
 
   const logoImg = require("../../assets/images/AdjusterAssist1.png");
 
@@ -59,7 +69,6 @@ export default function MFALoginScreen() {
 
       setChallengeId(data.challenge_id);
     } catch (error: any) {
-        console.log(error)
       toast.error("MFA Challenge Failed", {
         description: error?.message || "Unable to start MFA verification.",
       });
@@ -75,9 +84,11 @@ export default function MFALoginScreen() {
 
     if (!challengeId || code.length !== 6) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
       toast.error("Invalid Code", {
         description: "Enter the 6-digit code from your authenticator app.",
       });
+
       return;
     }
 
@@ -113,6 +124,54 @@ export default function MFALoginScreen() {
     }
   }
 
+  async function handleResetMFA() {
+    if (!mfaTempSession || loadingReset) return;
+
+    const password = resetPassword.trim();
+
+    if (!password) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+      toast.error("Password Required", {
+        description: "Please enter your password to reset MFA.",
+      });
+
+      return;
+    }
+
+    try {
+      setLoadingReset(true);
+
+      await resetMFALogin({
+        email: mfaTempSession.email,
+        password,
+        temp_access_token: mfaTempSession.temp_access_token,
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      setResetModalVisible(false);
+      setResetPassword("");
+      setOtp("");
+      setChallengeId("");
+
+      toast.success("MFA Reset Successful", {
+        description: "Please sign in again to set up MFA.",
+      });
+
+      logout();
+      router.replace("/login");
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+      toast.error("Reset Failed", {
+        description: error?.message || "Unable to reset MFA.",
+      });
+    } finally {
+      setLoadingReset(false);
+    }
+  }
+
   const logoStyle = {
     height: 50,
     width: isTablet ? 240 : width * 0.5,
@@ -133,14 +192,36 @@ export default function MFALoginScreen() {
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.arcHeader, { height: Math.max(220, height * 0.32) }]}>
+          <View
+            style={[styles.arcHeader, { height: Math.max(220, height * 0.32) }]}
+          >
             <LinearGradient
               colors={["#276bbd", "#1e40af", "#172554"]}
               style={StyleSheet.absoluteFill}
             />
 
-            <View style={[styles.bubble, { top: -40, right: -40, width: 200, height: 200 }]} />
-            <View style={[styles.bubble, { bottom: -30, left: -30, width: 130, height: 130 }]} />
+            <View
+              style={[
+                styles.bubble,
+                {
+                  top: -40,
+                  right: -40,
+                  width: 200,
+                  height: 200,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.bubble,
+                {
+                  bottom: -30,
+                  left: -30,
+                  width: 130,
+                  height: 130,
+                },
+              ]}
+            />
 
             <SafeAreaView style={styles.headerContent}>
               <View style={styles.logoContainer}>
@@ -165,24 +246,31 @@ export default function MFALoginScreen() {
               <Text style={styles.title}>Verify Login</Text>
 
               <Text style={styles.subtitle}>
-                Open your authenticator app and enter the 6-digit code to continue.
+                Open your authenticator app and enter the 6-digit code to
+                continue.
               </Text>
 
               {loadingChallenge ? (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator color="#1e40af" />
-                  <Text style={styles.loadingText}>Starting secure verification...</Text>
+                  <Text style={styles.loadingText}>
+                    Starting secure verification...
+                  </Text>
                 </View>
               ) : (
                 <>
                   <View style={styles.inputWrapper}>
                     <Text style={styles.inputLabel}>AUTHENTICATOR CODE</Text>
-                    <View style={[styles.inputBox, focused && styles.inputActive]}>
+
+                    <View
+                      style={[styles.inputBox, focused && styles.inputActive]}
+                    >
                       <Feather
                         name="lock"
                         size={18}
                         color={focused ? "#1e40af" : "#94A3B8"}
                       />
+
                       <TextInput
                         value={otp}
                         onChangeText={(text) =>
@@ -214,9 +302,16 @@ export default function MFALoginScreen() {
                         <ActivityIndicator color="#fff" />
                       ) : (
                         <>
-                          <Text style={styles.buttonText}>Verify & Sign In</Text>
+                          <Text style={styles.buttonText}>
+                            Verify & Sign In
+                          </Text>
+
                           <View style={styles.btnArrow}>
-                            <Feather name="arrow-right" size={16} color="#1e40af" />
+                            <Feather
+                              name="arrow-right"
+                              size={16}
+                              color="#1e40af"
+                            />
                           </View>
                         </>
                       )}
@@ -224,11 +319,15 @@ export default function MFALoginScreen() {
                   </Pressable>
 
                   <Pressable
-                    style={styles.retryButton}
-                    onPress={handleChallenge}
-                    disabled={loadingChallenge}
+                    style={[
+                      styles.resetMfaButton,
+                      loadingReset && { opacity: 0.6 },
+                    ]}
+                    onPress={() => setResetModalVisible(true)}
+                    disabled={loadingReset}
                   >
-                    <Text style={styles.retryText}>Restart Verification</Text>
+                    <Feather name="refresh-cw" size={15} color="#dc2626" />
+                    <Text style={styles.resetMfaText}>Reset MFA</Text>
                   </Pressable>
                 </>
               )}
@@ -246,6 +345,105 @@ export default function MFALoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={resetModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!loadingReset) {
+            setResetModalVisible(false);
+            setResetPassword("");
+          }
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={styles.modalBackdropTap}
+            onPress={() => {
+              if (!loadingReset) {
+                setResetModalVisible(false);
+                setResetPassword("");
+              }
+            }}
+          />
+
+          <View style={styles.modalCard}>
+            <View style={styles.modalIcon}>
+              <MaterialCommunityIcons
+                name="shield-alert-outline"
+                size={30}
+                color="#dc2626"
+              />
+            </View>
+
+            <Text style={styles.modalTitle}>Reset MFA?</Text>
+
+            <Text style={styles.modalSubtitle}>
+              This will remove your current authenticator setup. For security,
+              you will be signed out and must sign in again before setting up
+              MFA.
+            </Text>
+
+            <View style={styles.resetInputBox}>
+              <Feather name="lock" size={18} color="#94A3B8" />
+
+              <TextInput
+                value={resetPassword}
+                onChangeText={setResetPassword}
+                secureTextEntry={!showResetPassword}
+                placeholder="Enter password"
+                placeholderTextColor="#94A3B8"
+                style={styles.resetInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loadingReset}
+              />
+
+              <Pressable
+                onPress={() => setShowResetPassword(!showResetPassword)}
+                hitSlop={12}
+                disabled={loadingReset}
+              >
+                <Feather
+                  name={showResetPassword ? "eye-off" : "eye"}
+                  size={18}
+                  color="#94A3B8"
+                />
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={[
+                styles.modalDangerButton,
+                loadingReset && { opacity: 0.7 },
+              ]}
+              onPress={handleResetMFA}
+              disabled={loadingReset}
+            >
+              {loadingReset ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.modalDangerText}>Reset & Sign Out</Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={styles.modalCancelButton}
+              onPress={() => {
+                setResetModalVisible(false);
+                setResetPassword("");
+              }}
+              disabled={loadingReset}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -399,16 +597,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  retryButton: {
-    marginTop: 18,
-    alignItems: "center",
-    padding: 8,
-  },
-  retryText: {
-    color: "#1e40af",
-    fontWeight: "800",
-    fontSize: 14,
-  },
   logoutButton: {
     marginTop: 12,
     alignItems: "center",
@@ -418,5 +606,100 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontWeight: "700",
     fontSize: 14,
+  },
+  resetMfaButton: {
+    marginTop: 18,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  resetMfaText: {
+    color: "#dc2626",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.55)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalBackdropTap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 28,
+    padding: 24,
+    alignItems: "center",
+  },
+  modalIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  modalSubtitle: {
+    marginTop: 8,
+    color: "#64748B",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  resetInputBox: {
+    width: "100%",
+    height: 58,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 18,
+  },
+  resetInput: {
+    flex: 1,
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  modalDangerButton: {
+    width: "100%",
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: "#dc2626",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalDangerText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  modalCancelButton: {
+    marginTop: 14,
+    padding: 8,
+  },
+  modalCancelText: {
+    color: "#64748B",
+    fontWeight: "800",
   },
 });

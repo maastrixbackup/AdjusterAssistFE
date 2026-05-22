@@ -281,3 +281,27 @@ export async function verifyMFALogin(params: {
     aal: "aal2",
   };
 }
+
+export type ResetMFALoginResponse = {
+  success: boolean;
+  message: string;
+  temp_access_token?: string;
+  temp_refresh_token?: string;
+};
+
+export async function resetMFALogin(params: {
+  email: string;
+  password: string;
+  temp_access_token: string;
+}) {
+  return mfaRequest<ResetMFALoginResponse>(
+    "/auth/mfa/reset-login",
+    "POST",
+    params.temp_access_token,
+    {
+      email: params.email,
+      password: params.password,
+      temp_access_token: params.temp_access_token,
+    },
+  );
+}
