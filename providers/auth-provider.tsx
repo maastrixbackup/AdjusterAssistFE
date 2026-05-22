@@ -9,20 +9,38 @@ import {
 } from "react";
 
 import {
+  AuthSession,
+  LoginResult,
   loginWithEmail,
   logoutUser,
+  MfaTempSession,
   requestPasswordReset,
   signupWithEmail,
 } from "@/lib/services/authService";
 
+type AalLevel = "aal1" | "aal2";
+
 type AuthContextValue = {
   isHydrated: boolean;
+  // true only after MFA completed
   isAuthenticated: boolean;
+  // true when user logged in but MFA not setup/completed
+  needsMfaSetup: boolean;
+
   token: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   email: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  aal: AalLevel | null;
+
+  mfaTempSession: MfaTempSession | null;
+
+  login: (email: string, password: string) => Promise<LoginResult>;
+  completeMfaLogin: (session: AuthSession) => Promise<void>;
+
   hasSeenOnboarding: boolean;
   completeOnboarding: () => Promise<void>;
+
   signup: (
     name: string,
     email: string,
@@ -30,6 +48,7 @@ type AuthContextValue = {
     password: string,
     acceptedPolicy: boolean,
   ) => Promise<void>;
+
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;
 };
@@ -39,7 +58,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 type SessionData = {
   token: string;
+  access_token: string;
+  refresh_token: string;
   email: string;
+  expires_at?: number;
+  aal?: AalLevel;
 };
 
 async function saveSession(session: SessionData | null) {
@@ -47,12 +70,14 @@ async function saveSession(session: SessionData | null) {
     await AsyncStorage.removeItem(SESSION_KEY);
     return;
   }
+
   await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 async function loadSession(): Promise<SessionData | null> {
   const raw = await AsyncStorage.getItem(SESSION_KEY);
   if (!raw) return null;
+
   try {
     return JSON.parse(raw) as SessionData;
   } catch {
@@ -62,41 +87,128 @@ async function loadSession(): Promise<SessionData | null> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
+
   const [token, setToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [aal, setAal] = useState<AalLevel | null>(null);
+
+  const [mfaTempSession, setMfaTempSession] =
+    useState<MfaTempSession | null>(null);
+
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       const [session, onboarded] = await Promise.all([
         loadSession(),
         AsyncStorage.getItem("@has_seen_onboarding"),
       ]);
+
       if (!mounted) return;
+
       if (session) {
         setToken(session.token);
+        setAccessToken(session.access_token);
+        setRefreshToken(session.refresh_token);
         setEmail(session.email);
+        setAal(session.aal || "aal1");
       }
+
       setHasSeenOnboarding(onboarded === "true");
       setIsHydrated(true);
     })();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  async function persistAuthenticatedSession(session: AuthSession) {
+    const finalAal = session.aal || "aal1";
+
+    setToken(session.access_token);
+    setAccessToken(session.access_token);
+    setRefreshToken(session.refresh_token);
+    setEmail(session.email);
+    setAal(finalAal);
+    setMfaTempSession(null);
+
+    await saveSession({
+      token: session.access_token,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at,
+      email: session.email,
+      aal: finalAal,
+    });
+  }
+
+  async function clearAuthState() {
+    setToken(null);
+    setAccessToken(null);
+    setRefreshToken(null);
+    setEmail(null);
+    setAal(null);
+    setMfaTempSession(null);
+
+    await saveSession(null);
+  }
+
+  const isFullyAuthenticated = Boolean(accessToken && aal === "aal2");
+  const needsMfaSetup = Boolean(
+    mfaTempSession && !mfaTempSession.factor_id
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
       isHydrated,
-      isAuthenticated: Boolean(token),
+
+      isAuthenticated: isFullyAuthenticated,
+      needsMfaSetup,
+
       token,
+      accessToken,
+      refreshToken,
       email,
-      hasSeenOnboarding,
+      aal,
+
+      mfaTempSession,
+
       async login(inputEmail: string, password: string) {
-        const session = await loginWithEmail(inputEmail, password);
-        setToken(session.token);
-        setEmail(session.email);
-        await saveSession(session);
+        const result = await loginWithEmail(inputEmail, password);
+
+        if (
+          result.type === "MFA_REQUIRED" ||
+          result.type === "MFA_SETUP_REQUIRED"
+        ) {
+          setMfaTempSession(result.mfa);
+
+          setToken(null);
+          setAccessToken(null);
+          setRefreshToken(null);
+          setEmail(result.mfa.email);
+          setAal("aal1");
+
+          await saveSession(null);
+
+          return result;
+        }
+
+        await persistAuthenticatedSession(result.session);
+        return result;
       },
+
+      async completeMfaLogin(session: AuthSession) {
+        await persistAuthenticatedSession({
+          ...session,
+          aal: "aal2",
+        });
+      },
+
       async signup(
         name: string,
         inputEmail: string,
@@ -104,81 +216,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: string,
         acceptedPolicy: boolean,
       ) {
-        await signupWithEmail(name, inputEmail, role, password, acceptedPolicy);
-        setToken(null);
-        setEmail(null);
-        await saveSession(null);
+        await signupWithEmail(
+          name,
+          inputEmail,
+          role,
+          password,
+          acceptedPolicy,
+        );
+
+        await clearAuthState();
         await logoutUser();
       },
+
       async completeOnboarding() {
         await AsyncStorage.setItem("@has_seen_onboarding", "true");
         setHasSeenOnboarding(true);
       },
+
       logout() {
-        setToken(null);
-        setEmail(null);
-        void saveSession(null);
+        void clearAuthState();
         void AsyncStorage.removeItem("@session_saved_drafts_data");
         void AsyncStorage.removeItem("@session_saved_drafts");
         void logoutUser();
       },
+
       async sendPasswordReset(inputEmail: string) {
-        // Triggers the Supabase recovery email containing your deep link configuration URL
         await requestPasswordReset(inputEmail);
       },
+
+      hasSeenOnboarding,
     }),
-    [email, isHydrated, token, hasSeenOnboarding],
+    [
+      isHydrated,
+      isFullyAuthenticated,
+      needsMfaSetup,
+      token,
+      accessToken,
+      refreshToken,
+      email,
+      aal,
+      mfaTempSession,
+      hasSeenOnboarding,
+    ],
   );
-
-  // useEffect(() => {
-  //   const handleDeepLink = async (url: string | null) => {
-  //     if (!url) return;
-  //     const parsed = Linking.parse(url);
-  //     const hash = url.split("#")[1];
-  //     if (!hash) return;
-  //     const params = new URLSearchParams(hash);
-  //     const access_token = params.get("access_token");
-  //     const refresh_token = params.get("refresh_token");
-  //     const type = params.get("type");
-
-  //     if (type === "recovery" && access_token && refresh_token) {
-  //       // Inject token pair directly into Supabase client memory space
-  //       const { error } = await supabase.auth.setSession({
-  //         access_token,
-  //         refresh_token,
-  //       });
-
-  //       if (!error) {
-  //         router.replace("/reset-password");
-  //       } else {
-  //         console.error("Failed mounting temporary recovery session context:", error.message);
-  //       }
-  //     }
-  //   };
-
-  //   // App already closed but woke up due to dynamic link action click
-  //   Linking.getInitialURL().then(handleDeepLink);
-
-  //   // App actively running in task background states
-  //   const subscription = Linking.addEventListener(
-  //     "url",
-  //     ({ url }) => {
-  //       handleDeepLink(url);
-  //     }
-  //   );
-
-  //   return () => {
-  //     subscription.remove();
-  //   };
-  // }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used inside AuthProvider");
   }
+
   return context;
 }

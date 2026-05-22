@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -26,7 +26,7 @@ import { toast } from "sonner-native";
 export default function LoginScreen() {
   const { width, height } = useWindowDimensions();
   const isTablet = width > 768;
-  const { isHydrated, isAuthenticated, login } = useAuth();
+  const { isHydrated, isAuthenticated, login, needsMfaSetup } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +34,9 @@ export default function LoginScreen() {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+
+  const emailRef = useRef("");
+  const passwordRef = useRef("");
 
   const logoImg = require("../../assets/images/AdjusterAssist1.png");
 
@@ -47,10 +50,15 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    if (isHydrated && isAuthenticated) {
+    if (!isHydrated) return;
+    if (isAuthenticated) {
       router.replace("/(tabs)");
+      return;
     }
-  }, [isAuthenticated, isHydrated]);
+    if (needsMfaSetup) {
+      router.replace("/mfa-setup");
+    }
+  }, [isAuthenticated, needsMfaSetup, isHydrated]);
 
   useEffect(() => {
     if (showResend) {
@@ -58,7 +66,7 @@ export default function LoginScreen() {
     }
   }, [email, password]);
 
-  if (!isHydrated || isAuthenticated) {
+  if (!isHydrated || isAuthenticated || needsMfaSetup) {
     return (
       <View style={styles.loaderWrap}>
         <LinearGradient colors={["#276bbd", "rgb(28, 49, 119)"]} style={StyleSheet.absoluteFill} />
@@ -75,40 +83,60 @@ export default function LoginScreen() {
       });
       return;
     }
-
-    // Initial soft feedback for button press
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
-
     if (Platform.OS === "android") {
       Keyboard.dismiss();
     }
+    const submittedEmail = email.trim();
+    const submittedPassword = password;
 
+    emailRef.current = email;
+    passwordRef.current = password;
     try {
-      await toast.promise(login(email.trim(), password), {
+      await toast.promise(login(submittedEmail, submittedPassword), {
         loading: "Verifying credentials...",
         success: (data) => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          );
           setShowResend(false);
+
+          if (data.type === "MFA_REQUIRED") {
+            router.replace("/mfa-login");
+            return "MFA verification required.";
+          }
+
+          if (data.type === "MFA_SETUP_REQUIRED") {
+            router.replace("/mfa-setup");
+            return "Please set up MFA to continue.";
+          }
+
+          if (data.type === "AUTHENTICATED") {
+            router.replace("/(tabs)");
+            return "Welcome back!";
+          }
+
           return "Welcome back!";
         },
         error: (err: any) => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        
-          // Safely extract the custom data keys sent from your backend Express API
-          const errorTarget = err?.response?.data || err?.data || err ;
+          setEmail(emailRef.current);
+          setPassword(passwordRef.current);
+          Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Error
+          );
+          const errorTarget = err?.response?.data || err?.data || err;
           const errorCode = errorTarget?.code;
           const errorMessage = errorTarget?.message || "Invalid credentials";
-
-          console.log("🔍 Handled UI Response Target:", { errorCode, errorMessage });
-
-          // Clear tracking matches perfectly against our new structural code
-          if (errorCode === "EMAIL_NOT_VERIFIED" || errorMessage.includes("verify your email")) {
+          if (
+            errorCode === "EMAIL_NOT_VERIFIED" ||
+            errorMessage.includes("verify your email")
+          ) {
             setShowResend(true);
             return "Please verify your email before signing in.";
           }
 
           return errorMessage;
-        }
+        },
       });
 
       // iOS Keyboard dismissal often feels smoother after the transition starts
@@ -126,7 +154,6 @@ export default function LoginScreen() {
       Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Error
       );
-
       toast.error("Email Required", {
         description:
           "Please enter your email address first.",
@@ -134,10 +161,8 @@ export default function LoginScreen() {
 
       return;
     }
-
     try {
       setResendLoading(true);
-
       Haptics.impactAsync(
         Haptics.ImpactFeedbackStyle.Soft
       );
@@ -243,7 +268,10 @@ export default function LoginScreen() {
                     placeholderTextColor="#94A3B8"
                     style={styles.input}
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      emailRef.current = text;
+                      setEmail(text);
+                    }}
                     onFocus={() => setFocused("email")}
                     onBlur={() => setFocused(null)}
                     autoCapitalize="none"
@@ -263,7 +291,10 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     style={styles.input}
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(text) => {
+                      passwordRef.current = text;
+                      setPassword(text);
+                    }}
                     onFocus={() => setFocused("pass")}
                     onBlur={() => setFocused(null)}
                   />
