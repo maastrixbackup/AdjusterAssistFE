@@ -109,7 +109,7 @@ export async function apiRequest<T = unknown>(
 
   if (response.status === 401 && isRefreshEndpoint) {
     await performLogout();
-    throw new Error("Session expired. Please login again.");
+    throw new Error();
   }
 
   if (!response.ok) {

@@ -107,6 +107,7 @@ function NavigationGuard() {
       <Stack.Screen name="(auth)/callback" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/mfa-setup" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/mfa-login" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/mfa-recovery" options={{ headerShown: false }} />
     </Stack>
   );
 }
