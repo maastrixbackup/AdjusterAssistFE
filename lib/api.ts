@@ -176,7 +176,7 @@ const colors = {
   bold: "\x1b[1m",
 };
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -770,35 +770,17 @@ export async function resendVerificationEmail(
   });
 }
 
-export interface UsageHistoryResponse {
-  success: boolean;
-  meta: {
-    runInPeriod: number;
-    remaining: number;
-    nextRenewal: string;
-    planStatus: string;
-  };
-  transactions: {
-    id: string;
-    title: string;
-    workspace: string;
-    cost: string;
-    timestamp: string;
-  }[];
-}
-
-export const getCreditUsageHistory = async (
+export async function getCreditUsageHistory(
   token: string,
   range: "24h" | "week" | "month" | "year" | "all" = "all",
-): Promise<UsageHistoryResponse> => {
-  try {
-    return await apiRequest<UsageHistoryResponse>(
-      `/subscriptions/history?range=${range}`,
-      { method: "GET" },
-      token,
-    );
-  } catch (error) {
-    console.error(`Error fetching credit usage history (${range}):`, error);
-    throw error;
-  }
-};
+  page = 1,
+  limit = 30,
+) {
+  return apiRequest(
+    `/subscriptions/history?range=${range}&page=${page}&limit=${limit}`,
+    {
+      method: "GET",
+    },
+    token,
+  );
+}
