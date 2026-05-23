@@ -1,4 +1,11 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
+import {
+  clearSessionTokens,
+  getRefreshToken,
+  getToken,
+  saveSessionTokens,
+} from "@/lib/utils/storage";
+import { router } from "expo-router";
 
 export type AuthSession = {
   token: string;
@@ -169,69 +176,117 @@ const colors = {
   bold: "\x1b[1m",
 };
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = false; // Set to true to see logs during development
+const DEBUG_MODE = false;
+
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+let isLoggingOut = false;
+
+async function logoutAndRedirect() {
+  if (isLoggingOut) return;
+
+  isLoggingOut = true;
+
+  try {
+    await clearSessionTokens();
+    router.replace("/login");
+  } finally {
+    setTimeout(() => {
+      isLoggingOut = false;
+    }, 500);
+  }
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const refreshToken = await getRefreshToken();
+
+    if (!refreshToken) return null;
+
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        refresh_token: refreshToken,
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data?.access_token || !data?.refresh_token) {
+      return null;
+    }
+
+    await saveSessionTokens({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+    });
+
+    return data.access_token;
+  } catch (error) {
+    console.log("[TOKEN REFRESH FAILED]", error);
+    return null;
+  }
+}
 
 async function apiRequest<T>(
   path: string,
   init: RequestInit,
   token?: string,
+  retry = true,
 ): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error("Missing API_BASE_URL configuration.");
   }
+
   const url = `${API_BASE_URL}${path}`;
   const isFormData = init.body instanceof FormData;
+
+  const storedToken = await getToken();
+  const accessToken = token || storedToken;
+
   const headers: Record<string, string> = {
     ...(!isFormData && { "Content-Type": "application/json" }),
-    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
     ...(init.headers as Record<string, string>),
   };
 
-  // 3. Debug Request Log
-  if (DEBUG_MODE) {
-    const method = init.method || "GET";
-    console.log(
-      `${colors.bold}${colors.blue}[API REQUEST] ${method} -> ${url}${colors.reset}`,
+  const response = await fetch(url, {
+    ...init,
+    headers,
+  });
+
+  const json = await response.json().catch(() => ({}));
+
+  if (response.status === 401 && retry && path !== "/auth/refresh") {
+    if (!isRefreshing) {
+      isRefreshing = true;
+
+      refreshPromise = refreshAccessToken().finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
+    }
+
+    const newAccessToken = await refreshPromise;
+
+    if (!newAccessToken) {
+      await logoutAndRedirect();
+      throw new Error("Session expired. Please login again.");
+    }
+
+    return apiRequest<T>(path, init, newAccessToken, false);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      json?.message || `Error ${response.status}: ${response.statusText}`,
     );
-    if (init.body && !isFormData) {
-      console.log("Payload:", JSON.parse(init.body as string));
-    }
   }
 
-  try {
-    const response = await fetch(url, {
-      ...init,
-      headers,
-    });
-
-    const json = await response.json().catch(() => ({}));
-
-    // 4. Debug Response Log
-    if (DEBUG_MODE) {
-      const color = response.ok ? colors.green : colors.red;
-      console.log(
-        `${colors.bold}${color}[API RESPONSE] ${response.status} <- ${path}${colors.reset}`,
-        json,
-      );
-    }
-
-    if (!response.ok) {
-      // Use backend message or fallback to status text
-      throw new Error(
-        json?.message || `Error ${response.status}: ${response.statusText}`,
-      );
-    }
-
-    return json as T;
-  } catch (error: any) {
-    if (DEBUG_MODE) {
-      console.log(
-        `${colors.bold}${colors.red}[API ERROR] ${path}:${colors.reset}`,
-        error.message,
-      );
-    }
-    throw error;
-  }
+  return json as T;
 }
 /* --- Auth Actions --- */
 
@@ -590,18 +645,14 @@ export interface RefinePayload {
 }
 
 export const refineResponse = async (token: string, payload: RefinePayload) => {
-  // console.log("REFINE API PAYLOAD: ", payload);
-  const response = await fetch(`${BASE_URL}/drafts/refine`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  return apiRequest(
+    "/drafts/refine",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) throw new Error("Refinement failed");
-  return await response.json();
+    token,
+  );
 };
 
 export interface VariantPayload {
@@ -615,21 +666,14 @@ export const generateVariant = async (
   token: string,
   payload: VariantPayload,
 ) => {
-  // console.log("VARIANT API PAYLOAD: ", payload);
-  const response = await fetch(`${BASE_URL}/drafts/variant`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  return apiRequest(
+    "/drafts/variant",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "Variant generation failed");
-  }
-  return await response.json();
+    token,
+  );
 };
 
 export type UpdateUserPayload = {

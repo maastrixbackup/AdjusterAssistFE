@@ -1,19 +1,70 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
-import { logoutUser } from "@/lib/services/authService";
-import { getToken } from "@/lib/utils/storage";
+import { logoutUser, refreshSessionApi } from "@/lib/services/authService";
+import {
+  clearSessionTokens,
+  getRefreshToken,
+  getToken,
+  saveSessionTokens,
+} from "@/lib/utils/storage";
 import { router } from "expo-router";
 
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
 let isLoggingOut = false;
+
+async function performLogout() {
+  if (isLoggingOut) return;
+
+  isLoggingOut = true;
+
+  try {
+    await clearSessionTokens();
+    await logoutUser();
+
+    router.replace("/login");
+  } finally {
+    setTimeout(() => {
+      isLoggingOut = false;
+    }, 500);
+  }
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      return null;
+    }
+
+    const response = await refreshSessionApi(refreshToken);
+
+    await saveSessionTokens({
+      access_token: response.access_token,
+      refresh_token: response.refresh_token,
+    });
+
+    return response.access_token;
+  } catch (error) {
+    console.log("[TOKEN REFRESH FAILED]", error);
+    return null;
+  }
+}
 
 export async function apiRequest<T = unknown>(
   endpoint: string,
   method = "GET",
   body: unknown = null,
+  retry = true,
 ): Promise<T> {
   const token = await getToken();
   const url = `${BASE_URL}${endpoint}`;
+  const isRefreshEndpoint = endpoint === "/auth/refresh";
 
-  console.log("[API REQUEST]", { url, method, body });
+  console.log("[API REQUEST]", {
+    url,
+    method,
+    body,
+  });
 
   const response = await fetch(url, {
     method,
@@ -36,19 +87,29 @@ export async function apiRequest<T = unknown>(
     data,
   });
 
-  if (response.status === 401) {
-    if (!isLoggingOut) {
-      isLoggingOut = true;
+  if (response.status === 401 && retry && !isRefreshEndpoint) {
+    if (!isRefreshing) {
+      isRefreshing = true;
 
-      await logoutUser();
-
-      setTimeout(() => {
-        router.replace("/login");
-        isLoggingOut = false;
-      }, 100);
+      refreshPromise = refreshAccessToken().finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
     }
 
-    // throw new Error("Session expired. Please login again.");
+    const newAccessToken = await refreshPromise;
+
+    if (!newAccessToken) {
+      await performLogout();
+      throw new Error("Session expired. Please login again.");
+    }
+
+    return apiRequest<T>(endpoint, method, body, false);
+  }
+
+  if (response.status === 401 && isRefreshEndpoint) {
+    await performLogout();
+    throw new Error("Session expired. Please login again.");
   }
 
   if (!response.ok) {
