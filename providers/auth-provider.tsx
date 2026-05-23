@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { setUnauthorizedHandler } from "@/lib/services/authEvents";
 import {
   AuthSession,
   LoginResult,
@@ -18,10 +19,8 @@ import {
   requestPasswordReset,
   signupWithEmail,
 } from "@/lib/services/authService";
-import {
-  clearSessionTokens,
-  saveSessionTokens,
-} from "@/lib/utils/storage";
+import { clearSessionTokens, saveSessionTokens } from "@/lib/utils/storage";
+import { router } from "expo-router";
 
 type AalLevel = "aal1" | "aal2";
 
@@ -42,7 +41,6 @@ type AuthContextValue = {
   updateMfaTempSession: (session: MfaTempSession) => void;
   hasSeenOnboarding: boolean;
   completeOnboarding: () => Promise<void>;
-
 
   signup: (
     name: string,
@@ -97,8 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
   const [aal, setAal] = useState<AalLevel | null>(null);
 
-  const [mfaTempSession, setMfaTempSession] =
-    useState<MfaTempSession | null>(null);
+  const [mfaTempSession, setMfaTempSession] = useState<MfaTempSession | null>(
+    null,
+  );
 
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
@@ -166,10 +165,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearSessionTokens();
   }
 
+  useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await clearAuthState();
+
+      await AsyncStorage.removeItem("@session_saved_drafts_data");
+      await AsyncStorage.removeItem("@session_saved_drafts");
+
+      router.replace("/login");
+    });
+  }, []);
+
   const isFullyAuthenticated = Boolean(accessToken && aal === "aal2");
-  const needsMfaSetup = Boolean(
-    mfaTempSession && !mfaTempSession.factor_id
-  );
+  const needsMfaSetup = Boolean(mfaTempSession && !mfaTempSession.factor_id);
   async function refreshAuthSessionInternal() {
     if (!refreshToken) {
       await clearAuthState();
@@ -262,13 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: string,
         acceptedPolicy: boolean,
       ) {
-        await signupWithEmail(
-          name,
-          inputEmail,
-          role,
-          password,
-          acceptedPolicy,
-        );
+        await signupWithEmail(name, inputEmail, role, password, acceptedPolicy);
 
         await clearAuthState();
         await logoutUser();

@@ -169,20 +169,17 @@ export type ChallengeMFAResponse = {
 type VerifyEnrollmentRawResponse = {
   success: boolean;
   message: string;
-  data: {
-    access_token: string;
-    refresh_token: string;
-    expires_at?: number;
-    token?: string;
-    aal?: "aal1" | "aal2";
-    user: {
-      id: string;
-      email: string;
-      user_metadata?: {
-        full_name?: string;
-      };
-    };
+  access_token: string;
+  refresh_token: string;
+  expires_at?: number;
+  token?: string;
+  aal?: "aal1" | "aal2";
+  user: {
+    id: string;
+    email: string;
+    name?: string;
   };
+  recovery_codes?: string[];
 };
 
 type VerifyLoginRawResponse = {
@@ -212,7 +209,7 @@ export async function verifyMFAEnrollment(params: {
   factor_id: string;
   code: string;
   temp_access_token: string;
-}): Promise<AuthSession> {
+}): Promise<AuthSession & { recovery_codes?: string[] }> {
   const response = await mfaRequest<VerifyEnrollmentRawResponse>(
     "/auth/mfa/verify",
     "POST",
@@ -223,15 +220,21 @@ export async function verifyMFAEnrollment(params: {
     },
   );
 
-  const session = response.data;
+  const accessToken = response.access_token || response.token;
+  const refreshToken = response.refresh_token;
+
+  if (!accessToken || !refreshToken) {
+    throw new Error("MFA verified but session tokens are missing.");
+  }
 
   return {
-    token: session.access_token || session.token!,
-    access_token: session.access_token || session.token!,
-    refresh_token: session.refresh_token,
-    expires_at: session.expires_at,
-    email: session.user.email,
+    token: accessToken,
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_at: response.expires_at,
+    email: response.user.email,
     aal: "aal2",
+    recovery_codes: response.recovery_codes || [],
   };
 }
 
@@ -304,4 +307,28 @@ export async function resetMFALogin(params: {
       temp_access_token: params.temp_access_token,
     },
   );
+}
+
+export async function recoveryCodeLogin(params: {
+  recovery_code: string;
+  temp_access_token: string;
+}) {
+  return mfaRequest<{
+    success: boolean;
+    message: string;
+    recovery_used: boolean;
+    requires_mfa_setup: boolean;
+    removed_factors_count?: number;
+  }>("/auth/mfa/recovery-login", "POST", params.temp_access_token, {
+    recovery_code: params.recovery_code,
+  });
+}
+
+export async function requestMFARecovery(params: {
+  temp_access_token: string;
+}) {
+  return mfaRequest<{
+    success: boolean;
+    message: string;
+  }>("/auth/mfa/recovery-request", "POST", params.temp_access_token);
 }

@@ -1,7 +1,6 @@
 import {
-    challengeMFALogin,
-    resetMFALogin,
-    verifyMFALogin,
+  challengeMFALogin,
+  verifyMFALogin,
 } from "@/lib/services/mfaService";
 import { useAuth } from "@/providers/auth-provider";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -11,18 +10,18 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
@@ -38,21 +37,29 @@ export default function MFALoginScreen() {
   const [focused, setFocused] = useState(false);
   const [loadingChallenge, setLoadingChallenge] = useState(false);
   const [loadingVerify, setLoadingVerify] = useState(false);
-
-  const [resetModalVisible, setResetModalVisible] = useState(false);
-  const [resetPassword, setResetPassword] = useState("");
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [loadingReset, setLoadingReset] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const logoImg = require("../../assets/images/AdjusterAssist1.png");
 
   useEffect(() => {
-    if (!mfaTempSession || !mfaTempSession.factor_id) {
+    if (!mfaTempSession?.factor_id) {
       router.replace("/login");
       return;
     }
 
+    const showSub = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardOpen(true),
+    );
+    const hideSub = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardOpen(false),
+    );
+
     handleChallenge();
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   async function handleChallenge() {
@@ -70,7 +77,8 @@ export default function MFALoginScreen() {
       setChallengeId(data.challenge_id);
     } catch (error: any) {
       toast.error("MFA Challenge Failed", {
-        description: error?.message || "Unable to start MFA verification.",
+        description:
+          error?.message || "Unable to start MFA verification.",
       });
     } finally {
       setLoadingChallenge(false);
@@ -83,12 +91,14 @@ export default function MFALoginScreen() {
     const code = otp.trim();
 
     if (!challengeId || code.length !== 6) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning,
+      );
 
       toast.error("Invalid Code", {
-        description: "Enter the 6-digit code from your authenticator app.",
+        description:
+          "Enter the 6-digit code from your authenticator app.",
       });
-
       return;
     }
 
@@ -106,70 +116,31 @@ export default function MFALoginScreen() {
 
       await completeMfaLogin(session);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
 
-      toast.success("Verified", {
-        description: "Welcome back.",
-      });
+      // toast.success("Verified", {
+      //   description: "Welcome back.",
+      // });
 
       router.replace("/(tabs)");
     } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error,
+      );
 
       toast.error("Verification Failed", {
-        description: error?.message || "Invalid authentication code.",
+        description:
+          error?.message || "Invalid authentication code.",
       });
     } finally {
       setLoadingVerify(false);
     }
   }
 
-  async function handleResetMFA() {
-    if (!mfaTempSession || loadingReset) return;
-
-    const password = resetPassword.trim();
-
-    if (!password) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-      toast.error("Password Required", {
-        description: "Please enter your password to reset MFA.",
-      });
-
-      return;
-    }
-
-    try {
-      setLoadingReset(true);
-
-      await resetMFALogin({
-        email: mfaTempSession.email,
-        password,
-        temp_access_token: mfaTempSession.temp_access_token,
-      });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      setResetModalVisible(false);
-      setResetPassword("");
-      setOtp("");
-      setChallengeId("");
-
-      toast.success("MFA Reset Successful", {
-        description: "Please sign in again to set up MFA.",
-      });
-
-      logout();
-      router.replace("/login");
-    } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-      toast.error("Reset Failed", {
-        description: error?.message || "Unable to reset MFA.",
-      });
-    } finally {
-      setLoadingReset(false);
-    }
+  async function handleResetAccess() {
+    console.log("Clicked")
   }
 
   const logoStyle = {
@@ -184,16 +155,23 @@ export default function MFALoginScreen() {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
+        style={styles.flex}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[
+            styles.scroll,
+            keyboardOpen &&
+            Platform.OS === "android" && { paddingBottom: 60 },
+          ]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
           <View
-            style={[styles.arcHeader, { height: Math.max(220, height * 0.32) }]}
+            style={[
+              styles.arcHeader,
+              { height: Math.max(225, height * 0.32) },
+            ]}
           >
             <LinearGradient
               colors={["#276bbd", "#1e40af", "#172554"]}
@@ -203,23 +181,13 @@ export default function MFALoginScreen() {
             <View
               style={[
                 styles.bubble,
-                {
-                  top: -40,
-                  right: -40,
-                  width: 200,
-                  height: 200,
-                },
+                { top: -40, right: -40, width: 210, height: 210 },
               ]}
             />
             <View
               style={[
                 styles.bubble,
-                {
-                  bottom: -30,
-                  left: -30,
-                  width: 130,
-                  height: 130,
-                },
+                { bottom: -30, left: -30, width: 135, height: 135 },
               ]}
             />
 
@@ -229,16 +197,18 @@ export default function MFALoginScreen() {
               </View>
 
               <Text style={styles.arcTitle}>MFA Verification</Text>
-              <Text style={styles.arcSub}>Enter your authenticator code</Text>
+              <Text style={styles.arcSub}>
+                Enter your authenticator code
+              </Text>
             </SafeAreaView>
           </View>
 
-          <View style={[styles.body, { marginTop: -50 }]}>
+          <View style={[styles.body, { marginTop: -20 }]}>
             <View style={[styles.card, isTablet && styles.tabletCard]}>
               <View style={styles.iconCircle}>
                 <MaterialCommunityIcons
                   name="shield-check-outline"
-                  size={34}
+                  size={35}
                   color="#1e40af"
                 />
               </View>
@@ -246,8 +216,8 @@ export default function MFALoginScreen() {
               <Text style={styles.title}>Verify Login</Text>
 
               <Text style={styles.subtitle}>
-                Open your authenticator app and enter the 6-digit code to
-                continue.
+                Open your authenticator app and enter the 6-digit code
+                to continue.
               </Text>
 
               {loadingChallenge ? (
@@ -260,10 +230,15 @@ export default function MFALoginScreen() {
               ) : (
                 <>
                   <View style={styles.inputWrapper}>
-                    <Text style={styles.inputLabel}>AUTHENTICATOR CODE</Text>
+                    <Text style={styles.inputLabel}>
+                      AUTHENTICATOR CODE
+                    </Text>
 
                     <View
-                      style={[styles.inputBox, focused && styles.inputActive]}
+                      style={[
+                        styles.inputBox,
+                        focused && styles.inputActive,
+                      ]}
                     >
                       <Feather
                         name="lock"
@@ -282,18 +257,27 @@ export default function MFALoginScreen() {
                         placeholder="123456"
                         placeholderTextColor="#94A3B8"
                         maxLength={6}
+                        editable={!loadingVerify}
                         style={styles.input}
                       />
                     </View>
                   </View>
 
                   <Pressable
-                    style={styles.button}
+                    style={[
+                      styles.button,
+                      (loadingVerify || otp.length !== 6) &&
+                      styles.buttonDisabled,
+                    ]}
                     onPress={handleVerify}
-                    disabled={loadingVerify}
+                    disabled={loadingVerify || otp.length !== 6}
                   >
                     <LinearGradient
-                      colors={["#1e40af", "#1e3a8a"]}
+                      colors={
+                        loadingVerify || otp.length !== 6
+                          ? ["#94A3B8", "#64748B"]
+                          : ["#1e40af", "#1e3a8a"]
+                      }
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.buttonInner}
@@ -318,22 +302,42 @@ export default function MFALoginScreen() {
                     </LinearGradient>
                   </Pressable>
 
+                  <View style={styles.recoveryPanel}>
+                    <View style={styles.recoveryIcon}>
+                      <MaterialCommunityIcons
+                        name="lifebuoy"
+                        size={19}
+                        color="#1e40af"
+                      />
+                    </View>
+
+                    <View style={styles.recoveryContent}>
+                      <Text style={styles.recoveryTitle}>
+                        Lost your authenticator?
+                      </Text>
+                      <Text style={styles.recoveryDescription}>
+                        Use one of your saved recovery codes to reset MFA.
+                      </Text>
+                    </View>
+                  </View>
+
+           
                   <Pressable
-                    style={[
-                      styles.resetMfaButton,
-                      loadingReset && { opacity: 0.6 },
-                    ]}
-                    onPress={() => setResetModalVisible(true)}
-                    disabled={loadingReset}
+                    style={styles.recoveryButton}
+                    onPress={() => router.replace("/mfa-recovery")}
+                    disabled={loadingVerify}
                   >
-                    <Feather name="refresh-cw" size={15} color="#dc2626" />
-                    <Text style={styles.resetMfaText}>Reset MFA</Text>
+                    <Feather name="key" size={15} color="#1e40af" />
+                    <Text style={styles.recoveryButtonText}>
+                      Use Recovery Code
+                    </Text>
                   </Pressable>
                 </>
               )}
 
               <Pressable
                 style={styles.logoutButton}
+                disabled={loadingVerify}
                 onPress={() => {
                   logout();
                   router.replace("/login");
@@ -345,112 +349,17 @@ export default function MFALoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <Modal
-        visible={resetModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          if (!loadingReset) {
-            setResetModalVisible(false);
-            setResetPassword("");
-          }
-        }}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.modalOverlay}
-        >
-          <Pressable
-            style={styles.modalBackdropTap}
-            onPress={() => {
-              if (!loadingReset) {
-                setResetModalVisible(false);
-                setResetPassword("");
-              }
-            }}
-          />
-
-          <View style={styles.modalCard}>
-            <View style={styles.modalIcon}>
-              <MaterialCommunityIcons
-                name="shield-alert-outline"
-                size={30}
-                color="#dc2626"
-              />
-            </View>
-
-            <Text style={styles.modalTitle}>Reset MFA?</Text>
-
-            <Text style={styles.modalSubtitle}>
-              This will remove your current authenticator setup. For security,
-              you will be signed out and must sign in again before setting up
-              MFA.
-            </Text>
-
-            <View style={styles.resetInputBox}>
-              <Feather name="lock" size={18} color="#94A3B8" />
-
-              <TextInput
-                value={resetPassword}
-                onChangeText={setResetPassword}
-                secureTextEntry={!showResetPassword}
-                placeholder="Enter password"
-                placeholderTextColor="#94A3B8"
-                style={styles.resetInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loadingReset}
-              />
-
-              <Pressable
-                onPress={() => setShowResetPassword(!showResetPassword)}
-                hitSlop={12}
-                disabled={loadingReset}
-              >
-                <Feather
-                  name={showResetPassword ? "eye-off" : "eye"}
-                  size={18}
-                  color="#94A3B8"
-                />
-              </Pressable>
-            </View>
-
-            <Pressable
-              style={[
-                styles.modalDangerButton,
-                loadingReset && { opacity: 0.7 },
-              ]}
-              onPress={handleResetMFA}
-              disabled={loadingReset}
-            >
-              {loadingReset ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.modalDangerText}>Reset & Sign Out</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={styles.modalCancelButton}
-              onPress={() => {
-                setResetModalVisible(false);
-                setResetPassword("");
-              }}
-              disabled={loadingReset}
-            >
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1, backgroundColor: "#F8FAFC" },
-  scroll: { flexGrow: 1 },
+  scroll: {
+    flexGrow: 1,
+    paddingBottom: 36,
+  },
   arcHeader: {
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
@@ -483,7 +392,7 @@ const styles = StyleSheet.create({
   arcSub: {
     marginTop: 6,
     fontSize: 14,
-    color: "rgba(255,255,255,0.65)",
+    color: "rgba(255,255,255,0.68)",
     textAlign: "center",
   },
   body: {
@@ -492,7 +401,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   tabletCard: {
-    maxWidth: 500,
+    maxWidth: 520,
     alignSelf: "center",
   },
   card: {
@@ -535,7 +444,7 @@ const styles = StyleSheet.create({
   },
   loadingBox: {
     alignItems: "center",
-    paddingVertical: 30,
+    paddingVertical: 32,
   },
   loadingText: {
     marginTop: 12,
@@ -552,8 +461,8 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   inputBox: {
-    height: 58,
-    borderRadius: 17,
+    height: 60,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: "#F1F5F9",
     backgroundColor: "#F8FAFC",
@@ -577,8 +486,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
   },
+  buttonDisabled: {
+    opacity: 0.9,
+  },
   buttonInner: {
-    height: 60,
+    height: 62,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -597,8 +509,60 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  recoveryPanel: {
+    marginTop: 20,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    borderRadius: 18,
+    padding: 14,
+  },
+  recoveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recoveryContent: {
+    flex: 1,
+  },
+  recoveryTitle: {
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  recoveryDescription: {
+    marginTop: 3,
+    color: "#64748B",
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  recoveryButton: {
+    marginTop: 14,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 15,
+  },
+  recoveryButtonText: {
+    color: "#1e40af",
+    fontWeight: "800",
+    fontSize: 14,
+  },
   logoutButton: {
-    marginTop: 12,
+    marginTop: 14,
     alignItems: "center",
     padding: 8,
   },
@@ -606,100 +570,5 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontWeight: "700",
     fontSize: 14,
-  },
-  resetMfaButton: {
-    marginTop: 18,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
-  resetMfaText: {
-    color: "#dc2626",
-    fontWeight: "800",
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(15,23,42,0.55)",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  modalBackdropTap: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 28,
-    padding: 24,
-    alignItems: "center",
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#FEF2F2",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-  modalSubtitle: {
-    marginTop: 8,
-    color: "#64748B",
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  resetInputBox: {
-    width: "100%",
-    height: 58,
-    borderRadius: 17,
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 18,
-  },
-  resetInput: {
-    flex: 1,
-    color: "#0F172A",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  modalDangerButton: {
-    width: "100%",
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: "#dc2626",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalDangerText: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  modalCancelButton: {
-    marginTop: 14,
-    padding: 8,
-  },
-  modalCancelText: {
-    color: "#64748B",
-    fontWeight: "800",
   },
 });

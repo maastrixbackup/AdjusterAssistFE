@@ -6,11 +6,24 @@ import {
   getToken,
   saveSessionTokens,
 } from "@/lib/utils/storage";
-import { router } from "expo-router";
+import { triggerUnauthorizedLogout } from "./authEvents";
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 let isLoggingOut = false;
+
+const PUBLIC_AUTH_ENDPOINTS = [
+  "/auth/login",
+  "/auth/signup",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/resend-verification",
+  "/auth/refresh",
+];
+
+function isPublicAuthEndpoint(endpoint: string) {
+  return PUBLIC_AUTH_ENDPOINTS.some((item) => endpoint.startsWith(item));
+}
 
 async function performLogout() {
   if (isLoggingOut) return;
@@ -20,8 +33,7 @@ async function performLogout() {
   try {
     await clearSessionTokens();
     await logoutUser();
-
-    router.replace("/login");
+    await triggerUnauthorizedLogout();
   } finally {
     setTimeout(() => {
       isLoggingOut = false;
@@ -32,6 +44,7 @@ async function performLogout() {
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const refreshToken = await getRefreshToken();
+
     if (!refreshToken) {
       return null;
     }
@@ -57,8 +70,11 @@ export async function apiRequest<T = unknown>(
   retry = true,
 ): Promise<T> {
   const token = await getToken();
+  const refreshToken = await getRefreshToken();
+
   const url = `${BASE_URL}${endpoint}`;
   const isRefreshEndpoint = endpoint === "/auth/refresh";
+  const isPublicEndpoint = isPublicAuthEndpoint(endpoint);
 
   console.log("[API REQUEST]", {
     url,
@@ -70,7 +86,9 @@ export async function apiRequest<T = unknown>(
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
+      ...(token && !isPublicEndpoint
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
     },
     body: body ? JSON.stringify(body) : null,
   });
@@ -87,7 +105,15 @@ export async function apiRequest<T = unknown>(
     data,
   });
 
-  if (response.status === 401 && retry && !isRefreshEndpoint) {
+  const shouldTryRefresh =
+    response.status === 401 &&
+    retry &&
+    !isRefreshEndpoint &&
+    !isPublicEndpoint &&
+    Boolean(token) &&
+    Boolean(refreshToken);
+
+  if (shouldTryRefresh) {
     if (!isRefreshing) {
       isRefreshing = true;
 

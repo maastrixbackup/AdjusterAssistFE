@@ -1,13 +1,10 @@
 // components/DailyBriefing.tsx
-// Draggable floating button — iOS-level smooth feel
-// Time-based color: warm yellow/orange in day, deep blue at night
-// Improved glow, spring physics, and haptics
 
 import { ClaimFile } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -22,15 +19,30 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SW, height: SH } = Dimensions.get("window");
+
 const BTN_SIZE = 54;
 const EDGE_MARGIN = 16;
 const TAB_BAR_HEIGHT = 80;
 
-// ─── Time-based color theme ───────────────────────────────────────────────────
+/**
+ * Glow control:
+ * Keep opacity low for premium soft neon.
+ */
+const GLOW = {
+  idleMinOpacity: 0.12,
+  idleMaxOpacity: 0.98,
+  urgentMinOpacity: 0.18,
+  urgentMaxOpacity: 0.38,
+  idleScale: 1.16,
+  urgentScale: 1.22,
+  idleDuration: 2400,
+  urgentDuration: 1200,
+};
 
 type TimeTheme = {
   gradientColors: [string, string];
   glowColor: string;
+  borderColor: string;
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
 };
@@ -39,7 +51,8 @@ function getTimeTheme(hasUrgent: boolean): TimeTheme {
   if (hasUrgent) {
     return {
       gradientColors: ["#F59E0B", "#EF4444"],
-      glowColor: "rgba(245,158,11,0.5)",
+      glowColor: "rgba(245,158,11,0.45)",
+      borderColor: "rgba(255,255,255,0.18)",
       iconName: "alert-circle",
       label: "urgent",
     };
@@ -47,44 +60,48 @@ function getTimeTheme(hasUrgent: boolean): TimeTheme {
 
   const h = new Date().getHours();
 
-  // Dawn 5–7
-  if (h >= 5 && h < 7) return {
-    gradientColors: ["#F97316", "#FB923C"],
-    glowColor: "rgba(249,115,22,0.45)",
-    iconName: "partly-sunny-outline",
-    label: "dawn",
-  };
-  // Morning 7–12
-  if (h >= 7 && h < 12) return {
-    gradientColors: ["#F59E0B", "#FBBF24"],
-    glowColor: "rgba(245,158,11,0.45)",
-    iconName: "sunny",
-    label: "morning",
-  };
-  // Afternoon 12–17
-  if (h >= 12 && h < 17) return {
-    gradientColors: ["#F97316", "#EAB308"],
-    glowColor: "rgba(249,115,22,0.4)",
-    iconName: "sunny-outline",
-    label: "afternoon",
-  };
-  // Evening 17–20
-  if (h >= 17 && h < 20) return {
-    gradientColors: ["#F97316", "#DC2626"],
-    glowColor: "rgba(249,115,22,0.4)",
-    iconName: "partly-sunny-outline",
-    label: "evening",
-  };
-  // Night 20–5
+  // Morning: soft champagne / light premium
+  if (h >= 5 && h < 11) {
+    return {
+      gradientColors: ["#FDE68A", "#F59E0B"],
+      glowColor: "rgba(253,230,138,0.34)",
+      borderColor: "rgba(253,230,138,0.34)",
+      iconName: "partly-sunny-outline",
+      label: "morning",
+    };
+  }
+
+  // Day: refined yellow
+  if (h >= 11 && h < 16) {
+    return {
+      gradientColors: ["#FACC15", "#D97706"],
+      glowColor: "rgba(250,204,21,0.32)",
+      borderColor: "rgba(250,204,21,0.28)",
+      iconName: "sunny",
+      label: "day",
+    };
+  }
+
+  // Evening: controlled warm orange
+  if (h >= 16 && h < 20) {
+    return {
+      gradientColors: ["#FB923C", "#EA580C"],
+      glowColor: "rgba(251,146,60,0.34)",
+      borderColor: "rgba(251,146,60,0.3)",
+      iconName: "partly-sunny-outline",
+      label: "evening",
+    };
+  }
+
+  // Night: dark blue, app-theme friendly
   return {
-    gradientColors: ["#1D4ED8", "#0F172A"],
-    glowColor: "rgba(29,78,216,0.5)",
+    gradientColors: ["#2563EB", "#0F172A"],
+    glowColor: "rgba(37,99,235,0.36)",
+    borderColor: "rgba(96,165,250,0.26)",
     iconName: "moon",
     label: "night",
   };
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDaysSince(dateStr?: string): number {
   if (!dateStr) return 0;
@@ -107,8 +124,6 @@ function getTodayLabel(): string {
   });
 }
 
-// ─── Briefing Logic ───────────────────────────────────────────────────────────
-
 interface BriefingLine {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
@@ -119,6 +134,7 @@ interface BriefingLine {
 
 function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[] {
   const lines: BriefingLine[] = [];
+
   const activeFiles = files.filter((f) => f.status?.toLowerCase() === "active");
   const draftFiles = files.filter((f) => f.status?.toLowerCase() === "draft");
 
@@ -140,17 +156,20 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
     .sort(
       (a, b) =>
         getDaysSince(b.last_activity_at || b.updated_at) -
-        getDaysSince(a.last_activity_at || a.updated_at)
+        getDaysSince(a.last_activity_at || a.updated_at),
     );
 
   if (stale.length > 0) {
     const oldest = stale[0];
     const days = getDaysSince(oldest.last_activity_at || oldest.updated_at);
+
     lines.push({
       icon: "alert-circle-outline",
       color: "#F59E0B",
       bg: "rgba(245,158,11,0.15)",
-      text: `${oldest.claim_number} hasn't been updated in ${days} day${days !== 1 ? "s" : ""}. Consider following up.`,
+      text: `${oldest.claim_number} hasn't been updated in ${days} day${
+        days !== 1 ? "s" : ""
+      }. Consider following up.`,
       priority: 2,
     });
   }
@@ -187,8 +206,9 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
   }
 
   const touchedToday = files.filter(
-    (f) => getDaysSince(f.last_activity_at || f.updated_at) === 0
+    (f) => getDaysSince(f.last_activity_at || f.updated_at) === 0,
   );
+
   if (touchedToday.length === 0 && files.length > 0) {
     lines.push({
       icon: "sunny-outline",
@@ -212,24 +232,31 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
   return lines.sort((a, b) => a.priority - b.priority);
 }
 
-// ─── Main Export ──────────────────────────────────────────────────────────────
-
 interface Props {
   files: ClaimFile[];
   credits: number;
   userName?: string;
 }
 
-export function DailyBriefing({ files, credits, userName }: Props) {
+export function DailyBriefing({ files = [], credits, userName }: Props) {
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
 
-  const hasFiles = files && files.length > 0;
-  if (!hasFiles) return null;
+  const hasFiles = files.length > 0;
 
-  const lines = buildBriefingLines(files, credits);
-  const hasUrgent = lines.some((l) => l.priority === 0 || l.priority === 2);
-  const theme = getTimeTheme(hasUrgent);
+  const lines = useMemo(
+    () => buildBriefingLines(files, credits),
+    [files, credits],
+  );
+
+  const hasUrgent = useMemo(
+    () => lines.some((l) => l.priority === 0 || l.priority === 2),
+    [lines],
+  );
+
+  const theme = useMemo(() => getTimeTheme(hasUrgent), [hasUrgent]);
+
+  if (!hasFiles) return null;
 
   return (
     <>
@@ -242,6 +269,7 @@ export function DailyBriefing({ files, credits, userName }: Props) {
         theme={theme}
         bottomBound={insets.bottom + TAB_BAR_HEIGHT}
       />
+
       <BriefingModal
         visible={modalVisible}
         onClose={() => {
@@ -258,8 +286,6 @@ export function DailyBriefing({ files, credits, userName }: Props) {
   );
 }
 
-// ─── Draggable Button ─────────────────────────────────────────────────────────
-
 function DraggableButton({
   onPress,
   hasUrgent,
@@ -274,115 +300,83 @@ function DraggableButton({
   const initX = SW - BTN_SIZE - EDGE_MARGIN;
   const initY = SH - bottomBound - BTN_SIZE - EDGE_MARGIN;
 
-  // NON-NATIVE: position
   const posX = useRef(new Animated.Value(initX)).current;
   const posY = useRef(new Animated.Value(initY)).current;
 
-  // NATIVE: visuals only
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current; // subtle icon wobble on grab
+  const rotateAnim = useRef(new Animated.Value(0)).current;
   const trailAnim = useRef(new Animated.Value(0)).current;
 
   const currentPos = useRef({ x: initX, y: initY });
   const dragStartTime = useRef(0);
   const dragDistance = useRef(0);
 
-  // Idle breathe — very subtle, iOS-like
   useEffect(() => {
-    if (!hasUrgent) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.04,
-            duration: 2200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1.0,
-            duration: 2200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
+    pulseAnim.stopAnimation();
+    glowAnim.stopAnimation();
 
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 0.5,
-            duration: 2200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0.1,
-            duration: 2200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, []);
+    const maxOpacity = hasUrgent ? GLOW.urgentMaxOpacity : GLOW.idleMaxOpacity;
+    const minOpacity = hasUrgent ? GLOW.urgentMinOpacity : GLOW.idleMinOpacity;
+    const maxScale = hasUrgent ? 1.055 : 1.025;
+    const duration = hasUrgent ? GLOW.urgentDuration : GLOW.idleDuration;
 
-  // Urgent pulse — faster, more intense
-  useEffect(() => {
-    if (hasUrgent) {
-      pulseAnim.stopAnimation();
-      glowAnim.stopAnimation();
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: maxScale,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
 
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.12,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1.0,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: maxOpacity,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: minOpacity,
+          duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
 
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0.25,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, [hasUrgent]);
+    pulseLoop.start();
+    glowLoop.start();
+
+    return () => {
+      pulseLoop.stop();
+      glowLoop.stop();
+    };
+  }, [hasUrgent, pulseAnim, glowAnim]);
 
   const snapToEdge = (x: number, y: number, velocityX = 0) => {
-    // Use velocity to determine snap side if near center
-    let snapX: number;
     const center = x + BTN_SIZE / 2;
-    if (Math.abs(center - SW / 2) < 60) {
-      // Near center — use velocity to decide
-      snapX = velocityX >= 0
-        ? SW - BTN_SIZE - EDGE_MARGIN
-        : EDGE_MARGIN;
-    } else {
-      snapX = center < SW / 2 ? EDGE_MARGIN : SW - BTN_SIZE - EDGE_MARGIN;
-    }
+
+    const snapX =
+      Math.abs(center - SW / 2) < 60
+        ? velocityX >= 0
+          ? SW - BTN_SIZE - EDGE_MARGIN
+          : EDGE_MARGIN
+        : center < SW / 2
+          ? EDGE_MARGIN
+          : SW - BTN_SIZE - EDGE_MARGIN;
 
     const minY = 80;
     const maxY = SH - bottomBound - BTN_SIZE - EDGE_MARGIN;
@@ -390,7 +384,6 @@ function DraggableButton({
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // Smooth iOS-style spring snap
     Animated.parallel([
       Animated.spring(posX, {
         toValue: snapX,
@@ -406,7 +399,6 @@ function DraggableButton({
       }),
     ]).start();
 
-    // Scale bounce back
     Animated.spring(scaleAnim, {
       toValue: 1,
       tension: 200,
@@ -421,7 +413,6 @@ function DraggableButton({
       useNativeDriver: true,
     }).start();
 
-    // Snap wobble
     Animated.sequence([
       Animated.timing(rotateAnim, {
         toValue: snapX === EDGE_MARGIN ? -1 : 1,
@@ -449,22 +440,20 @@ function DraggableButton({
         dragStartTime.current = Date.now();
         dragDistance.current = 0;
 
-        // iOS press-down: scale up + slight opacity
         Animated.spring(scaleAnim, {
-          toValue: 1.18,
+          toValue: 1.14,
           tension: 280,
           friction: 7,
           useNativeDriver: true,
         }).start();
 
         Animated.timing(opacityAnim, {
-          toValue: 0.88,
+          toValue: 0.9,
           duration: 80,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }).start();
 
-        // Grab wobble
         Animated.sequence([
           Animated.timing(rotateAnim, {
             toValue: 0.8,
@@ -483,11 +472,10 @@ function DraggableButton({
           }),
         ]).start();
 
-        // Trail burst
         trailAnim.setValue(0);
         Animated.timing(trailAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 360,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }).start();
@@ -504,7 +492,6 @@ function DraggableButton({
         const moved = dragDistance.current;
 
         if (elapsed < 200 && moved < 8) {
-          // Tap: quick spring back + fire
           Animated.spring(scaleAnim, {
             toValue: 0.94,
             tension: 400,
@@ -529,40 +516,35 @@ function DraggableButton({
           return;
         }
 
-        // Drag release: snap with velocity
         snapToEdge(
           currentPos.current.x + g.dx,
           currentPos.current.y + g.dy,
-          g.vx
+          g.vx,
         );
       },
 
       onPanResponderTerminate: (_, g) => {
         snapToEdge(
           currentPos.current.x + (g.dx || 0),
-          currentPos.current.y + (g.dy || 0)
+          currentPos.current.y + (g.dy || 0),
         );
       },
-    })
+    }),
   ).current;
 
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
   const glowScale = pulseAnim.interpolate({
-    inputRange: [1, 1.12],
-    outputRange: [1, 1.3],
+    inputRange: [1, 1.055],
+    outputRange: [1, hasUrgent ? GLOW.urgentScale : GLOW.idleScale],
   });
 
   const trailScale = trailAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.8, 2.8],
+    outputRange: [0.8, 1.9],
   });
+
   const trailOpacity = trailAnim.interpolate({
-    inputRange: [0, 0.3, 1],
-    outputRange: [0.5, 0.2, 0],
+    inputRange: [0, 0.35, 1],
+    outputRange: [0.22, 0.1, 0],
   });
 
   const rotate = rotateAnim.interpolate({
@@ -575,20 +557,30 @@ function DraggableButton({
       style={[fabStyles.positionLayer, { left: posX, top: posY }]}
       {...panResponder.panHandlers}
     >
-      {/* Outer glow halo — expands with pulse */}
       <Animated.View
         pointerEvents="none"
         style={[
-          fabStyles.glowHalo,
+          fabStyles.softGlow,
           {
             backgroundColor: theme.glowColor,
-            opacity: glowOpacity,
+            opacity: glowAnim,
             transform: [{ scale: glowScale }],
           },
         ]}
       />
 
-      {/* Drag trail burst */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          fabStyles.edgeGlow,
+          {
+            borderColor: theme.glowColor,
+            opacity: glowAnim,
+            transform: [{ scale: glowScale }],
+          },
+        ]}
+      />
+
       <Animated.View
         pointerEvents="none"
         style={[
@@ -601,18 +593,19 @@ function DraggableButton({
         ]}
       />
 
-      {/* Inner glow ring (urgent only) */}
       {hasUrgent && (
         <Animated.View
           pointerEvents="none"
           style={[
             fabStyles.urgentRing,
-            { opacity: glowOpacity },
+            {
+              borderColor: theme.glowColor,
+              opacity: glowAnim,
+            },
           ]}
         />
       )}
 
-      {/* Button face — scale + rotate (NATIVE) */}
       <Animated.View
         style={[
           fabStyles.btnWrapper,
@@ -629,11 +622,15 @@ function DraggableButton({
           colors={theme.gradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={fabStyles.gradient}
+          style={[
+            fabStyles.gradient,
+            {
+              borderColor: theme.borderColor,
+              shadowColor: "#000",
+            },
+          ]}
         >
-          {/* Top shine gloss */}
           <View style={fabStyles.shineTop} />
-          {/* Bottom reflection */}
           <View style={fabStyles.shineBottom} />
 
           <Ionicons name={theme.iconName} size={22} color="#FFFFFF" />
@@ -641,7 +638,6 @@ function DraggableButton({
 
         {hasUrgent && <View style={fabStyles.dot} />}
 
-        {/* Drag hint dots */}
         <View style={fabStyles.dragDots}>
           {[0, 1, 2].map((i) => (
             <View key={i} style={fabStyles.dragDot} />
@@ -651,8 +647,6 @@ function DraggableButton({
     </Animated.View>
   );
 }
-
-// ─── Briefing Modal ───────────────────────────────────────────────────────────
 
 function BriefingModal({
   visible,
@@ -679,6 +673,7 @@ function BriefingModal({
   useEffect(() => {
     if (visible) {
       setMounted(true);
+
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -714,7 +709,7 @@ function BriefingModal({
         }),
       ]).start(() => setMounted(false));
     }
-  }, [visible]);
+  }, [visible, slideAnim, backdropAnim, scaleAnim]);
 
   if (!mounted) return null;
 
@@ -723,20 +718,15 @@ function BriefingModal({
 
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
-      {/* Backdrop */}
       <Animated.View style={[mStyles.backdrop, { opacity: backdropAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Card */}
       <Animated.View
         style={[
           mStyles.cardWrapper,
           {
-            transform: [
-              { translateY: slideAnim },
-              { scale: scaleAnim },
-            ],
+            transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
           },
         ]}
       >
@@ -746,13 +736,15 @@ function BriefingModal({
           end={{ x: 1, y: 1 }}
           style={mStyles.card}
         >
-          {/* Top shimmer accent — uses theme color */}
-          <View style={[mStyles.shimmerLine, { backgroundColor: theme.glowColor }]} />
+          <View
+            style={[
+              mStyles.shimmerLine,
+              { backgroundColor: theme.glowColor },
+            ]}
+          />
 
-          {/* Handle */}
           <View style={mStyles.handle} />
 
-          {/* Header */}
           <View style={mStyles.header}>
             <View style={mStyles.headerLeft}>
               <LinearGradient
@@ -763,6 +755,7 @@ function BriefingModal({
               >
                 <Ionicons name={theme.iconName} size={18} color="#fff" />
               </LinearGradient>
+
               <View style={{ flex: 1 }}>
                 <Text style={mStyles.greeting}>
                   {getGreeting()}, {displayName} 👋
@@ -770,15 +763,25 @@ function BriefingModal({
                 <Text style={mStyles.dateLabel}>{getTodayLabel()}</Text>
               </View>
             </View>
+
             <Pressable onPress={onClose} style={mStyles.closeBtn} hitSlop={12}>
               <Ionicons name="close" size={15} color="rgba(255,255,255,0.5)" />
             </Pressable>
           </View>
 
-          {/* Stats */}
           <View style={mStyles.statsRow}>
-            <StatPill label="Claims" value={totalFiles} icon="layers-outline" color="#3B82F6" />
-            <StatPill label="Credits" value={credits} icon="flash-outline" color="#F59E0B" />
+            <StatPill
+              label="Claims"
+              value={totalFiles}
+              icon="layers-outline"
+              color="#3B82F6"
+            />
+            <StatPill
+              label="Credits"
+              value={credits}
+              icon="flash-outline"
+              color="#F59E0B"
+            />
           </View>
 
           <View style={mStyles.divider} />
@@ -787,12 +790,16 @@ function BriefingModal({
 
           <View style={mStyles.linesContainer}>
             {lines.map((line, i) => (
-              <BriefingRow key={i} line={line} index={i} />
+              <BriefingRow key={`${line.text}-${i}`} line={line} index={i} />
             ))}
           </View>
 
           <View style={mStyles.footer}>
-            <Ionicons name="shield-checkmark-outline" size={11} color="rgba(255,255,255,0.2)" />
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={11}
+              color="rgba(255,255,255,0.2)"
+            />
             <Text style={mStyles.footerText}>
               Auto-generated from your workspace data
             </Text>
@@ -803,9 +810,12 @@ function BriefingModal({
   );
 }
 
-// ─── Stat Pill ────────────────────────────────────────────────────────────────
-
-function StatPill({ label, value, icon, color }: {
+function StatPill({
+  label,
+  value,
+  icon,
+  color,
+}: {
   label: string;
   value: number;
   icon: keyof typeof Ionicons.glyphMap;
@@ -821,8 +831,6 @@ function StatPill({ label, value, icon, color }: {
     </View>
   );
 }
-
-// ─── Briefing Row ─────────────────────────────────────────────────────────────
 
 function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -845,7 +853,7 @@ function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim, index]);
 
   return (
     <Animated.View
@@ -862,8 +870,6 @@ function BriefingRow({ line, index }: { line: BriefingLine; index: number }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const fabStyles = StyleSheet.create({
   positionLayer: {
     position: "absolute",
@@ -871,14 +877,23 @@ const fabStyles = StyleSheet.create({
     height: BTN_SIZE,
     zIndex: 9999,
   },
-  // Large soft outer glow — breathes with pulse
-  glowHalo: {
+  softGlow: {
     position: "absolute",
-    width: BTN_SIZE + 32,
-    height: BTN_SIZE + 32,
-    borderRadius: (BTN_SIZE + 32) / 2,
-    top: -16,
-    left: -16,
+    width: BTN_SIZE + 18,
+    height: BTN_SIZE + 18,
+    borderRadius: (BTN_SIZE + 18) / 2,
+    top: -9,
+    left: -9,
+  },
+  edgeGlow: {
+    position: "absolute",
+    width: BTN_SIZE + 10,
+    height: BTN_SIZE + 10,
+    borderRadius: (BTN_SIZE + 10) / 2,
+    top: -5,
+    left: -5,
+    borderWidth: 1.2,
+    backgroundColor: "transparent",
   },
   trail: {
     position: "absolute",
@@ -893,8 +908,7 @@ const fabStyles = StyleSheet.create({
     borderRadius: (BTN_SIZE + 14) / 2,
     top: -7,
     left: -7,
-    borderWidth: 1.5,
-    borderColor: "rgba(245,158,11,0.6)",
+    borderWidth: 1.4,
     backgroundColor: "transparent",
   },
   btnWrapper: {
@@ -908,31 +922,31 @@ const fabStyles = StyleSheet.create({
     borderRadius: BTN_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.55,
-    shadowRadius: 16,
+    elevation: 10,
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.32,
+    shadowRadius: 12,
+    borderWidth: 1,
     overflow: "hidden",
   },
   shineTop: {
     position: "absolute",
     top: 5,
     left: 10,
-    width: BTN_SIZE * 0.52,
-    height: BTN_SIZE * 0.22,
+    width: BTN_SIZE * 0.5,
+    height: BTN_SIZE * 0.2,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.2)",
     transform: [{ rotate: "-22deg" }],
   },
   shineBottom: {
     position: "absolute",
     bottom: 7,
     right: 8,
-    width: BTN_SIZE * 0.25,
-    height: BTN_SIZE * 0.12,
+    width: BTN_SIZE * 0.24,
+    height: BTN_SIZE * 0.1,
     borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.07)",
     transform: [{ rotate: "-22deg" }],
   },
   dot: {
@@ -996,7 +1010,7 @@ const mStyles = StyleSheet.create({
     right: "20%",
     height: 1.5,
     borderRadius: 1,
-    opacity: 0.5,
+    opacity: 0.35,
   },
   handle: {
     width: 42,
