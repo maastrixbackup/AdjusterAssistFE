@@ -6,7 +6,7 @@ import {
   getToken,
   saveSessionTokens,
 } from "@/lib/utils/storage";
-import { router } from "expo-router";
+import { triggerUnauthorizedLogout } from "./authEvents";
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -33,7 +33,7 @@ async function performLogout() {
   try {
     await clearSessionTokens();
     await logoutUser();
-    router.replace("/login");
+    await triggerUnauthorizedLogout();
   } finally {
     setTimeout(() => {
       isLoggingOut = false;
