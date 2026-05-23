@@ -120,9 +120,9 @@ export default function MFALoginScreen() {
         Haptics.NotificationFeedbackType.Success,
       );
 
-      toast.success("Verified", {
-        description: "Welcome back.",
-      });
+      // toast.success("Verified", {
+      //   description: "Welcome back.",
+      // });
 
       router.replace("/(tabs)");
     } catch (error: any) {
