@@ -28,7 +28,6 @@ type AuthContextValue = {
   isHydrated: boolean;
   isAuthenticated: boolean;
   needsMfaSetup: boolean;
-
   token: string | null;
   accessToken: string | null;
   refreshToken: string | null;
@@ -37,6 +36,7 @@ type AuthContextValue = {
   mfaTempSession: MfaTempSession | null;
   login: (email: string, password: string) => Promise<LoginResult>;
   completeMfaLogin: (session: AuthSession) => Promise<void>;
+  completeRecoveryLogin: (session: AuthSession) => Promise<void>;
   refreshAuthSession: () => Promise<string | null>;
   updateMfaTempSession: (session: MfaTempSession) => void;
   hasSeenOnboarding: boolean;
@@ -176,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const isFullyAuthenticated = Boolean(accessToken && aal === "aal2");
+  const isFullyAuthenticated = Boolean(accessToken);
   const needsMfaSetup = Boolean(mfaTempSession && !mfaTempSession.factor_id);
   async function refreshAuthSessionInternal() {
     if (!refreshToken) {
@@ -235,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAal("aal1");
 
           await saveSession(null);
+          await clearSessionTokens();
 
           return result;
         }
@@ -249,6 +250,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           aal: "aal2",
         });
       },
+      async completeRecoveryLogin(session: AuthSession) {
+        await persistAuthenticatedSession({
+          ...session,
+          aal: session.aal || "aal2",
+        });
+      },
 
       async refreshAuthSession() {
         return refreshAuthSessionInternal();
@@ -257,7 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateMfaTempSession(session: MfaTempSession) {
         setMfaTempSession(session);
         setEmail(session.email);
-        setAal("aal1");
+        setAal("aal2");
 
         setToken(null);
         setAccessToken(null);
@@ -271,7 +278,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         acceptedPolicy: boolean,
       ) {
         await signupWithEmail(name, inputEmail, role, password, acceptedPolicy);
-
         await clearAuthState();
         await logoutUser();
       },

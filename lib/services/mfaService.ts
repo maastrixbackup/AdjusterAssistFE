@@ -317,8 +317,17 @@ export async function recoveryCodeLogin(params: {
     success: boolean;
     message: string;
     recovery_used: boolean;
+    requires_mfa: boolean;
     requires_mfa_setup: boolean;
-    removed_factors_count?: number;
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    expires_at: number;
+    token_type: string;
+    user: {
+      id: string;
+      email: string;
+    };
   }>("/auth/mfa/recovery-login", "POST", params.temp_access_token, {
     recovery_code: params.recovery_code,
   });

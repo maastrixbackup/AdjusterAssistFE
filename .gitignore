@@ -3,7 +3,7 @@
 # dependencies
 node_modules/
 adjusterassist-e6b9a-firebase-adminsdk-fbsvc-0b9ebdfaab.json
-google-services.json
+# !google-services.json
 
 # Expo
 .expo/
