@@ -1,6 +1,7 @@
 // lib/notifications/registerForPushToken.ts
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { apiRequest } from "../services/apiClient";
 
 export async function registerAndSendPushToken(
   token: string | null, // pass token from component
@@ -56,30 +57,16 @@ export async function registerAndSendPushToken(
       return;
     }
 
-    // 5. Auth token is passed in; don’t call useAuth here
     if (!token) {
       showToast?.("You are not logged in");
       return;
     }
 
-    // 6. Send to backend
-    const res = await fetch(
-      "https://adjusterassist-backend.onrender.com/api/v1/notifications/save-token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ pushToken: expoPushToken }),
-      },
-    );
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Failed to save token");
-    }
-    showToast?.("Push token saved");
+    // 6. Send to backend using refresh-enabled apiRequest
+    await apiRequest("/notifications/save-token", "POST", {
+      pushToken: expoPushToken,
+    });
+    // showToast?.("Push token saved");
   } catch (err: any) {
     console.log("registerAndSendPushToken error:", err);
     showToast?.(`Error: ${err.message}`);
