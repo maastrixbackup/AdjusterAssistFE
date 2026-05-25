@@ -29,9 +29,7 @@ import { toast } from "sonner-native";
 export default function MFALoginScreen() {
   const { width, height } = useWindowDimensions();
   const isTablet = width > 768;
-
   const { mfaTempSession, completeMfaLogin, logout } = useAuth();
-
   const [challengeId, setChallengeId] = useState("");
   const [otp, setOtp] = useState("");
   const [focused, setFocused] = useState(false);

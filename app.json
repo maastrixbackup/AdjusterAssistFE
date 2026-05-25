@@ -2,14 +2,10 @@
   "expo": {
     "name": "AdjusterAssist",
     "slug": "AdjusterAssist",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "adjusterassist",
-    "notifications": {
-      "icon": "./assets/images/notification-icon.png",
-      "color": "#0B3C7A"
-    },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -45,7 +41,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#004AC0"
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -80,7 +82,6 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker",
       "expo-web-browser",
       "expo-secure-store"
     ],

@@ -176,7 +176,6 @@ const colors = {
   bold: "\x1b[1m",
 };
 const API_BASE_URL = BASE_URL;
-const DEBUG_MODE = true;
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -644,8 +643,22 @@ export interface RefinePayload {
   userInput: string;
 }
 
-export const refineResponse = async (token: string, payload: RefinePayload) => {
-  return apiRequest(
+export type RefineResult = {
+  success: boolean;
+  data: {
+    ai_response: string;
+    output_format: string;
+    next_step_suggestion: string;
+    created_at: string;
+    updated_at: string;
+  };
+};
+
+export const refineResponse = async (
+  token: string,
+  payload: RefinePayload,
+): Promise<RefineResult> => {
+  return apiRequest<RefineResult>(
     "/drafts/refine",
     {
       method: "POST",
@@ -661,12 +674,21 @@ export interface VariantPayload {
   variantLabel: string;
   userInput: string;
 }
+export type VariantResult = {
+  success: boolean;
+  data: {
+    ai_response: string;
+    output_format: string;
+    next_step_suggestion: string;
+  };
+  updated_at?: string;
+};
 
 export const generateVariant = async (
   token: string,
   payload: VariantPayload,
-) => {
-  return apiRequest(
+): Promise<VariantResult> => {
+  return apiRequest<VariantResult>(
     "/drafts/variant",
     {
       method: "POST",
@@ -675,7 +697,6 @@ export const generateVariant = async (
     token,
   );
 };
-
 export type UpdateUserPayload = {
   name?: string;
   phone?: number;

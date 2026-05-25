@@ -45,7 +45,7 @@ function normalizeRecoveryCode(value: string) {
 export default function MFARecoveryScreen() {
     const { width, height } = useWindowDimensions();
     const isTablet = width > 768;
-    const { mfaTempSession, updateMfaTempSession, logout } = useAuth();
+    const { mfaTempSession, completeRecoveryLogin, logout } = useAuth();
     const [supportLoading, setSupportLoading] = useState(false);
     const [code, setCode] = useState("");
     const [focused, setFocused] = useState(false);
@@ -134,23 +134,31 @@ export default function MFARecoveryScreen() {
                 temp_access_token: mfaTempSession.temp_access_token,
             });
 
-            if (!response.success || !response.requires_mfa_setup) {
+            if (
+                !response.success ||
+                !response.recovery_used ||
+                !response.access_token ||
+                !response.refresh_token
+            ) {
                 throw new Error(response.message || "Recovery failed.");
             }
 
-            updateMfaTempSession({
-                email: mfaTempSession.email,
-                temp_access_token: mfaTempSession.temp_access_token,
-                temp_refresh_token: mfaTempSession.temp_refresh_token,
+            await completeRecoveryLogin({
+                token: response.access_token,
+                access_token: response.access_token,
+                refresh_token: response.refresh_token,
+                expires_at: response.expires_at,
+                email: response.user.email,
+                aal: "aal2",
             });
 
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-            toast.success("Recovery Code Accepted", {
-                description: "Please set up MFA again.",
+            toast.success("Recovery successful", {
+                description: "You are now signed in securely.",
             });
 
-            router.replace("/mfa-setup");
+            router.replace("/(tabs)");
         } catch (error: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 

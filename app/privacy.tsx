@@ -2,7 +2,6 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import {
     Dimensions,
@@ -13,6 +12,7 @@ import {
     Text,
     View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -230,7 +230,7 @@ export default function PrivacyScreen() {
 
                 <View style={styles.footer}>
                     <Text style={styles.footerBrand}>AdjusterAssist Intelligence</Text>
-                    <Text style={styles.footerVersion}>VERSION 1.6.0</Text>
+                    <Text style={styles.footerVersion}>VERSION 1.7.0</Text>
                 </View>
             </ScrollView>
         </View>
