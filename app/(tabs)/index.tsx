@@ -24,7 +24,6 @@ import {
   getMyFiles,
   getSubscriptionStatus
 } from "@/lib/api";
-import { logoutUser } from "@/lib/services/authService";
 import { useAuth } from "@/providers/auth-provider";
 
 const { width } = Dimensions.get("window");
@@ -70,16 +69,16 @@ const WorkspaceItem = memo(({ file, onPress, getStyle }: any) => {
 WorkspaceItem.displayName = "WorkspaceItem";
 
 export default function HomeScreen() {
-  const { token, email } = useAuth();
+  const { token, email, sessionChecking  } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const logo = require("../../assets/images/header-icon.png");
 
   // React Query for Subscription Status
   const { data: status } = useQuery({
-    queryKey: ["subscriptionStatus", token],
-    queryFn: () => getSubscriptionStatus(token!),
-    enabled: !!token,
+    queryKey: ["subscriptionStatus"],
+    queryFn: getSubscriptionStatus,
+    enabled: !!token && !sessionChecking,
   });
 
   // React Query for Files
@@ -87,28 +86,19 @@ export default function HomeScreen() {
     data: files = [],
     isLoading,
     refetch,
-    isRefetching
+    isRefetching,
   } = useQuery({
-    queryKey: ["myFiles", token],
-    queryFn: async () => {
-      try {
-        return await getMyFiles(token!);
-      } catch (err: any) {
-        if (err.message.includes("401") || err.message.includes("Unauthorized")) {
-          logoutUser();
-        }
-        throw err;
-      }
-    },
-    enabled: !!token,
+    queryKey: ["myFiles"],
+    queryFn: getMyFiles,
+    enabled: !!token && !sessionChecking,
   });
 
   // Re-fetch on focus
-  useFocusEffect(
-    React.useCallback(() => {
-      refetch();
-    }, [refetch])
-  );
+  // useFocusEffect(
+  //   React.useCallback(() => {
+  //     refetch();
+  //   }, [refetch])
+  // );
 
   const mostRecentFile = useMemo(() => {
     if (!files || files.length === 0) return null;

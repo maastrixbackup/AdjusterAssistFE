@@ -150,7 +150,7 @@ const responseTypeLabels: Record<string, string> = {
   email_insured: "Email Response",
   email_contractor: "Contractor Response",
   escalation_response: "Escalation Response",
-  supplement_response: "Suplement Response",
+  supplement_response: "Supplement Response",
   coverage_analysis: "Coverage Analysis",
   denial_support: "Denial Support",
   claim_summary: "Claim Summary",
@@ -167,6 +167,9 @@ const responseTypeLabels: Record<string, string> = {
  * Core API Helper
  */
 // Color constants for terminal
+const DEBUG_MODE = true;
+const API_BASE_URL = BASE_URL;
+
 const colors = {
   reset: "\x1b[0m",
   blue: "\x1b[34m",
@@ -174,12 +177,21 @@ const colors = {
   red: "\x1b[31m",
   yellow: "\x1b[33m",
   bold: "\x1b[1m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
 };
-const API_BASE_URL = BASE_URL;
 
-let isRefreshing = false;
-let refreshPromise: Promise<string | null> | null = null;
+function debugLog(color: keyof typeof colors, label: string, data?: unknown) {
+  if (!DEBUG_MODE) return;
+
+  console.log(
+    `${colors[color]}${colors.bold}[${label}]${colors.reset}`,
+    data ?? "",
+  );
+}
+
 let isLoggingOut = false;
+let refreshPromise: Promise<string | null> | null = null;
 
 async function logoutAndRedirect() {
   if (isLoggingOut) return;
@@ -196,12 +208,48 @@ async function logoutAndRedirect() {
   }
 }
 
+function decodeJwtPayload(token: string) {
+  const base64Url = token.split(".")[1];
+  if (!base64Url) return null;
+
+  const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+
+  const decoded = decodeURIComponent(
+    globalThis
+      .atob(base64)
+      .split("")
+      .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+      .join(""),
+  );
+
+  return JSON.parse(decoded);
+}
+
+function isJwtExpiringSoon(token?: string | null, bufferSeconds = 300) {
+  if (!token) return false;
+
+  try {
+    const payload = decodeJwtPayload(token);
+    const exp = payload?.exp;
+    if (!exp) return true;
+    const now = Math.floor(Date.now() / 1000);
+    const secondsLeft = exp - now;
+    debugLog("cyan", "TOKEN EXPIRY CHECK", {
+      secondsLeft,
+      expiringSoon: secondsLeft <= bufferSeconds,
+    });
+    return exp - now <= bufferSeconds;
+  } catch {
+    return true;
+  }
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const refreshToken = await getRefreshToken();
 
     if (!refreshToken) return null;
-
+    debugLog("yellow", "TOKEN REFRESH STARTED");
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: {
@@ -215,61 +263,107 @@ async function refreshAccessToken(): Promise<string | null> {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || !data?.access_token || !data?.refresh_token) {
+      debugLog("red", "TOKEN REFRESH FAILED", {
+        status: response.status,
+        data,
+      });
       return null;
     }
-
     await saveSessionTokens({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
     });
+    debugLog("green", "TOKEN REFRESH SUCCESS");
 
     return data.access_token;
   } catch (error) {
-    console.log("[TOKEN REFRESH FAILED]", error);
+    debugLog("red", "TOKEN REFRESH ERROR", error);
     return null;
   }
 }
 
+async function getFreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) {
+    debugLog(
+      "yellow",
+      "TOKEN REFRESH WAITING",
+      "Using existing refresh request",
+    );
+    return refreshPromise;
+  }
+
+  refreshPromise = refreshAccessToken().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
 async function apiRequest<T>(
   path: string,
-  init: RequestInit,
+  init: RequestInit = {},
   token?: string,
   retry = true,
 ): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error("Missing API_BASE_URL configuration.");
   }
-
+  const startTime = Date.now();
   const url = `${API_BASE_URL}${path}`;
   const isFormData = init.body instanceof FormData;
 
   const storedToken = await getToken();
-  const accessToken = token || storedToken;
+  let accessToken = token || storedToken;
+  if (retry && path !== "/auth/refresh" && isJwtExpiringSoon(accessToken)) {
+    const refreshedToken = await getFreshAccessToken();
 
-  const headers: Record<string, string> = {
-    ...(!isFormData && { "Content-Type": "application/json" }),
-    ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+    if (refreshedToken) {
+      accessToken = refreshedToken;
+    }
+  }
+
+  const incomingHeaders = {
     ...(init.headers as Record<string, string>),
   };
 
+  delete incomingHeaders.Authorization;
+  delete incomingHeaders.authorization;
+
+  if (isFormData) {
+    delete incomingHeaders["Content-Type"];
+    delete incomingHeaders["content-type"];
+  }
+
+  const headers: Record<string, string> = {
+    ...incomingHeaders,
+    ...(!isFormData && { "Content-Type": "application/json" }),
+    ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+  };
+  debugLog("blue", "API REQUEST", {
+    method: init.method || "GET",
+    path,
+    isFormData,
+    hasToken: Boolean(accessToken),
+    retry,
+  });
   const response = await fetch(url, {
     ...init,
     headers,
   });
 
   const json = await response.json().catch(() => ({}));
+  debugLog(response.ok ? "green" : "red", "API RESPONSE", {
+    method: init.method || "GET",
+    path,
+    status: response.status,
+    ok: response.ok,
+    duration: `${Date.now() - startTime}ms`,
+    data: json,
+  });
 
   if (response.status === 401 && retry && path !== "/auth/refresh") {
-    if (!isRefreshing) {
-      isRefreshing = true;
-
-      refreshPromise = refreshAccessToken().finally(() => {
-        isRefreshing = false;
-        refreshPromise = null;
-      });
-    }
-
-    const newAccessToken = await refreshPromise;
+    debugLog("magenta", "401 RETRY TRIGGERED", { path });
+    const newAccessToken = await getFreshAccessToken();
 
     if (!newAccessToken) {
       await logoutAndRedirect();
@@ -287,6 +381,7 @@ async function apiRequest<T>(
 
   return json as T;
 }
+
 /* --- Auth Actions --- */
 
 export async function loginWithEmail(
@@ -316,12 +411,11 @@ export async function signupWithEmail(
 
 /* --- File & Workspace Actions --- */
 
-export const getMyFiles = async (token: string): Promise<ClaimFile[]> => {
+export const getMyFiles = async (): Promise<ClaimFile[]> => {
   try {
     const response = await apiRequest<{ success: boolean; files: ClaimFile[] }>(
       "/files/my-files",
       { method: "GET" },
-      token,
     );
     return response.files || [];
   } catch (error) {
@@ -364,7 +458,6 @@ export async function generateResponse(
       next_step_suggestion: string;
       created_at: string;
       attachments: {
-        // Added
         image: { available: boolean; fileName: string } | null;
         document: { available: boolean; fileName: string } | null;
       };
@@ -374,8 +467,6 @@ export async function generateResponse(
     {
       method: "POST",
       body: isFormData ? payload : JSON.stringify(payload),
-      // We pass custom headers here, but apiRequest MUST not override them with JSON
-      headers: isFormData ? { Authorization: `Bearer ${token}` } : undefined,
     },
     token,
   );
@@ -383,10 +474,8 @@ export async function generateResponse(
   if (!res.data?.output_format) {
     throw new Error("Backend did not provide output_format");
   }
-  // Type-safe extraction of fileId for the return object
   let extractedFileId: number | string;
   if (isFormData) {
-    // Access the internal parts array safely using 'any'
     const parts = (payload as any)._parts;
     const fileIdPart = parts.find((p: any[]) => p[0] === "fileId");
     extractedFileId = Number(fileIdPart?.[1]);
@@ -465,14 +554,10 @@ export async function deleteDraft(
   }
 }
 
-export async function getSubscriptionStatus(
-  token: string,
-): Promise<SubscriptionStatus> {
-  return apiRequest<SubscriptionStatus>(
-    "/subscriptions/my-plan",
-    { method: "GET" },
-    token,
-  );
+export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
+  return apiRequest<SubscriptionStatus>("/subscriptions/my-plan", {
+    method: "GET",
+  });
 }
 
 export async function upgradeSubscription(
@@ -604,20 +689,20 @@ export const AllDraftsofUser = async (
     success: boolean;
     data: ClaimMessage[];
     count: number;
-  }>("/drafts/history", {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+  }>(
+    "/drafts/history",
+    {
+      method: "GET",
     },
-  });
+    token,
+  );
 
   if (!response.success) {
     throw new Error("Failed to fetch draft history");
   }
 
   // Log only the count as requested
-  console.log(`Total Drafts Fetched: ${response.count}`);
+  debugLog("cyan", "TOTAL DRAFTS FETCHED", response.count);
 
   return response.data || []; // Return the .data array
 };
@@ -745,14 +830,10 @@ export async function updateUserProfile(
   );
 }
 
-export async function getProfile(token: string): Promise<UpdateUserResponse> {
-  return apiRequest<UpdateUserResponse>(
-    "/user/profile",
-    {
-      method: "GET",
-    },
-    token,
-  );
+export async function getProfile(): Promise<UpdateUserResponse> {
+  return apiRequest<UpdateUserResponse>("/user/profile", {
+    method: "GET",
+  });
 }
 
 export const getAttachmentPreview = async (
