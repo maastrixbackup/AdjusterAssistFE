@@ -1,13 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
 import { setUnauthorizedHandler } from "@/lib/services/authEvents";
 import {
   AuthSession,
@@ -20,8 +10,17 @@ import {
   signupWithEmail,
 } from "@/lib/services/authService";
 import { clearSessionTokens, saveSessionTokens } from "@/lib/utils/storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { AppState } from "react-native";
 type AalLevel = "aal1" | "aal2";
 
 type AuthContextValue = {
@@ -41,6 +40,7 @@ type AuthContextValue = {
   updateMfaTempSession: (session: MfaTempSession) => void;
   hasSeenOnboarding: boolean;
   completeOnboarding: () => Promise<void>;
+  sessionChecking: boolean;
 
   signup: (
     name: string,
@@ -88,7 +88,7 @@ async function loadSession(): Promise<SessionData | null> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
-
+  const [sessionChecking, setSessionChecking] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
@@ -122,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setHasSeenOnboarding(onboarded === "true");
       setIsHydrated(true);
+      setSessionChecking(false);
     })();
 
     return () => {
@@ -179,9 +180,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isFullyAuthenticated = Boolean(accessToken);
   const needsMfaSetup = Boolean(mfaTempSession && !mfaTempSession.factor_id);
   async function refreshAuthSessionInternal() {
+    setSessionChecking(true);
     if (!refreshToken) {
       await clearAuthState();
       await logoutUser();
+      setSessionChecking(false);
       return null;
     }
 
@@ -198,17 +201,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
 
       await persistAuthenticatedSession(newSession);
-
       return response.access_token;
     } catch {
       await clearAuthState();
       await logoutUser();
       return null;
+    } finally {
+      setSessionChecking(false);
     }
   }
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", async (state) => {
+      if (state === "active" && refreshToken) {
+        await refreshAuthSessionInternal();
+      }
+    });
+
+    return () => sub.remove();
+  }, [refreshToken]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       isHydrated,
+      sessionChecking,
       isAuthenticated: isFullyAuthenticated,
       needsMfaSetup,
       token,
@@ -216,7 +232,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshToken,
       email,
       aal,
-
       mfaTempSession,
 
       async login(inputEmail: string, password: string) {

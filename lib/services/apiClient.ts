@@ -27,9 +27,7 @@ function isPublicAuthEndpoint(endpoint: string) {
 
 async function performLogout() {
   if (isLoggingOut) return;
-
   isLoggingOut = true;
-
   try {
     await clearSessionTokens();
     await logoutUser();
