@@ -77,13 +77,13 @@ export default function SettingsScreen() {
 
   const { data: subscriptionData, isLoading: isSubLoading, refetch: refetchSub } = useQuery({
     queryKey: ['subscription', token],
-    queryFn: () => getSubscriptionStatus(token!),
+    queryFn: () => getSubscriptionStatus(),
     enabled: !!token,
   });
 
   const { data: profileData, isLoading: isProfileLoading, refetch: refetchProfile } = useQuery({
     queryKey: ['profile', token],
-    queryFn: () => getProfile(token!),
+    queryFn: () => getProfile(),
     enabled: !!token,
   });
 
@@ -106,7 +106,6 @@ export default function SettingsScreen() {
       }
 
       // 3. Conditional Signature Details
-      // Only send this if we are actually trying to update signature info
       if (payload.signature_name || payload.signature_designation) {
         formData.append('signature_details', JSON.stringify({
           name: payload.signature_name,

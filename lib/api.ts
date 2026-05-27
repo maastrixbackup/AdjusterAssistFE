@@ -316,7 +316,6 @@ async function apiRequest<T>(
   let accessToken = token || storedToken;
   if (retry && path !== "/auth/refresh" && isJwtExpiringSoon(accessToken)) {
     const refreshedToken = await getFreshAccessToken();
-
     if (refreshedToken) {
       accessToken = refreshedToken;
     }

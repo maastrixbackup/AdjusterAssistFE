@@ -262,7 +262,7 @@ export default function UsageHistoryScreen() {
 
   const isCompact = width < 380;
   const isSmallHeight = height < 720;
-  const headerHeight = Math.max(isSmallHeight ? 195 : 215, height * 0.26);
+  const headerHeight = Math.max(isSmallHeight ? 120 : 150, height * 0.15);
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const planBadge = useMemo(() => getPlanBadge(planStatus), [planStatus]);
@@ -298,7 +298,7 @@ export default function UsageHistoryScreen() {
       duration: 700,
       useNativeDriver: false,
     }).start();
-  }, [progressPercent]);
+  }, [progressAnim, progressPercent]);
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 100],
@@ -689,7 +689,7 @@ export default function UsageHistoryScreen() {
       {/* Gradient Header — fixed height, no overlap tricks */}
       <View style={[styles.arcHeader, { height: headerHeight }]}>
         <LinearGradient
-          colors={["#004AC0", "#002657"]}
+          colors={["#001638e8", "#002657"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}

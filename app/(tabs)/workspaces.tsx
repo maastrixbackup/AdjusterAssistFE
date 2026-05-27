@@ -48,8 +48,7 @@ export default function WorkspacesScreen() {
   } = useQuery({
     queryKey: ["workspaces", token],
     queryFn: async () => {
-      const res = await getMyFiles(token!);
-      // We move the normalization logic directly into the fetcher
+      const res = await getMyFiles();
       return (res || []).map((f: any) => ({
         ...f,
         status: (f.status?.toLowerCase() === "closed" ? "closed" : "active") as "active" | "closed",
@@ -66,7 +65,7 @@ export default function WorkspacesScreen() {
   );
   const { data: status } = useQuery({
     queryKey: ["subscriptionStatus", token],
-    queryFn: () => getSubscriptionStatus(token!),
+    queryFn: () => getSubscriptionStatus(),
     enabled: !!token,
   });
 
@@ -388,8 +387,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logo: { 
-    width: 38, 
-    height: 38, 
+    width: 45, 
+    height: 45, 
     resizeMode: "contain" 
   },
   brandText: {

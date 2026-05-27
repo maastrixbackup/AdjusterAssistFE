@@ -101,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
+  // AFTER
   useEffect(() => {
     let mounted = true;
 
@@ -110,24 +111,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         AsyncStorage.getItem("@has_seen_onboarding"),
       ]);
 
+      // // TEMP TEST — remove after testing
+      // if (session) {
+      //   session.access_token = "stale_access_token-282";
+      //   session.token = "stale_access_token-263";
+      // }
+
       if (!mounted) return;
 
-      if (session) {
-        setToken(session.token);
-        setAccessToken(session.access_token);
-        setRefreshToken(session.refresh_token);
-        setEmail(session.email);
-        setAal(session.aal || "aal1");
+      setHasSeenOnboarding(onboarded === "true");
+
+      // No refresh token → nothing to refresh, go to login
+      if (!session?.refresh_token) {
+        setIsHydrated(true);
+        setSessionChecking(false);
+        return;
       }
 
-      setHasSeenOnboarding(onboarded === "true");
+      // Always call refresh on app open → guarantees fresh token
+      try {
+        const response = await refreshSessionApi(session.refresh_token);
+        if (!mounted) return;
+
+        await persistAuthenticatedSession({
+          token: response.access_token,
+          access_token: response.access_token,
+          refresh_token: response.refresh_token,
+          expires_at: response.expires_at,
+          email: response.user.email,
+          aal: response.aal || "aal1",
+        });
+      } catch {
+        if (!mounted) return;
+        await clearAuthState();
+      }
+
+      if (!mounted) return;
       setIsHydrated(true);
       setSessionChecking(false);
     })();
 
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   async function persistAuthenticatedSession(session: AuthSession) {
@@ -211,15 +235,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // AFTER
   useEffect(() => {
+    if (!isHydrated) return; // ← skip until mount refresh is done
+
     const sub = AppState.addEventListener("change", async (state) => {
       if (state === "active" && refreshToken) {
         await refreshAuthSessionInternal();
       }
     });
-
     return () => sub.remove();
-  }, [refreshToken]);
+  }, [isHydrated, refreshToken]); // ← add isHydrated
 
   const value = useMemo<AuthContextValue>(
     () => ({

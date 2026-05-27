@@ -1,5 +1,6 @@
 import { ClaimFile } from '@/lib/api';
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -33,9 +35,9 @@ const RenderInput = ({ label, value, onChange, placeholder, icon }: any) => (
         <Text style={styles.label}>{label}</Text>
         <View style={styles.inputWrapper}>
             {icon && <Feather name={icon} size={16} color="#94A3B8" style={styles.inputIcon} />}
-            <TextInput 
-                style={styles.modernInput} 
-                value={value || ''} 
+            <TextInput
+                style={styles.modernInput}
+                value={value || ''}
                 onChangeText={onChange}
                 placeholder={placeholder}
                 placeholderTextColor="#94A3B8"
@@ -46,9 +48,79 @@ const RenderInput = ({ label, value, onChange, placeholder, icon }: any) => (
     </View>
 );
 
+const RenderDateInput = ({ label, value, onPress, active }: any) => (
+    <View style={styles.inputGroup}>
+        <Text style={styles.label}>{label}</Text>
+
+        <Pressable
+            onPress={onPress}
+            style={[
+                styles.inputWrapper,
+                styles.dateInputWrapper,
+                active && styles.dateInputActive,
+            ]}
+        >
+            <Feather
+                name="calendar"
+                size={16}
+                color={active ? "#4F46E5" : "#94A3B8"}
+                style={styles.inputIcon}
+            />
+
+            <Text
+                style={[
+                    styles.modernInput,
+                    styles.dateInputText,
+                    { color: value ? "#1E293B" : "#94A3B8" },
+                ]}
+                numberOfLines={1}
+            >
+                {value || "Select date"}
+            </Text>
+
+            <Feather
+                name="chevron-down"
+                size={16}
+                color={active ? "#4F46E5" : "#94A3B8"}
+                style={{ marginRight: 14 }}
+            />
+        </Pressable>
+    </View>
+);
+
 export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: WorkspaceMetaModalProps) => {
+    const insets = useSafeAreaInsets();
+    const IOS_TAB_BAR_HEIGHT = 78;
+    const IOS_PICKER_HEIGHT = 310;
     const [isUpdating, setIsUpdating] = useState(false);
     const [editData, setEditData] = useState<Partial<ClaimFile>>({});
+    const [datePickerField, setDatePickerField] = useState<
+        "date_of_loss" | "reported_date" | null
+    >(null);
+    const [tempDate, setTempDate] = useState<Date>(new Date());
+
+    const formatDateForApi = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    };
+
+    const closeModal = () => {
+        setDatePickerField(null);
+        onClose();
+    };
+    const openDatePicker = (field: "date_of_loss" | "reported_date") => {
+        const existingValue = editData[field];
+
+        setTempDate(existingValue ? new Date(existingValue) : new Date());
+        setDatePickerField(field);
+
+        if (Platform.OS !== "web") {
+            Haptics.selectionAsync();
+        }
+    };
 
     useEffect(() => {
         if (isVisible && item) {
@@ -67,7 +139,7 @@ export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: Works
         try {
             await onUpdate(editData);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            onClose();
+            closeModal();
         } catch (error) {
             console.error("Update failed:", error);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -82,82 +154,96 @@ export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: Works
     };
 
     return (
-        <Modal animationType="slide" transparent visible={isVisible} onRequestClose={onClose}>
-            <Pressable style={styles.overlay} onPress={onClose}>
-                <KeyboardAvoidingView 
-                    behavior={Platform.OS === "ios" ? "padding" : "height"} 
+        <Modal animationType="slide" transparent visible={isVisible} onRequestClose={closeModal}>
+            <Pressable style={styles.overlay} onPress={() => {
+                if (datePickerField) {
+                    setDatePickerField(null);
+                    return;
+                }
+
+                closeModal();
+            }}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
                     style={styles.keyboardView}
                     keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
                 >
                     <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
                         <View style={styles.handle} />
-                        
+
                         <View style={styles.sheetHeader}>
                             <View>
                                 <Text style={styles.sheetTitle}>Workspace Details</Text>
                                 <Text style={styles.sheetSubtitle}>Manage complete claim metadata</Text>
                             </View>
-                            <TouchableOpacity onPress={onClose} style={styles.circleClose}>
+                            <TouchableOpacity onPress={closeModal} style={styles.circleClose}>
                                 <Feather name="x" size={18} color="#64748B" />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView 
-                            showsVerticalScrollIndicator={false} 
-                            contentContainerStyle={styles.scrollContent} 
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={[
+                                styles.scrollContent,
+                                datePickerField &&
+                                Platform.OS === "ios" && {
+                                    paddingBottom: IOS_PICKER_HEIGHT + IOS_TAB_BAR_HEIGHT,
+                                },
+                            ]}
                             keyboardShouldPersistTaps="handled"
+                            keyboardDismissMode="on-drag"
                         >
                             {/* SECTION: PRIMARY IDENTIFIERS */}
                             <Text style={styles.sectionDivider}>Core Information</Text>
-                            <RenderInput 
-                                label="Claim Number" 
-                                value={editData.claim_number} 
-                                onChange={(t: string) => updateField('claim_number', t)} 
-                                placeholder="e.g. CLM-201" 
+                            <RenderInput
+                                label="Claim Number"
+                                value={editData.claim_number}
+                                onChange={(t: string) => updateField('claim_number', t)}
+                                placeholder="e.g. CLM-201"
                             />
-                            <RenderInput 
-                                label="Policyholder / Insured" 
-                                value={editData.client_name} 
-                                onChange={(t: string) => updateField('client_name', t)} 
-                                placeholder="Full name of insured..." 
+                            <RenderInput
+                                label="Policyholder / Insured"
+                                value={editData.client_name}
+                                onChange={(t: string) => updateField('client_name', t)}
+                                placeholder="Full name of insured..."
                             />
 
                             {/* SECTION: POLICY & TYPE */}
                             <Text style={styles.sectionDivider}>Policy & Loss Details</Text>
                             <View style={styles.grid}>
                                 <View style={styles.gridHalf}>
-                                    <RenderInput 
-                                        label="Policy Form" 
-                                        value={editData.policy_form} 
-                                        onChange={(t: string) => updateField('policy_form', t)} 
-                                        placeholder="e.g. HO-3" 
+                                    <RenderInput
+                                        label="Policy Form"
+                                        value={editData.policy_form}
+                                        onChange={(t: string) => updateField('policy_form', t)}
+                                        placeholder="e.g. HO-3"
                                     />
                                 </View>
                                 <View style={styles.gridHalf}>
-                                    <RenderInput 
-                                        label="Line of Business" 
-                                        value={editData.line_of_business} 
-                                        onChange={(t: string) => updateField('line_of_business', t)} 
-                                        placeholder="e.g. Homeowners" 
+                                    <RenderInput
+                                        label="Line of Business"
+                                        value={editData.line_of_business}
+                                        onChange={(t: string) => updateField('line_of_business', t)}
+                                        placeholder="e.g. Homeowners"
                                     />
                                 </View>
                             </View>
 
                             <View style={styles.grid}>
                                 <View style={styles.gridHalf}>
-                                    <RenderInput 
-                                        label="Loss Type" 
-                                        value={editData.loss_type} 
-                                        onChange={(t: string) => updateField('loss_type', t)} 
-                                        placeholder="e.g. Water" 
+                                    <RenderInput
+                                        label="Loss Type"
+                                        value={editData.loss_type}
+                                        onChange={(t: string) => updateField('loss_type', t)}
+                                        placeholder="e.g. Water"
                                     />
                                 </View>
                                 <View style={styles.gridHalf}>
-                                    <RenderInput 
-                                        label="Jurisdiction" 
-                                        value={editData.jurisdiction} 
-                                        onChange={(t: string) => updateField('jurisdiction', t)} 
-                                        placeholder="e.g. FL" 
+                                    <RenderInput
+                                        label="Jurisdiction"
+                                        value={editData.jurisdiction}
+                                        onChange={(t: string) => updateField('jurisdiction', t)}
+                                        placeholder="e.g. FL"
                                     />
                                 </View>
                             </View>
@@ -166,43 +252,43 @@ export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: Works
                             <Text style={styles.sectionDivider}>Timeline (YYYY-MM-DD)</Text>
                             <View style={styles.grid}>
                                 <View style={styles.gridHalf}>
-                                    <RenderInput 
-                                        label="Date of Loss" 
-                                        value={editData.date_of_loss} 
-                                        onChange={(t: string) => updateField('date_of_loss', t)} 
-                                        placeholder="2026-04-13" 
+                                    <RenderDateInput
+                                        label="Date of Loss"
+                                        value={editData.date_of_loss}
+                                        active={datePickerField === "date_of_loss"}
+                                        onPress={() => openDatePicker("date_of_loss")}
                                     />
                                 </View>
                                 <View style={styles.gridHalf}>
-                                    <RenderInput 
-                                        label="Reported Date" 
-                                        value={editData.reported_date} 
-                                        onChange={(t: string) => updateField('reported_date', t)} 
-                                        placeholder="2026-04-14" 
+                                    <RenderDateInput
+                                        label="Reported Date"
+                                        value={editData.reported_date}
+                                        active={datePickerField === "reported_date"}
+                                        onPress={() => openDatePicker("reported_date")}
                                     />
                                 </View>
                             </View>
 
                             {/* SECTION: LOCATION & STAGE */}
                             <Text style={styles.sectionDivider}>Workflow Context</Text>
-                            <RenderInput 
-                                label="Property Address" 
-                                value={editData.address} 
-                                onChange={(t: string) => updateField('address', t)} 
-                                placeholder="Full site address..." 
+                            <RenderInput
+                                label="Property Address"
+                                value={editData.address}
+                                onChange={(t: string) => updateField('address', t)}
+                                placeholder="Full site address..."
                             />
-                            <RenderInput 
-                                label="Current Claim Stage" 
-                                value={editData.claim_stage} 
-                                onChange={(t: string) => updateField('claim_stage', t)} 
-                                placeholder="e.g. Inspection" 
+                            <RenderInput
+                                label="Current Claim Stage"
+                                value={editData.claim_stage}
+                                onChange={(t: string) => updateField('claim_stage', t)}
+                                placeholder="e.g. Inspection"
                             />
 
                             {/* SECTION: STATUS TOGGLE */}
                             <Text style={styles.label}>Operational Status</Text>
                             <View style={styles.statusRow}>
                                 {(['active', 'closed'] as const).map((s) => (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         key={s}
                                         onPress={() => updateField('status', s)}
                                         style={[styles.statusTab, editData.status === s && styles.statusTabActive]}
@@ -214,10 +300,10 @@ export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: Works
                                 ))}
                             </View>
 
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 activeOpacity={0.8}
-                                style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]} 
-                                onPress={handleSave} 
+                                style={[styles.saveBtn, isUpdating && styles.saveBtnDisabled]}
+                                onPress={handleSave}
                                 disabled={isUpdating}
                             >
                                 {isUpdating ? (
@@ -227,7 +313,70 @@ export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: Works
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
+                        {datePickerField && Platform.OS === "android" && (
+                            <DateTimePicker
+                                value={tempDate}
+                                mode="date"
+                                display="calendar"
+                                onChange={(event, selectedDate) => {
+                                    const field = datePickerField;
+                                    setDatePickerField(null);
+                                    if (event.type === "dismissed" || !selectedDate || !field) return;
+                                    updateField(field, formatDateForApi(selectedDate));
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                }}
+                            />
+                        )}
                     </Pressable>
+                    {datePickerField && Platform.OS === "ios" && (
+                        <View
+                            style={[
+                                styles.iosDatePanel,
+                                {
+                                    bottom: IOS_TAB_BAR_HEIGHT + Math.max(insets.bottom, 8),
+                                    paddingBottom: 12,
+                                },
+                            ]}
+                        >
+                            <View style={styles.iosDateHeader}>
+                                <TouchableOpacity
+                                    onPress={() => setDatePickerField(null)}
+                                    style={styles.iosDateAction}
+                                >
+                                    <Text style={styles.iosCancelText}>Cancel</Text>
+                                </TouchableOpacity>
+
+                                <Text style={styles.iosDateTitle}>
+                                    {datePickerField === "date_of_loss" ? "Date of Loss" : "Reported Date"}
+                                </Text>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        updateField(datePickerField, formatDateForApi(tempDate));
+                                        setDatePickerField(null);
+
+                                        if (Platform.OS !== "web") {
+                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                        }
+                                    }}
+                                    style={styles.iosDateAction}
+                                >
+                                    <Text style={styles.iosDoneText}>Done</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <DateTimePicker
+                                value={tempDate}
+                                mode="date"
+                                display="spinner"
+                                onChange={(_, selectedDate) => {
+                                    if (selectedDate) {
+                                        setTempDate(selectedDate);
+                                    }
+                                }}
+                            />
+                        </View>
+                    )}
                 </KeyboardAvoidingView>
             </Pressable>
         </Modal>
@@ -237,11 +386,11 @@ export const WorkspaceMetaModal = ({ isVisible, onClose, item, onUpdate }: Works
 const styles = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
     keyboardView: { width: '100%' },
-    sheet: { 
-        backgroundColor: '#FFF', 
-        borderTopLeftRadius: 32, 
-        borderTopRightRadius: 32, 
-        paddingHorizontal: 24, 
+    sheet: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingHorizontal: 24,
         maxHeight: SCREEN_HEIGHT * 0.9, // Slightly taller to fit more fields
         shadowColor: "#000",
         shadowOffset: { width: 0, height: -10 },
@@ -261,19 +410,19 @@ const styles = StyleSheet.create({
     inputGroup: { marginBottom: 16 },
     label: { fontSize: 11, fontWeight: '800', color: '#64748B', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6, marginLeft: 4 },
     inputWrapper: {
-        backgroundColor: '#F8FAFC', 
-        borderWidth: 1, 
-        borderColor: '#E2E8F0', 
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         borderRadius: 14,
         flexDirection: 'row',
         alignItems: 'center'
     },
     inputIcon: { marginLeft: 14 },
-    modernInput: { 
+    modernInput: {
         flex: 1,
-        padding: 14, 
-        fontSize: 15, 
-        color: '#1E293B', 
+        padding: 14,
+        fontSize: 15,
+        color: '#1E293B',
         fontWeight: '600'
     },
     statusRow: { flexDirection: 'row', gap: 10, marginBottom: 25, marginTop: 8 },
@@ -281,11 +430,11 @@ const styles = StyleSheet.create({
     statusTabActive: { backgroundColor: '#EEF2FF', borderColor: '#4F46E5' },
     statusTabText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
     statusTabTextActive: { color: '#4F46E5' },
-    saveBtn: { 
-        backgroundColor: '#4F46E5', 
-        padding: 18, 
-        borderRadius: 18, 
-        alignItems: 'center', 
+    saveBtn: {
+        backgroundColor: '#4F46E5',
+        padding: 18,
+        borderRadius: 18,
+        alignItems: 'center',
         marginTop: 10,
         shadowColor: '#4F46E5',
         shadowOffset: { width: 0, height: 4 },
@@ -294,5 +443,67 @@ const styles = StyleSheet.create({
         elevation: 8
     },
     saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
-    saveBtnDisabled: { backgroundColor: '#94A3B8', shadowOpacity: 0 }
+    saveBtnDisabled: { backgroundColor: '#94A3B8', shadowOpacity: 0 },
+    dateInputWrapper: {
+        minHeight: 50,
+    },
+
+    dateInputActive: {
+        borderColor: "#4F46E5",
+        backgroundColor: "#EEF2FF",
+    },
+
+    dateInputText: {
+        paddingVertical: 14,
+    },
+
+    iosDatePanel: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        backgroundColor: "#FFFFFF",
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        borderTopWidth: 1,
+        borderTopColor: "#E2E8F0",
+        paddingHorizontal: 18,
+        paddingTop: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 18,
+        elevation: 30,
+        zIndex: 999,
+    },
+
+    iosDateHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 8,
+    },
+
+    iosDateAction: {
+        minWidth: 70,
+        paddingVertical: 8,
+    },
+
+    iosDateTitle: {
+        fontSize: 14,
+        fontWeight: "800",
+        color: "#0F172A",
+    },
+
+    iosCancelText: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#64748B",
+    },
+
+    iosDoneText: {
+        fontSize: 14,
+        fontWeight: "800",
+        color: "#4F46E5",
+        textAlign: "right",
+    },
 });
