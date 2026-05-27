@@ -53,7 +53,7 @@ interface Props {
   token: string | null;
 }
 
-export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token }: Props) {
+export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, }: Props) {
   const [isCreating, setIsCreating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState<{ show: boolean; field: "date_of_loss" | "reported_date" | null }>({
     show: false,

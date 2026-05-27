@@ -9,6 +9,7 @@ import {
     getAttachmentPreview,
     getDraftsByFile,
     getFileById,
+    getSubscriptionStatus,
     refineResponse,
     updateDraft,
     updateFile,
@@ -215,9 +216,16 @@ export default function AiChatScreen() {
     const { token } = useAuth();
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
+    const { data: subscriptionData } = useQuery({
+        queryKey: ["subscription"],
+        queryFn: () => getSubscriptionStatus(),
+        enabled: !!token,
+    });
 
     const [inputText, setInputText] = useState("");
     const [userCredits, setUserCredits] = useState(Number(credits || 0));
+    const liveCredits =
+        subscriptionData?.subscription?.remaining ?? userCredits;
     const [isMetaModalVisible, setIsMetaModalVisible] = useState(false);
     const [loadingCardId, setLoadingCardId] = useState<number | null>(null);
 
@@ -226,7 +234,10 @@ export default function AiChatScreen() {
 
     const flatListRef = useRef<FlatList>(null);
     const keyboardOffset = useKeyboardOffset();
-
+    const syncCredits = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ["subscription"] });
+        queryClient.invalidateQueries({ queryKey: ["usage-history"] });
+    }, [queryClient]);
     // ─── React Query: thread history ─────────────────────────────────────────
     const {
         data: draftsData,
@@ -235,7 +246,7 @@ export default function AiChatScreen() {
         queryKey: ["drafts", fileId],
         queryFn: () => getDraftsByFile(token!, Number(fileId)),
         enabled: !!token && !!fileId,
-        staleTime: 30_000, // consider data fresh for 30 s — avoids redundant refetches
+        staleTime: 30_000,
     });
 
     // Sync React Query data → local chatHistory (reversed for inverted FlatList)
@@ -366,6 +377,7 @@ export default function AiChatScreen() {
                     };
                     setChatHistory((prev) => [newInteraction, ...prev]);
                     setUserCredits((prev) => Math.max(0, prev - 1));
+                    syncCredits();
                     setInputText("");
                     toast.success("Response added to timeline");
                     // Also invalidate so background sync stays fresh
@@ -378,7 +390,7 @@ export default function AiChatScreen() {
                 setIsGenerating(false);
             }
         },
-        [token, fileId, inputText, queryClient],
+        [token, inputText, fileId, syncCredits, queryClient],
     );
 
     // ─── Quick actions ────────────────────────────────────────────────────────
@@ -413,6 +425,7 @@ export default function AiChatScreen() {
                             ),
                         );
                         setUserCredits((prev) => Math.max(0, prev - 1));
+                        syncCredits();
                     }
                 } catch (error: any) {
                     toast.error(error?.message || "Failed to create variant");
@@ -452,7 +465,7 @@ export default function AiChatScreen() {
                     break;
             }
         },
-        [fileId, token, chatHistory],
+        [token, fileId, syncCredits, chatHistory],
     );
 
     // ─── Refinement ───────────────────────────────────────────────────────────
@@ -472,6 +485,7 @@ export default function AiChatScreen() {
                 if (result.success) {
                     toast.success(`${option} Applied`);
                     setUserCredits((prev) => Math.max(0, prev - 1));
+                    syncCredits();
                     setChatHistory((prev) =>
                         prev.map((item) =>
                             item.id === parentId
@@ -494,7 +508,7 @@ export default function AiChatScreen() {
                 setLoadingCardId(null);
             }
         },
-        [token, fileId],
+        [token, fileId, syncCredits],
     );
 
     // ─── Share ────────────────────────────────────────────────────────────────
