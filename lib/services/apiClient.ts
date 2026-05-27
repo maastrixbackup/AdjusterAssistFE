@@ -8,9 +8,34 @@ import {
 } from "@/lib/utils/storage";
 import { triggerUnauthorizedLogout } from "./authEvents";
 
+/* --- Global Concurrency State Control Variables --- */
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 let isLoggingOut = false;
+
+const DEBUG_MODE = true;
+const colors = {
+  reset: "\x1b[0m",
+  blue: "\x1b[34m",
+  green: "\x1b[32m",
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
+  bold: "\x1b[1m",
+};
+
+function debugLog(
+  color: keyof typeof colors,
+  label: string,
+  payload?: unknown,
+) {
+  if (!DEBUG_MODE) return;
+  console.log(
+    `${colors[color]}${colors.bold}[${label}]${colors.reset}`,
+    payload ?? "",
+  );
+}
 
 const PUBLIC_AUTH_ENDPOINTS = [
   "/auth/login",
@@ -47,16 +72,20 @@ async function refreshAccessToken(): Promise<string | null> {
       return null;
     }
 
+    debugLog("yellow", "TOKEN REFRESH STARTED VIA CONFIG INTERCEPTOR");
     const response = await refreshSessionApi(refreshToken);
-
     await saveSessionTokens({
       access_token: response.access_token,
       refresh_token: response.refresh_token,
     });
 
+    debugLog("green", "TOKEN REFRESH SUCCESS VIA CONFIG INTERCEPTOR");
     return response.access_token;
   } catch (error) {
-    console.log("[TOKEN REFRESH FAILED]", error);
+    console.log(
+      `${colors.red}${colors.bold}[TOKEN REFRESH FAILED]${colors.reset}`,
+      error,
+    );
     return null;
   }
 }
@@ -74,10 +103,11 @@ export async function apiRequest<T = unknown>(
   const isRefreshEndpoint = endpoint === "/auth/refresh";
   const isPublicEndpoint = isPublicAuthEndpoint(endpoint);
 
-  console.log("[API REQUEST]", {
+  debugLog("blue", "API REQUEST CONFIG STARTED", {
     url,
     method,
-    body,
+    hasToken: Boolean(token),
+    retry,
   });
 
   const response = await fetch(url, {
@@ -95,7 +125,7 @@ export async function apiRequest<T = unknown>(
     message?: string;
   };
 
-  console.log("[API RESPONSE]", {
+  debugLog(response.ok ? "green" : "red", "API RESPONSE CONFIG RECEIVED", {
     url,
     method,
     status: response.status,
@@ -114,6 +144,7 @@ export async function apiRequest<T = unknown>(
   if (shouldTryRefresh) {
     if (!isRefreshing) {
       isRefreshing = true;
+      debugLog("magenta", "401 RETRY QUEUED IN CONFIG", { endpoint });
 
       refreshPromise = refreshAccessToken().finally(() => {
         isRefreshing = false;
@@ -124,6 +155,7 @@ export async function apiRequest<T = unknown>(
     const newAccessToken = await refreshPromise;
 
     if (!newAccessToken) {
+      debugLog("red", "REFRESH RETURNED NULL - FORCING OUT VIA CONFIG");
       await performLogout();
       throw new Error("Session expired. Please login again.");
     }
@@ -132,6 +164,7 @@ export async function apiRequest<T = unknown>(
   }
 
   if (response.status === 401 && isRefreshEndpoint) {
+    debugLog("red", "REFRESH ENDPOINT RETURNED 401 - TERMINATING SESSION");
     await performLogout();
     throw new Error("Session expired. Please login again.");
   }
