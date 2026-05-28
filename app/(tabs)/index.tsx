@@ -19,11 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
 import { DailyBriefing } from "@/components/DailyBriefingCard";
-import {
-  ClaimFile,
-  getMyFiles,
-  getSubscriptionStatus
-} from "@/lib/api";
+import { ClaimFile, getDashboardBootstrap } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 
 const { width } = Dimensions.get("window");
@@ -69,36 +65,47 @@ const WorkspaceItem = memo(({ file, onPress, getStyle }: any) => {
 WorkspaceItem.displayName = "WorkspaceItem";
 
 export default function HomeScreen() {
-  const { token, email, sessionChecking } = useAuth();
+  const { token, sessionChecking } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const logo = require("../../assets/images/header-icon.png");
 
-  // React Query for Subscription Status
-  const { data: status } = useQuery({
-    queryKey: ["subscriptionStatus"],
-    queryFn: getSubscriptionStatus,
-    enabled: !!token && !sessionChecking,
-  });
-
-  // React Query for Files
   const {
-    data: files = [],
+    data: dashboard,
     isLoading,
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["myFiles"],
-    queryFn: getMyFiles,
+    queryKey: ["dashboardBootstrap", token],
+    queryFn: () => getDashboardBootstrap(token!),
     enabled: !!token && !sessionChecking,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
-  // Re-fetch on focus
-  // useFocusEffect(
-  //   React.useCallback(() => {
-  //     refetch();
-  //   }, [refetch])
-  // );
+  const files = dashboard?.files ?? [];
+  const subscription = dashboard?.subscription ?? null;
+  const remainingCredits = subscription?.remaining ?? 0;
+  const user = dashboard?.user ?? null;
+  const totalFiles = dashboard?.file_count ?? files.length;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (token && !sessionChecking && !isCreateModalVisible) {
+        refetch();
+      }
+    }, [token, sessionChecking, refetch, isCreateModalVisible])
+  );
+
+  const handleRefresh = React.useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: ["dashboardBootstrap", token],
+    });
+  }, [queryClient, token]);
+
 
   const mostRecentFile = useMemo(() => {
     if (!files || files.length === 0) return null;
@@ -139,19 +146,20 @@ export default function HomeScreen() {
   );
 
   const handleWorkspaceCreated = React.useCallback((newFile: ClaimFile) => {
-    setIsCreateModalVisible(false);
-    queryClient.invalidateQueries({ queryKey: ["myFiles"] }); // Refresh background data
+    queryClient.invalidateQueries({
+      queryKey: ["dashboardBootstrap", token],
+    });
     router.push({
       pathname: "/aiChat",
       params: {
         fileId: newFile.id,
         claimNumber: newFile.claim_number,
         clientName: newFile.client_name,
-        credits: status?.subscription?.remaining ?? 0,
-        initialData: JSON.stringify(newFile)
-      }
+        credits: remainingCredits,
+        initialData: JSON.stringify(newFile),
+      },
     });
-  }, [status, queryClient]);
+  }, [queryClient, token, remainingCredits]);
 
   const getStatusStyle = React.useCallback((value?: string) => {
     const s = value?.toLowerCase();
@@ -167,10 +175,37 @@ export default function HomeScreen() {
         fileId: file.id,
         claimNumber: file.claim_number,
         clientName: file.client_name,
-        credits: status?.subscription?.remaining ?? 0,
+        credits: remainingCredits
       }
     });
-  }, [status]);
+  }, [remainingCredits]);
+
+  
+  if (isLoading && !dashboard) {
+    return (
+      <View style={styles.mainContainer}>
+        <StatusBar style="light" />
+
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              color: "#64748B",
+              fontWeight: "700",
+              fontSize: 15,
+            }}
+          >
+            Loading dashboard...
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.mainContainer}>
@@ -189,16 +224,16 @@ export default function HomeScreen() {
             {/* Credit Pill */}
             <Pressable onPress={() => router.push("/settings")} style={styles.creditPill}>
               <Ionicons name="sparkles" size={14} color="#FDE68A" />
-              <Text style={styles.creditText}>{status?.subscription?.remaining ?? 0}</Text>
+              <Text style={styles.creditText}>{remainingCredits}</Text>
             </Pressable>
           </View>
           <Text style={styles.welcomeText}>Claims Workspace</Text>
           <Text style={styles.welcomeSub}>Manage claim workspaces efficiently.</Text>
 
           <View style={styles.statsRow}>
-            <StatCard label="Total" val={files.length} />
+            <StatCard label="Total" val={totalFiles} />
             <StatCard label="Active" val={activeFilesCount} active />
-            <StatCard label="Credits" val={status?.subscription?.remaining ?? 0} />
+            <StatCard label="Credits" val={remainingCredits} />
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -209,7 +244,7 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={handleRefresh}
             tintColor="#165bb6"
           />
         }
@@ -280,8 +315,8 @@ export default function HomeScreen() {
       {!isCreateModalVisible && (
         <DailyBriefing
           files={files}
-          credits={status?.subscription?.remaining ?? 0}
-          userName={email ?? undefined}
+          credits={remainingCredits}
+          userName={user?.name ?? undefined}
         />
       )}
 
