@@ -45,7 +45,7 @@ export default function WorkspacesScreen() {
     refetch,
     isRefetching: refreshing
   } = useQuery({
-    queryKey: ["workspaces", token],
+    queryKey: ["workspaces"],
     queryFn: async () => {
       const res = await getMyFiles();
       return (res || []).map((f: any) => ({
@@ -59,9 +59,20 @@ export default function WorkspacesScreen() {
   // Re-fetch when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      refetch();
-    }, [refetch])
+      if (!isCreateModalVisible && !isDeleteModalVisible) {
+        refetch();
+      }
+    }, [refetch, isCreateModalVisible, isDeleteModalVisible])
   );
+  const openCreateModal = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.selectionAsync();
+    }
+
+    requestAnimationFrame(() => {
+      setCreateModalVisible(true);
+    });
+  }, []);
   const { data: status } = useQuery({
     queryKey: ["subscriptionStatus", token],
     queryFn: () => getSubscriptionStatus(),
@@ -141,7 +152,7 @@ export default function WorkspacesScreen() {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => setCreateModalVisible(true)}
+              onPress={openCreateModal}
               style={styles.newWorkspaceBtn}
             >
               <LinearGradient
@@ -242,7 +253,6 @@ export default function WorkspacesScreen() {
         token={token}
         onSuccess={(newFile) => {
           queryClient.invalidateQueries({ queryKey: ["workspaces"] }); // Fixed: Trigger fresh sync
-          setCreateModalVisible(false);
         }}
       />
       {/* <Toaster/> */}
@@ -365,30 +375,30 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase', // Professional look
   },
-  headerGradient: { 
-    paddingTop: 12, 
-    paddingBottom: 34, 
-    borderBottomLeftRadius: 36, 
-    borderBottomRightRadius: 36 
+  headerGradient: {
+    paddingTop: 12,
+    paddingBottom: 34,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36
   },
-  headerContent: { 
-    paddingHorizontal: 24 
+  headerContent: {
+    paddingHorizontal: 24
   },
-  headerTopRow: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center", 
-    marginBottom: 20 
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20
   },
   brandingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  logo: { 
-    width: 45, 
-    height: 45, 
-    resizeMode: "contain" 
+  logo: {
+    width: 45,
+    height: 45,
+    resizeMode: "contain"
   },
   brandText: {
     fontSize: 20,
@@ -399,26 +409,26 @@ const styles = StyleSheet.create({
   brandTextAccent: {
     color: '#3B82F6', // Primary Blue
   },
-  creditPill: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    backgroundColor: "rgba(255, 255, 255, 0.12)", 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 20, 
-    borderWidth: 1, 
-    borderColor: "rgba(255, 255, 255, 0.2)" 
+  creditPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)"
   },
-  creditText: { 
-    color: "#FDE68A", 
-    fontSize: 13, 
-    fontWeight: "700", 
-    marginLeft: 6 
+  creditText: {
+    color: "#FDE68A",
+    fontSize: 13,
+    fontWeight: "700",
+    marginLeft: 6
   },
-  welcomeText: { 
-    fontSize: 26, 
-    fontWeight: "800", 
-    color: "#FFFFFF", 
-    letterSpacing: -0.5 
+  welcomeText: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.5
   },
 });
