@@ -51,9 +51,10 @@ interface Props {
   onClose: () => void;
   onSuccess: (newFile: ClaimFile) => void;
   token: string | null;
+  bottomOffset?: number;
 }
 
-export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, }: Props) {
+export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, bottomOffset = 0 }: Props) {
   const [isCreating, setIsCreating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState<{ show: boolean; field: "date_of_loss" | "reported_date" | null }>({
     show: false,
@@ -176,7 +177,13 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, }: 
 
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scroll}
+              contentContainerStyle={[
+                styles.scroll,
+                showDatePicker.show &&
+                Platform.OS === "ios" && {
+                  paddingBottom: 360,
+                },
+              ]}
               keyboardShouldPersistTaps="handled"
             >
               <InputField label="Claim Number *" icon="identifier" value={form.claim_number} onChangeText={(t: string) => updateField("claim_number", t)} placeholder="e.g. CLM-9921" />
@@ -199,14 +206,14 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, }: 
               </View>
 
               <InputField label="Claim Stage" icon="step-forward" value={form.claim_stage} onChangeText={(t: string) => updateField("claim_stage", t)} placeholder="Mitigation Review" />
-              
+
               {validationError && (
                 <View style={styles.errorContainer}>
                   <Ionicons name="alert-circle" size={16} color="#B91C1C" />
                   <Text style={styles.errorText}>{validationError}</Text>
                 </View>
               )}
-              
+
               <Pressable style={styles.actionBtn} onPress={handleCreate} disabled={isCreating}>
                 {isCreating ? (
                   <ActivityIndicator color="#FFF" />
@@ -222,13 +229,40 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, }: 
         </KeyboardAvoidingView>
       </View>
 
-      {showDatePicker.show && (
+      {showDatePicker.show && Platform.OS === "android" && (
         <DateTimePicker
           value={(form as any)[showDatePicker.field!]}
           mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
+          display="default"
           onChange={onDateChange}
         />
+      )}
+
+      {showDatePicker.show && Platform.OS === "ios" && (
+        <View style={[styles.iosPickerPanel, { bottom: bottomOffset }]}>
+          <View style={styles.iosPickerHeader}>
+            <Pressable onPress={() => setShowDatePicker({ show: false, field: null })}>
+              <Text style={styles.iosCancelText}>Cancel</Text>
+            </Pressable>
+
+            <Text style={styles.iosPickerTitle}>
+              {showDatePicker.field === "date_of_loss"
+                ? "Date of Loss"
+                : "Reported Date"}
+            </Text>
+
+            <Pressable onPress={() => setShowDatePicker({ show: false, field: null })}>
+              <Text style={styles.iosDoneText}>Done</Text>
+            </Pressable>
+          </View>
+
+          <DateTimePicker
+            value={(form as any)[showDatePicker.field!]}
+            mode="date"
+            display="spinner"
+            onChange={onDateChange}
+          />
+        </View>
       )}
     </Modal>
   );
@@ -254,7 +288,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: "rgba(2, 6, 23, 0.7)", justifyContent: "flex-end" },
   keyboardView: { width: "100%", justifyContent: "flex-end" },
   modalContent: {
-    height: "90%",
+    height: Platform.OS === "ios" ? "82%" : "90%",
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
@@ -306,4 +340,48 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   actionText: { color: "#FFF", fontWeight: "800", fontSize: 16, letterSpacing: 0.5 },
+  iosPickerPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 30,
+    zIndex: 9999,
+  },
+
+  iosPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+
+  iosPickerTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  iosCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  iosDoneText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F4C9C",
+  },
 });

@@ -69,7 +69,7 @@ const WorkspaceItem = memo(({ file, onPress, getStyle }: any) => {
 WorkspaceItem.displayName = "WorkspaceItem";
 
 export default function HomeScreen() {
-  const { token, email, sessionChecking  } = useAuth();
+  const { token, email, sessionChecking } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const logo = require("../../assets/images/header-icon.png");
@@ -277,17 +277,20 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <DailyBriefing
-        files={files}
-        credits={status?.subscription?.remaining ?? 0}
-        userName={email ?? undefined}
-      />
+      {!isCreateModalVisible && (
+        <DailyBriefing
+          files={files}
+          credits={status?.subscription?.remaining ?? 0}
+          userName={email ?? undefined}
+        />
+      )}
 
       <CreateWorkspaceModal
         isVisible={isCreateModalVisible}
         onClose={() => setIsCreateModalVisible(false)}
         onSuccess={handleWorkspaceCreated}
         token={token}
+        bottomOffset={90}
       />
     </View>
   );
