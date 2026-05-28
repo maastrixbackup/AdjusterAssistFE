@@ -573,21 +573,6 @@ export async function upgradeSubscription(
   );
 }
 
-export const getRecentDrafts = async (
-  token: string,
-): Promise<RecentDraft[]> => {
-  try {
-    const response = await apiRequest<{
-      success: boolean;
-      data: RecentDraft[];
-    }>("/drafts/recent", { method: "GET" }, token);
-    return response.data || [];
-  } catch (error) {
-    console.error("Error fetching recent drafts:", error);
-    return [];
-  }
-};
-
 export const getDraftsByFile = async (
   token: string,
   fileId: number,
@@ -884,4 +869,26 @@ export async function getCreditUsageHistory(
     },
     token,
   );
+}
+
+export async function getDashboardBootstrap(token: string) {
+  return apiRequest<{
+    success: boolean;
+    data: {
+      files: ClaimFile[];
+      subscription: {
+        plan_type: string;
+        usage_limit: number;
+        current_usage: number;
+        remaining: number;
+        expires_at: string;
+        status: string;
+      } | null;
+      recentDrafts: any[];
+      meta: {
+        activeFiles: number;
+        totalFiles: number;
+      };
+    };
+  }>("/dashboard/bootstrap", { method: "GET" }, token);
 }
