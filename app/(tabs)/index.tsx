@@ -5,6 +5,7 @@ import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { memo, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   BackHandler,
   Dimensions,
   Image,
@@ -76,7 +77,7 @@ export default function HomeScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["dashboardBootstrap", token],
+    queryKey: ["dashboardBootstrap"],
     queryFn: () => getDashboardBootstrap(token!),
     enabled: !!token && !sessionChecking,
     staleTime: 60_000,
@@ -102,7 +103,7 @@ export default function HomeScreen() {
 
   const handleRefresh = React.useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: ["dashboardBootstrap", token],
+      queryKey: ["dashboardBootstrap"],
     });
   }, [queryClient, token]);
 
@@ -147,7 +148,7 @@ export default function HomeScreen() {
 
   const handleWorkspaceCreated = React.useCallback((newFile: ClaimFile) => {
     queryClient.invalidateQueries({
-      queryKey: ["dashboardBootstrap", token],
+      queryKey: ["dashboardBootstrap"],
     });
     router.push({
       pathname: "/aiChat",
@@ -180,33 +181,36 @@ export default function HomeScreen() {
     });
   }, [remainingCredits]);
 
-  
-  if (isLoading && !dashboard) {
-    return (
-      <View style={styles.mainContainer}>
-        <StatusBar style="light" />
 
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text
-            style={{
-              color: "#64748B",
-              fontWeight: "700",
-              fontSize: 15,
-            }}
-          >
-            Loading dashboard...
-          </Text>
-        </View>
-      </View>
-    );
-  }
+// if (isLoading && !dashboard) {
+//   return (
+//     <View style={styles.mainContainer}>
+//       <StatusBar style="light" />
 
+//       <LinearGradient
+//         colors={["#001529", "#003366"]}
+//         style={styles.loadingScreen}
+//       >
+//         <Image
+//           source={logo}
+//           style={styles.loadingLogo}
+//         />
+
+//         <Text style={styles.loadingTitle}>AdjusterAssist</Text>
+
+//         <Text style={styles.loadingSubtitle}>
+//           Preparing your claims workspace
+//         </Text>
+
+//         <ActivityIndicator
+//           size="large"
+//           color="#FDE68A"
+//           style={{ marginTop: 24 }}
+//         />
+//       </LinearGradient>
+//     </View>
+//   );
+// }
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />
@@ -401,4 +405,32 @@ const styles = StyleSheet.create({
   brandTextAccent: {
     color: '#3B82F6', // "Assist" in Primary Blue
   },
+  loadingScreen: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 32,
+},
+
+loadingLogo: {
+  width: 76,
+  height: 76,
+  resizeMode: "contain",
+  marginBottom: 18,
+},
+
+loadingTitle: {
+  fontSize: 26,
+  fontWeight: "900",
+  color: "#FFFFFF",
+  letterSpacing: -0.5,
+},
+
+loadingSubtitle: {
+  marginTop: 8,
+  fontSize: 14,
+  fontWeight: "600",
+  color: "rgba(255,255,255,0.72)",
+  textAlign: "center",
+},
 });

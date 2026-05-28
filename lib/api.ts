@@ -871,24 +871,41 @@ export async function getCreditUsageHistory(
   );
 }
 
+export type DashboardBootstrapResponse = {
+  success: boolean;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    phone?: string;
+    company?: string;
+    avatar_url?: string | null;
+    expo_push_token?: string | null;
+    push_enabled?: boolean;
+    is_signature_enabled?: boolean;
+    signature_details?: any;
+    accepted_policies?: boolean;
+    created_at?: string;
+    updated_at?: string;
+  };
+  files: ClaimFile[];
+  file_count: number;
+  subscription: {
+    plan_type: string;
+    usage_limit: number;
+    current_usage: number;
+    expires_at: string;
+    remaining: number;
+    is_unlimited: boolean;
+    status?: string;
+  } | null;
+};
+
 export async function getDashboardBootstrap(token: string) {
-  return apiRequest<{
-    success: boolean;
-    data: {
-      files: ClaimFile[];
-      subscription: {
-        plan_type: string;
-        usage_limit: number;
-        current_usage: number;
-        remaining: number;
-        expires_at: string;
-        status: string;
-      } | null;
-      recentDrafts: any[];
-      meta: {
-        activeFiles: number;
-        totalFiles: number;
-      };
-    };
-  }>("/dashboard/bootstrap", { method: "GET" }, token);
+  return apiRequest<DashboardBootstrapResponse>(
+    "/dashboard/bootstrap",
+    { method: "GET" },
+    token,
+  );
 }

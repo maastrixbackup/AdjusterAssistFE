@@ -3,12 +3,10 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { apiRequest } from "../services/apiClient";
 
-export async function registerAndSendPushToken(
-  token: string | null, // pass token from component
-  showToast?: (msg: string) => void,
-) {
+export async function registerAndSendPushToken(token: string | null) {
   try {
-    // 1. Android: set notification channel
+    if (!token) return;
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "default",
@@ -18,9 +16,9 @@ export async function registerAndSendPushToken(
       });
     }
 
-    // 2. Ask for permission
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
+
     let finalStatus = existingStatus;
 
     if (existingStatus !== "granted") {
@@ -28,47 +26,47 @@ export async function registerAndSendPushToken(
       finalStatus = status;
     }
 
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== "granted") {
-        showToast?.("Push notification permission denied");
-        return;
+    // USER DENIED: update profile only, then stop
+    if (finalStatus !== "granted") {
+      if (__DEV__) {
+        console.log("Push permission denied. Updating push_enabled false.");
       }
-      finalStatus = status;
-    }
 
-    // 3. Get projectId (EAS)
-    const projectId = "34289344-f849-4bd5-ae0b-728b8cc40829";
-
-    if (!projectId) {
-      showToast?.("Project ID not found");
+      setTimeout(() => {
+        apiRequest("/user/update", "PATCH", {
+          push_enabled: false,
+          expo_push_token: null,
+        }).catch(() => {});
+      }, 1000);
       return;
     }
-    // console.log("projectId:", projectId);
-    // 4. Get Expo push token
+
+    const projectId = "34289344-f849-4bd5-ae0b-728b8cc40829";
+
     const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
 
-    console.log("Expo push token:", expoPushToken);
+    if (!expoPushToken) return;
 
-    if (!expoPushToken) {
-      showToast?.("Failed to get push token");
-      return;
+    if (__DEV__) {
+      console.log("Expo push token:", expoPushToken);
     }
 
-    if (!token) {
-      showToast?.("You are not logged in");
-      return;
-    }
-
-    // 6. Send to backend using refresh-enabled apiRequest
     await apiRequest("/notifications/save-token", "POST", {
       pushToken: expoPushToken,
     });
-    // showToast?.("Push token saved");
+
+    await apiRequest("/user/update", "PATCH", {
+      push_enabled: true,
+      expo_push_token: expoPushToken,
+    });
   } catch (err: any) {
-    console.log("registerAndSendPushToken error:", err);
-    showToast?.(`Error: ${err.message}`);
+    if (__DEV__) {
+      console.log("Push registration skipped:", err?.message || err);
+    }
+
+    // Important: never throw from here
+    return;
   }
 }
