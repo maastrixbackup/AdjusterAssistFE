@@ -11,12 +11,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { toast, Toaster } from "sonner-native";
+
 
 export const unstable_settings = {
   initialRouteName: "onboarding",
@@ -41,6 +42,7 @@ function NavigationGuard() {
   const { isAuthenticated, isHydrated, hasSeenOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
 
   // NO useState, NO useEffect for reading AsyncStorage — context handles it
 
@@ -143,8 +145,8 @@ export default function RootLayout() {
 // Defined inside layout, but BELOW the provider
 function AppContent() {
   const router = useRouter();
-
   const { isAuthenticated, token } = useAuth();
+  const pushRegistrationStarted = useRef(false);
 
   const showToast = (
     msg: string,
@@ -165,14 +167,19 @@ function AppContent() {
   };
 
   // Push token registration
+
   useEffect(() => {
     if (!isAuthenticated || !token) return;
+    if (pushRegistrationStarted.current) return;
 
-    registerAndSendPushToken(
-      token,
-      showToast
-    );
-  }, [isAuthenticated, token]);
+    pushRegistrationStarted.current = true;
+
+    const timer = setTimeout(() => {
+      registerAndSendPushToken(token);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [isAuthenticated]);
 
   // Notification click listener
   useEffect(() => {
