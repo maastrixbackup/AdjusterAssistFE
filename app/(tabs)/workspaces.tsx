@@ -1,4 +1,15 @@
+import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
+import { CustomConfirmModal } from "@/components/CustomConfirmModal";
+import FileWorkspaceItem from "@/components/FileWorkspaceItem";
+import {
+  deleteFile,
+  getMyFiles,
+  getSubscriptionStatus,
+  updateFile
+} from "@/lib/api";
+import { useAuth } from "@/providers/auth-provider";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
@@ -17,18 +28,6 @@ import {
 import { RefreshControl } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
-
-import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
-import { CustomConfirmModal } from "@/components/CustomConfirmModal";
-import FileWorkspaceItem from "@/components/FileWorkspaceItem";
-import {
-  deleteFile,
-  getMyFiles,
-  getSubscriptionStatus,
-  updateFile
-} from "@/lib/api";
-import { useAuth } from "@/providers/auth-provider";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function WorkspacesScreen() {
   const { token } = useAuth();
