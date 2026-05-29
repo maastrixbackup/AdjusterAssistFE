@@ -36,15 +36,10 @@ export default function ForgotPasswordScreen() {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail) {
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Warning
-      );
-
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       toast.error("Email Required", {
-        description:
-          "Please enter your registered email address.",
+        description: "Please enter your registered email address.",
       });
-
       return;
     }
     try {
@@ -58,16 +53,22 @@ export default function ForgotPasswordScreen() {
         Haptics.NotificationFeedbackType.Success
       );
 
-      toast.success("Reset Link Sent", {
-        description:
-          "Check your email for the password reset link.",
+      toast.success("OTP Sent", {
+        description: "Check your email for the 6-digit recovery code.",
+      });
+
+      router.push({
+        pathname: "/reset-password",
+        params: {
+          email: normalizedEmail,
+        },
       });
 
     } catch (error: any) {
-      toast.error("Reset Failed", {
+      toast.error("Reset Password Failed", {
         description:
           error?.message ||
-          "Unable to send reset email.",
+          "Unable to send OTP",
       });
     } finally {
       setLoading(false);
@@ -125,12 +126,10 @@ export default function ForgotPasswordScreen() {
                 />
               </View>
 
-              <View style={styles.textGroup}>
-                <Text style={styles.title}>Forgot Password?</Text>
-                <Text style={styles.subtitle}>
-                  Enter your registered email and we&apos;ll send you a secure password reset link.
-                </Text>
-              </View>
+              <Text style={styles.title}>Forgot Password?</Text>
+              <Text style={styles.subtitle}>
+                Enter your registered email and we&apos;ll send you a 6-digit recovery code.
+              </Text>
 
               <View style={styles.inputWrapper}>
                 <Text style={styles.inputLabel}>REGISTERED EMAIL</Text>
@@ -170,7 +169,7 @@ export default function ForgotPasswordScreen() {
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
                     <>
-                      <Text style={styles.buttonText}>Send Reset Link</Text>
+                      <Text style={styles.buttonText}>Send Recovery OTP</Text>
                       <View style={styles.btnArrow}>
                         <Feather name="arrow-right" size={16} color="#1e40af" />
                       </View>
@@ -178,7 +177,21 @@ export default function ForgotPasswordScreen() {
                   )}
                 </LinearGradient>
               </TouchableOpacity>
-
+              <TouchableOpacity
+                style={styles.alreadyOtpButton}
+                activeOpacity={0.85}
+                onPress={() => {
+                  router.push({
+                    pathname: "/reset-password",
+                    params: {
+                      email: email.trim().toLowerCase(),
+                    },
+                  });
+                }}
+              >
+                <Feather name="key" size={15} color="#1e40af" />
+                <Text style={styles.alreadyOtpText}>Already have an OTP?</Text>
+              </TouchableOpacity>
               <View style={styles.footer}>
                 <TouchableOpacity
                   onPress={() => router.replace("/login")}
@@ -357,5 +370,24 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontWeight: "700",
     fontSize: 14,
+  },
+  alreadyOtpButton: {
+    marginTop: 14,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+
+  alreadyOtpText: {
+    color: "#1e40af",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });
