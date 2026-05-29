@@ -7,7 +7,9 @@ import {
   MfaTempSession,
   refreshSessionApi,
   requestPasswordReset,
+  resetPasswordWithOtp,
   signupWithEmail,
+  verifyResetOtp,
 } from "@/lib/services/authService";
 import { clearSessionTokens, saveSessionTokens } from "@/lib/utils/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -52,6 +54,15 @@ type AuthContextValue = {
 
   logout: () => void;
   sendPasswordReset: (email: string) => Promise<void>;
+  verifyPasswordResetOtp: (
+    email: string,
+    otp: string,
+  ) => Promise<string>;
+
+  resetPasswordWithVerifiedOtp: (
+    accessToken: string,
+    newPassword: string,
+  ) => Promise<void>;
 };
 
 const SESSION_KEY = "adjusterassist_session_v1";
@@ -337,6 +348,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       async sendPasswordReset(inputEmail: string) {
         await requestPasswordReset(inputEmail);
+      },
+      async verifyPasswordResetOtp(inputEmail: string, otp: string) {
+        const response = await verifyResetOtp(inputEmail, otp);
+        return response.accessToken;
+      },
+
+      async resetPasswordWithVerifiedOtp(accessToken: string, newPassword: string) {
+        await resetPasswordWithOtp(accessToken, newPassword);
       },
 
       hasSeenOnboarding,
