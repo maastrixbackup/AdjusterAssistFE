@@ -10,17 +10,18 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { SvgXml } from "react-native-svg";
 import { toast } from "sonner-native";
 
@@ -210,7 +211,8 @@ export default function MFASetupScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <SafeAreaView edges={["top"]} style={styles.topSafeArea} />
+      <StatusBar style="light"/>
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -398,7 +400,7 @@ export default function MFASetupScreen() {
                       styles.button,
                       pressed && { opacity: 0.94 },
                       (loadingVerify || otp.length !== 6) &&
-                        styles.buttonDisabled,
+                      styles.buttonDisabled,
                     ]}
                     onPress={handleVerify}
                     disabled={loadingVerify || otp.length !== 6}
@@ -711,5 +713,8 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontWeight: "700",
     fontSize: 13,
+  },
+  topSafeArea: {
+    backgroundColor: "#276bbd",
   },
 });

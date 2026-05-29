@@ -7,7 +7,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL;
 //   process.env.EXPO_PUBLIC_DEBUG_MODE === "true" ||
 //   process.env.EXPO_PUBLIC_DEBUG_MODE === "1";
 
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 if (!BASE_URL) {
   console.log("\x1b[31m[MFA BASE URL]: MISSING\x1b[0m");

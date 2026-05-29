@@ -178,7 +178,8 @@ export default function ForgotPasswordScreen() {
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.alreadyOtpButton}
+                style={[styles.alreadyOtpButton, loading && { opacity: 0.6 }]}
+                disabled={loading}
                 activeOpacity={0.85}
                 onPress={() => {
                   router.push({
