@@ -75,10 +75,10 @@ export default function ResetPasswordScreen() {
       return;
     }
 
-    if (otp.length !== 6) {
+    if (otp.length !== 8) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       toast.error("Invalid OTP", {
-        description: "Please enter the 6-digit recovery code.",
+        description: "Please enter the 8-digit recovery code.",
       });
       return;
     }
@@ -252,7 +252,7 @@ export default function ResetPasswordScreen() {
               <View style={styles.textGroup}>
                 <Text style={styles.title}>Enter Recovery OTP</Text>
                 <Text style={styles.subtitle}>
-                  Use the 6-digit code sent to your registered email.
+                  Use the 8-digit code sent to your registered email.
                 </Text>
               </View>
 
@@ -285,7 +285,7 @@ export default function ResetPasswordScreen() {
               </View>
 
               <View style={styles.inputWrapper}>
-                <Text style={styles.inputLabel}>6-DIGIT OTP</Text>
+                <Text style={styles.inputLabel}>8-DIGIT OTP</Text>
                 <View
                   style={[
                     styles.inputBox,
@@ -300,13 +300,13 @@ export default function ResetPasswordScreen() {
                   <TextInput
                     value={otp}
                     onChangeText={(text) =>
-                      setOtp(text.replace(/\D/g, "").slice(0, 6))
+                      setOtp(text.replace(/\D/g, "").slice(0, 8))
                     }
                     onFocus={() => setFocusedField("otp")}
                     onBlur={() => setFocusedField(null)}
                     keyboardType="number-pad"
-                    maxLength={6}
-                    placeholder="Enter 6-digit code"
+                    maxLength={8}
+                    placeholder="Enter 8-digit code"
                     placeholderTextColor="#94A3B8"
                     style={[styles.input, styles.otpInput]}
                   />

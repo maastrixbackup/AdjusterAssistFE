@@ -54,7 +54,7 @@ export default function ForgotPasswordScreen() {
       );
 
       toast.success("OTP Sent", {
-        description: "Check your email for the 6-digit recovery code.",
+        description: "Check your email for the 8-digit recovery code.",
       });
 
       router.push({
