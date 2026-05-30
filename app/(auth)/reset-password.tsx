@@ -43,7 +43,7 @@ export default function ResetPasswordScreen() {
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
+  const [modalError, setModalError] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -106,27 +106,23 @@ export default function ResetPasswordScreen() {
   };
 
   const handleSavePassword = async () => {
+    setModalError(null);
     const passwordError = validatePassword(newPassword);
 
     if (passwordError) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      toast.error("Weak Password", { description: passwordError });
+      setModalError(passwordError);
       return;
     }
 
     if (newPassword !== confirmPassword) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      toast.error("Password Mismatch", {
-        description: "New password and confirm password do not match.",
-      });
+      setModalError("New password and confirm password do not match.");
       return;
     }
 
     if (!verifiedAccessToken) {
-      toast.error("Session Expired", {
-        description: "Please verify your OTP again.",
-      });
-      setShowPasswordModal(false);
+      setModalError("Session expired. Please verify your OTP again.");
       return;
     }
 
@@ -135,24 +131,22 @@ export default function ResetPasswordScreen() {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await resetPasswordWithVerifiedOtp(verifiedAccessToken, newPassword);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowPasswordModal(false);
       toast.success("Password Updated", {
         description: "Please login with your new password.",
       });
 
-      setShowPasswordModal(false);
       setVerifiedAccessToken(null);
       setOtp("");
       setNewPassword("");
       setConfirmPassword("");
       setTimeout(() => {
         router.replace("/login");
-      }, 1200);
+      }, 1500);
     } catch (error: any) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-      toast.error("Reset Failed", {
-        description: error?.message || "Unable to update password.",
-      });
+      setModalError(error?.message || "Unable to update password.");
     } finally {
       setSaving(false);
     }
@@ -183,6 +177,17 @@ export default function ResetPasswordScreen() {
       setResending(false);
     }
   };
+
+  const closePasswordModal = () => {
+  if (saving) return;
+
+  setModalError(null);
+  setNewPassword("");
+  setConfirmPassword("");
+  setShowPassword(false);
+  setShowConfirmPassword(false);
+  setShowPasswordModal(false);
+};
 
   return (
     <View style={styles.container}>
@@ -383,13 +388,7 @@ export default function ResetPasswordScreen() {
           >
             <Pressable
               style={styles.modalBackdrop}
-              onPress={() => {
-                if (!saving) {
-                  setNewPassword("");
-                  setConfirmPassword("");
-                  setShowPasswordModal(false);
-                }
-              }}
+              onPress={closePasswordModal}
             />
 
             <View style={styles.passwordCard}>
@@ -490,7 +489,12 @@ export default function ResetPasswordScreen() {
                   Use 8+ characters with a number and special character.
                 </Text>
               </View>
-
+              {modalError && (
+                <View style={styles.modalErrorBox}>
+                  <Feather name="alert-circle" size={15} color="#B91C1C" />
+                  <Text style={styles.modalErrorText}>{modalError}</Text>
+                </View>
+              )}
               <TouchableOpacity
                 style={[styles.button, saving && { opacity: 0.75 }]}
                 onPress={handleSavePassword}
@@ -517,9 +521,7 @@ export default function ResetPasswordScreen() {
 
               <TouchableOpacity
                 style={styles.cancelModalBtn}
-                onPress={() => {
-                  if (!saving) setShowPasswordModal(false);
-                }}
+                onPress={closePasswordModal}
                 disabled={saving}
               >
                 <Text style={styles.cancelModalText}>Cancel</Text>
@@ -785,5 +787,24 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 14,
     fontWeight: "800",
+  },
+  modalErrorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+
+  modalErrorText: {
+    flex: 1,
+    color: "#B91C1C",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
   },
 });

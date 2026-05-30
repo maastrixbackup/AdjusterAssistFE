@@ -57,12 +57,14 @@ export default function ForgotPasswordScreen() {
         description: "Check your email for the 8-digit recovery code.",
       });
 
-      router.push({
-        pathname: "/reset-password",
-        params: {
-          email: normalizedEmail,
-        },
-      });
+      setTimeout(() => {
+        router.push({
+          pathname: "/reset-password",
+          params: {
+            email: normalizedEmail,
+          },
+        });
+      }, 1200);
 
     } catch (error: any) {
       toast.error("Reset Password Failed", {
@@ -128,7 +130,7 @@ export default function ForgotPasswordScreen() {
 
               <Text style={styles.title}>Forgot Password?</Text>
               <Text style={styles.subtitle}>
-                Enter your registered email and we&apos;ll send you a 6-digit recovery code.
+                Enter your registered email and we&apos;ll send you a 8-digit recovery code.
               </Text>
 
               <View style={styles.inputWrapper}>
@@ -185,7 +187,7 @@ export default function ForgotPasswordScreen() {
                   router.push({
                     pathname: "/reset-password",
                     params: {
-                      email: email.trim().toLowerCase(),
+                      email: email.trim().toLowerCase() || undefined,
                     },
                   });
                 }}
