@@ -12,11 +12,11 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { toast, Toaster } from "sonner-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 
 
 export const unstable_settings = {
@@ -85,9 +85,12 @@ function NavigationGuard() {
     <Stack
       screenOptions={{
         headerTintColor: "#FFFFFF",
-        contentStyle: { backgroundColor: "#0B3C7A" },
+        contentStyle: { backgroundColor: "#F8FAFC" },
         headerTitleStyle: { fontSize: 15, fontWeight: "600" },
-        animation: "fade",
+        animation: Platform.OS === "ios" ? "slide_from_right" : "fade_from_bottom",
+        animationDuration: 280,
+        gestureEnabled: true,
+        fullScreenGestureEnabled: true,
         headerBackground: () => (
           <LinearGradient
             colors={["#276bbd", "#0B3C7A"]}

@@ -153,10 +153,41 @@ export async function signupWithEmail(
 ): Promise<void> {
   await signupUser(name, email, role, password, acceptedPolicy);
 }
+export type VerifyResetOtpResponse = {
+  success: boolean;
+  message: string;
+  accessToken: string;
+};
+
+export type ResetPasswordResponse = {
+  success: boolean;
+  message: string;
+};
 
 export async function requestPasswordReset(email: string): Promise<void> {
   await apiRequest("/auth/forgot-password", "POST", { email });
 }
+
+export async function verifyResetOtp(
+  email: string,
+  token: string,
+): Promise<VerifyResetOtpResponse> {
+  return apiRequest<VerifyResetOtpResponse>("/auth/verify-reset-otp", "POST", {
+    email,
+    token,
+  });
+}
+
+export async function resetPasswordWithOtp(
+  accessToken: string,
+  newPassword: string,
+): Promise<ResetPasswordResponse> {
+  return apiRequest<ResetPasswordResponse>("/auth/reset-password", "POST", {
+    accessToken,
+    newPassword,
+  });
+}
+
 
 export async function logoutUser(): Promise<void> {
   await removeToken();
