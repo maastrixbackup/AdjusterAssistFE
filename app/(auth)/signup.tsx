@@ -119,13 +119,15 @@ export default function SignupScreen() {
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: Platform.OS === "ios" ? 100 : 60 }]}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
           {/* ══ ARC HEADER ══════════════════════════════════════════ */}
@@ -351,8 +353,8 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  scroll: { flexGrow: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  scroll: { flexGrow: 1, backgroundColor: "#F8FAFC" },
   bubble: { position: "absolute", borderRadius: 999, backgroundColor: "rgba(255,255,255,0.05)" },
   headerContent: { paddingHorizontal: 30, alignItems: 'center' },
   logoContainer: {

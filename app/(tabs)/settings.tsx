@@ -392,8 +392,8 @@ export default function SettingsScreen() {
 
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>VERSION 1.7.2 DEVELOPMENT</Text>
-          <Text style={styles.versionText}>Effective Date: May 28, 2026</Text>
+          <Text style={styles.versionText}>VERSION 1.8.2 DEVELOPMENT</Text>
+          <Text style={styles.versionText}>Effective Date: May 30, 2026</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence</Text>
         </View>
       </ScrollView>

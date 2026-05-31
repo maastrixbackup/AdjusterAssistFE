@@ -85,12 +85,9 @@ function NavigationGuard() {
     <Stack
       screenOptions={{
         headerTintColor: "#FFFFFF",
-        contentStyle: { backgroundColor: "#F8FAFC" },
+        contentStyle: { backgroundColor: "#0B3C7A" },
         headerTitleStyle: { fontSize: 15, fontWeight: "600" },
-        animation: Platform.OS === "ios" ? "slide_from_right" : "fade_from_bottom",
-        animationDuration: 280,
-        gestureEnabled: true,
-        fullScreenGestureEnabled: true,
+        animation: "fade",
         headerBackground: () => (
           <LinearGradient
             colors={["#276bbd", "#0B3C7A"]}
