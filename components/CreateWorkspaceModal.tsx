@@ -54,26 +54,38 @@ interface Props {
   bottomOffset?: number;
 }
 
+const formatDateForApi = (date: Date) => {
+  return date.toISOString().split("T")[0];
+};
+
+const generateClaimNumber = () => {
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const randomPart = Math.floor(10 + Math.random() * 9000);
+  return `CLM-${datePart}-${randomPart}`;
+};
+
+const getWorkspaceDefaults = () => ({
+  claim_number: generateClaimNumber(),
+  client_name: "Unnamed Insured",
+  address: "Address pending",
+  policy_form: "HO-3",
+  date_of_loss: new Date(),
+  reported_date: new Date(),
+  loss_type: "undetermined",
+  jurisdiction: "Pending",
+  line_of_business: "homeowners",
+  claim_stage: "initial_review",
+  status: "active" as const,
+});
+
 export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, bottomOffset = 0 }: Props) {
   const [isCreating, setIsCreating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState<{ show: boolean; field: "date_of_loss" | "reported_date" | null }>({
     show: false,
     field: null,
   });
-
-  const [form, setForm] = useState({
-    claim_number: "",
-    client_name: "",
-    address: "",
-    policy_form: "HO-3",
-    date_of_loss: new Date(),
-    reported_date: new Date(),
-    loss_type: "water",
-    jurisdiction: "",
-    line_of_business: "homeowners",
-    claim_stage: "mitigation_review",
-    status: "active" as const,
-  });
+  const [form, setForm] = useState(getWorkspaceDefaults);
 
   const updateField = (field: keyof typeof form, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -95,10 +107,7 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, bot
 
   const handleCreate = async () => {
     if (!token) return;
-
-    // Reset error state at start of attempt
     setValidationError(null);
-
     const required = ["claim_number", "client_name", "address", "jurisdiction", "loss_type"];
 
     // The loop defines 'key', so the logic must live inside or after it
@@ -106,12 +115,8 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, bot
       if (!(form as any)[key]) {
         const friendlyName = key.replace(/_/g, " ");
         const errorMessage = `${friendlyName.charAt(0).toUpperCase() + friendlyName.slice(1)} is required`;
-
-        // 2. Set the local error state (Fixed the 'key' undefined issue)
         setValidationError(errorMessage);
         console.warn("Validation failed:", errorMessage);
-
-        // 3. Still trigger the toast for consistency
         toast.warning(errorMessage);
         return;
       }
@@ -119,30 +124,28 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, bot
 
     setIsCreating(true);
     try {
+      const defaults = getWorkspaceDefaults();
+
       const payload = {
+        ...defaults,
         ...form,
-        date_of_loss: form.date_of_loss.toISOString().split("T")[0],
-        reported_date: form.reported_date.toISOString().split("T")[0],
+        claim_number: form.claim_number?.trim() || defaults.claim_number,
+        client_name: form.client_name?.trim() || defaults.client_name,
+        address: form.address?.trim() || defaults.address,
+        jurisdiction: form.jurisdiction?.trim() || defaults.jurisdiction,
+        loss_type: form.loss_type?.trim() || defaults.loss_type,
+        policy_form: form.policy_form?.trim() || defaults.policy_form,
+        line_of_business: form.line_of_business?.trim() || defaults.line_of_business,
+        claim_stage: form.claim_stage?.trim() || defaults.claim_stage,
+        date_of_loss: formatDateForApi(form.date_of_loss),
+        reported_date: formatDateForApi(form.reported_date),
       };
 
       const response = await createFile(token, payload);
 
       if (response.success) {
         toast.success("Workspace Initialized");
-        // Reset form for next time
-        setForm({
-          claim_number: "",
-          client_name: "",
-          address: "",
-          policy_form: "HO-3",
-          date_of_loss: new Date(),
-          reported_date: new Date(),
-          loss_type: "water",
-          jurisdiction: "",
-          line_of_business: "homeowners",
-          claim_stage: "mitigation_review",
-          status: "active",
-        });
+        setForm(getWorkspaceDefaults());
         onSuccess(response.file);
         onClose();
       }
@@ -186,22 +189,22 @@ export function CreateWorkspaceModal({ isVisible, onClose, onSuccess, token, bot
               ]}
               keyboardShouldPersistTaps="handled"
             >
-              <InputField label="Claim Number *" icon="identifier" value={form.claim_number} onChangeText={(t: string) => updateField("claim_number", t)} placeholder="e.g. CLM-9921" />
-              <InputField label="Client Name *" icon="account-outline" value={form.client_name} onChangeText={(t: string) => updateField("client_name", t)} placeholder="Insured Full Name" />
-              <InputField label="Property Address *" icon="map-marker-outline" value={form.address} onChangeText={(t: string) => updateField("address", t)} placeholder="123 Main St, City, State" />
+              <InputField label="Claim Number" icon="identifier" value={form.claim_number} onChangeText={(t: string) => updateField("claim_number", t)} placeholder="e.g. CLM-9921" />
+              <InputField label="Client Name" icon="account-outline" value={form.client_name} onChangeText={(t: string) => updateField("client_name", t)} placeholder="Insured Full Name" />
+              <InputField label="Property Address" icon="map-marker-outline" value={form.address} onChangeText={(t: string) => updateField("address", t)} placeholder="123 Main St, City, State" />
 
               <View style={styles.row}>
-                <InputField label="Jurisdiction *" icon="gavel" value={form.jurisdiction} onChangeText={(t: string) => updateField("jurisdiction", t)} placeholder="e.g. FL" half />
+                <InputField label="Jurisdiction" icon="gavel" value={form.jurisdiction} onChangeText={(t: string) => updateField("jurisdiction", t)} placeholder="e.g. FL" half />
                 <InputField label="Policy Form" icon="file-document-outline" value={form.policy_form} onChangeText={(t: string) => updateField("policy_form", t)} placeholder="HO-3" half />
               </View>
 
               <View style={styles.row}>
-                <DateField label="Date of Loss *" value={form.date_of_loss} onPress={() => setShowDatePicker({ show: true, field: "date_of_loss" })} half />
+                <DateField label="Date of Loss" value={form.date_of_loss} onPress={() => setShowDatePicker({ show: true, field: "date_of_loss" })} half />
                 <DateField label="Reported Date" value={form.reported_date} onPress={() => setShowDatePicker({ show: true, field: "reported_date" })} half />
               </View>
 
               <View style={styles.row}>
-                <InputField label="Loss Type *" icon="water-alert-outline" value={form.loss_type} onChangeText={(t: string) => updateField("loss_type", t)} placeholder="water" half />
+                <InputField label="Loss Type" icon="water-alert-outline" value={form.loss_type} onChangeText={(t: string) => updateField("loss_type", t)} placeholder="water" half />
                 <InputField label="Line of Business" icon="briefcase-outline" value={form.line_of_business} onChangeText={(t: string) => updateField("line_of_business", t)} placeholder="Homeowners" half />
               </View>
 

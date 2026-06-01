@@ -63,7 +63,7 @@ function getTimeTheme(hasUrgent: boolean): TimeTheme {
   // Morning: soft champagne / light premium
   if (h >= 5 && h < 11) {
     return {
-      gradientColors: ["#FDE68A", "#F59E0B"],
+      gradientColors: ["#FBBF24", "#F59E0B"],
       glowColor: "rgba(253,230,138,0.34)",
       borderColor: "rgba(253,230,138,0.34)",
       iconName: "partly-sunny-outline",
@@ -74,7 +74,7 @@ function getTimeTheme(hasUrgent: boolean): TimeTheme {
   // Day: refined yellow
   if (h >= 11 && h < 16) {
     return {
-      gradientColors: ["#FACC15", "#D97706"],
+      gradientColors: ["#FACC15", "#d98f06"],
       glowColor: "rgba(250,204,21,0.32)",
       borderColor: "rgba(250,204,21,0.28)",
       iconName: "sunny",
@@ -167,9 +167,8 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
       icon: "alert-circle-outline",
       color: "#F59E0B",
       bg: "rgba(245,158,11,0.15)",
-      text: `${oldest.claim_number} hasn't been updated in ${days} day${
-        days !== 1 ? "s" : ""
-      }. Consider following up.`,
+      text: `${oldest.claim_number} hasn't been updated in ${days} day${days !== 1 ? "s" : ""
+        }. Consider following up.`,
       priority: 2,
     });
   }
@@ -731,7 +730,12 @@ function BriefingModal({
         ]}
       >
         <LinearGradient
-          colors={["#080F1E", "#0C1E3E", "#080F1E"]}
+          colors={[
+            "#020617",
+            "#0F172A",
+            "#1E293B",
+            "#0F172A"
+          ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={mStyles.card}
@@ -926,8 +930,10 @@ const fabStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 7 },
     shadowOpacity: 0.32,
     shadowRadius: 12,
-    borderWidth: 1,
     overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.05)"
   },
   shineTop: {
     position: "absolute",
@@ -959,6 +965,9 @@ const fabStyles = StyleSheet.create({
     backgroundColor: "#EF4444",
     borderWidth: 2.5,
     borderColor: "#fff",
+    shadowColor: "#FF6B6B",
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   dragDots: {
     position: "absolute",
