@@ -280,10 +280,14 @@ const skeletonStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
   },
   footerLeft: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
+    flex: 1,
   },
 });
 // ─────────────────────────────────────────────────────────────────────────────
@@ -363,7 +367,7 @@ export const ChatTimelineCard = ({
 
         <View style={styles.contentContainer}>
           <View style={styles.cardHeader}>
-            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", gap: 6, alignItems: "center", flexShrink: 1, maxWidth: "100%", }}>
               <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
                 <Text style={[styles.badgeText, { color: color }]}>
                   {category.toUpperCase()}
@@ -374,7 +378,7 @@ export const ChatTimelineCard = ({
 
             <View style={styles.rightHeaderGroup}>
               {outputFormat && (
-                <Text style={[styles.formatText, { color: "#f80505" }]}>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.formatText, { color: "#f80505" }]}>
                   {outputFormat.replace("_", " ")}
                 </Text>
               )}
@@ -393,6 +397,7 @@ export const ChatTimelineCard = ({
                 </TouchableOpacity>
               )}
             </View>
+
           </View>
           {isAI && (
             <View style={[styles.badge, { backgroundColor: 'transparent', paddingHorizontal: 0 }]}>
@@ -503,6 +508,8 @@ export const ChatTimelineCard = ({
                     ]}
                   >
                     <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
                       style={[
                         styles.actionBadgeText,
                         isActuallyUsed && styles.actionBadgeTextUsed,
@@ -673,9 +680,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 8,
+    gap: 8,
+    flexWrap: "wrap",
   },
-  actionsRow: { flexDirection: "row", flex: 1, gap: 6 },
+  actionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    flex: 1,
+    gap: 6,
+    minWidth: 0,
+  },
   actionBadge: {
     backgroundColor: "#F1F5F9",
     paddingHorizontal: 8,
@@ -683,27 +698,43 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    maxWidth: 120,
   },
   actionBadgeUsed: { backgroundColor: "#DCFCE7", borderColor: "#86EFAC" },
   actionBadgeTextUsed: { color: "#166534" },
   actionBadgePressed: { backgroundColor: "#cfd9e6", borderColor: "#7aa0ce" },
-  actionBadgeText: { fontSize: 12, color: "#0052c5", fontWeight: "700" },
+  actionBadgeText: { fontSize: 11, color: "#0052c5", fontWeight: "700" },
   timeText: {
     fontSize: 10,
     color: "#94A3B8",
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
-  rightFooterGroup: { flexDirection: "row", alignItems: "center", gap: 12 },
+  rightFooterGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   shareBtn: { padding: 4, backgroundColor: "#eff6fff3", borderRadius: 8 },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
+    alignItems: "flex-start",
+    marginBottom: 8,
+    gap: 8,
+    flexWrap: "wrap",
   },
   rightHeaderGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
-  formatText: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+  formatText: {
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    maxWidth: 110,
+  },
   refineTrigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -868,25 +899,25 @@ const styles = StyleSheet.create({
   },
 
   premiumImageContainer: {
-  alignItems: "center",
-  maxWidth: 90,
-},
+    alignItems: "center",
+    maxWidth: 90,
+  },
 
-imageFallback: {
-  width: "100%",
-  height: "100%",
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "#F1F5F9",
-},
+  imageFallback: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+  },
 
-imageFileName: {
-  marginTop: 4,
-  fontSize: 11,
-  fontWeight: "600",
-  color: "#475569",
-  textAlign: "center",
-},
+  imageFileName: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#475569",
+    textAlign: "center",
+  },
 });
 
 const markdownStyles = {
