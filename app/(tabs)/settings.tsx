@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import React, { ReactElement, useCallback, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -27,7 +27,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
-import { NotificationSettings } from "@/components/NotificationSettings";
 import {
   getProfile,
   getSubscriptionStatus,
@@ -47,22 +46,20 @@ type MenuLinkProps = {
   onPress?: () => void;
   isToggle?: boolean;
   toggleValue?: boolean;
+  toggleDisabled?: boolean;
   onToggleChange?: (val: boolean) => void;
 };
 
 export default function SettingsScreen() {
   const { token, email, logout } = useAuth();
   const queryClient = useQueryClient();
-  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [busyCheckout, setBusyCheckout] = useState(false);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [notificationUpdating, setNotificationUpdating] = useState(false);
   const router = useRouter();
-  const [isNotificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [notifPrefs, setNotifPrefs] = useState({
-    claimUpdates: true,
-    weeklySummary: false,
-  });
+
 
   const [form, setForm] = useState({
     name: "",
@@ -87,6 +84,12 @@ export default function SettingsScreen() {
     enabled: !!token,
   });
 
+  useEffect(() => {
+    if (profileData?.user?.push_enabled !== undefined) {
+      setNotificationEnabled(Boolean(profileData.user.push_enabled));
+    }
+  }, [profileData?.user?.push_enabled]);
+
   const { mutate: updateProfile, isPending: isUpdating } = useMutation({
     mutationFn: async (payload: any) => {
       const formData = new FormData();
@@ -97,7 +100,6 @@ export default function SettingsScreen() {
       if (payload.company !== undefined) formData.append('company', payload.company);
 
       if (payload.push_enabled !== undefined) {
-        console.log("Appending push_enabled to formData:", payload.push_enabled);
         formData.append('push_enabled', String(payload.push_enabled));
       }
 
@@ -163,6 +165,30 @@ export default function SettingsScreen() {
   const handleContactSupport = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Linking.openURL('mailto:info@adjusterassistapp.com?subject=Support Request');
+  };
+
+
+  const handleNotificationToggle = (value: boolean) => {
+    if (notificationUpdating) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const previousValue = notificationEnabled;
+    setNotificationEnabled(value);
+    setNotificationUpdating(true);
+
+    updateProfile(
+      { push_enabled: value },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["profile"] });
+        },
+        onError: () => {
+          setNotificationEnabled(previousValue);
+        },
+        onSettled: () => {
+          setNotificationUpdating(false);
+        },
+      }
+    );
   };
 
   const handleRateApp = () => {
@@ -337,23 +363,11 @@ export default function SettingsScreen() {
             icon="notifications-outline"
             label="Notifications"
             color="#3B82F6"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setNotificationModalVisible(!isNotificationModalVisible);
-            }}
+            isToggle
+            toggleValue={notificationEnabled}
+            toggleDisabled={notificationUpdating}
+            onToggleChange={handleNotificationToggle}
           />
-          {isNotificationModalVisible && (
-            <View style={styles.inlineSettingsWrapper}>
-              <NotificationSettings
-                preferences={notifPrefs}
-                onUpdate={(key: any, val: any) => {
-                  setNotifPrefs((prev) => ({ ...prev, [key]: val }));
-                  // Logic to update server
-                  // updateProfile({ [key]: val });
-                }}
-              />
-            </View>
-          )}
 
           <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -376,7 +390,7 @@ export default function SettingsScreen() {
           <MenuLink
             icon="call-outline"
             label="Contact Support"
-            color="#2035f3" 
+            color="#2035f3"
             isLast
             onPress={handleContactSupport}
           />
@@ -563,11 +577,15 @@ function MenuLink({
   color,
   isLast,
   onPress,
+  isToggle,
+  toggleValue,
+  toggleDisabled,
+  onToggleChange,
 }: MenuLinkProps): ReactElement {
   return (
     <View>
       <Pressable
-        onPress={onPress}
+        onPress={isToggle ? undefined : onPress}
         style={({ pressed }) => [
           styles.menuItem,
           pressed && { backgroundColor: '#F1F5F9' }
@@ -582,7 +600,18 @@ function MenuLink({
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+        {isToggle ? (
+          <Switch
+            value={toggleValue}
+            disabled={toggleDisabled}
+            onValueChange={onToggleChange}
+            ios_backgroundColor="#E2E8F0"
+            trackColor={{ false: "#E2E8F0", true: "#BFDBFE" }}
+            thumbColor={toggleValue ? "#2563EB" : "#FFFFFF"}
+          />
+        ) : (
+          <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+        )}
       </Pressable>
 
       {/* Premium Divider Logic: Doesn't show on the last item of a group */}
