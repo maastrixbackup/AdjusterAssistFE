@@ -167,8 +167,8 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
       icon: "alert-circle-outline",
       color: "#F59E0B",
       bg: "rgba(245,158,11,0.15)",
-      text: `${oldest.claim_number} hasn't been updated in ${days} day${days !== 1 ? "s" : ""
-        }. Consider following up.`,
+      text: `${oldest.claim_number} has not been updated in ${days} day${days !== 1 ? "s" : ""
+        }. Review when appropriate.`,
       priority: 2,
     });
   }
@@ -199,7 +199,7 @@ function buildBriefingLines(files: ClaimFile[], credits: number): BriefingLine[]
       icon: "flash-outline",
       color: "#F59E0B",
       bg: "rgba(245,158,11,0.15)",
-      text: `${credits} credits remaining. Consider upgrading.`,
+      text: `${credits} credits remaining.`,
       priority: 1,
     });
   }
