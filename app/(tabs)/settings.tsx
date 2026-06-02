@@ -28,6 +28,7 @@ import { toast } from "sonner-native";
 
 import { CustomConfirmModal } from "@/components/CustomConfirmModal";
 import {
+  deleteAccount,
   getProfile,
   getSubscriptionStatus,
   updateUserProfile,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { useRouter } from "expo-router";
+import DeleteAccountModal from "@/components/DeleteAccountModal";
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +61,8 @@ export default function SettingsScreen() {
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [notificationUpdating, setNotificationUpdating] = useState(false);
   const router = useRouter();
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
 
   const [form, setForm] = useState({
@@ -221,6 +225,25 @@ export default function SettingsScreen() {
     setLogoutModalVisible(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await logout();
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setDeleteLoading(true);
+      await deleteAccount({ confirmation: "DELETE"});
+      toast.success("Account deleted");
+      await logout();
+      router.replace("/login");
+    } catch (error: any) {
+      toast.error("Delete failed", {
+        description:
+          error?.message ||
+          "Unable to delete account.",
+      });
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModalVisible(false);
+    }
   };
 
   const usagePercentage = subscriptionData?.subscription?.usage_limit
@@ -396,11 +419,13 @@ export default function SettingsScreen() {
           />
 
           <MenuLink
-            icon="log-out-outline"
-            label="Sign Out"
-            color="#EF4444"
+            icon="trash-outline"
+            label="Delete Account"
+            color="#DC2626"
             isLast
-            onPress={() => setLogoutModalVisible(true)}
+            onPress={() => {
+              setDeleteModalVisible(true);
+            }}
           />
         </View>
 
@@ -558,6 +583,13 @@ export default function SettingsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <DeleteAccountModal
+        visible={deleteModalVisible}
+        loading={deleteLoading}
+        onClose={() => setDeleteModalVisible(false)}
+        onConfirm={handleDeleteAccount}
+      />
 
       <CustomConfirmModal
         isVisible={isLogoutModalVisible}

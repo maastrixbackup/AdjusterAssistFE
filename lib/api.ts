@@ -909,3 +909,17 @@ export async function getDashboardBootstrap(token: string) {
     token,
   );
 }
+
+export async function deleteAccount(params: {
+  confirmation: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  return apiRequest("/user/delete-account", {
+    method: "DELETE",
+    body: JSON.stringify({
+      confirmation: params.confirmation,
+    }),
+  });
+}
