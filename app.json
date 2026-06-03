@@ -45,7 +45,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#156bdb",
+          "color": "#004AC0",
           "androidMode": "default"
         }
       ],
