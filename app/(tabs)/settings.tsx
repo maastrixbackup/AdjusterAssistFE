@@ -37,6 +37,7 @@ import {
 import { useAuth } from "@/providers/auth-provider";
 import { useRouter } from "expo-router";
 import DeleteAccountModal from "@/components/DeleteAccountModal";
+import Constants from "expo-constants";
 
 const { width } = Dimensions.get('window');
 
@@ -230,7 +231,7 @@ export default function SettingsScreen() {
   const handleDeleteAccount = async () => {
     try {
       setDeleteLoading(true);
-      await deleteAccount({ confirmation: "DELETE"});
+      await deleteAccount({ confirmation: "DELETE" });
       toast.success("Account deleted");
       await logout();
       router.replace("/login");
@@ -392,10 +393,26 @@ export default function SettingsScreen() {
             onToggleChange={handleNotificationToggle}
           />
 
-          <MenuLink icon="shield-outline" label="Security & Privacy" color="#64748B" onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/privacy");
-          }} />
+          <MenuLink
+            icon="shield-checkmark-outline"
+            label="Privacy Policy"
+            color="#2563EB"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/privacy");
+            }}
+          />
+
+          <MenuLink
+            icon="document-text-outline"
+            label="Terms of Service"
+            color="#7C3AED"
+            isLast
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/terms");
+            }}
+          />
 
           <MenuLink icon="bar-chart-outline" label="Usage history" color="#64748B" onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -431,7 +448,7 @@ export default function SettingsScreen() {
 
 
         <View style={styles.footerSection}>
-          <Text style={styles.versionText}>VERSION 1.8.2 DEVELOPMENT</Text>
+          <Text style={styles.versionText}> BUILD {Constants.expoConfig?.version} | DEVELOPMENT</Text>
           <Text style={styles.versionText}>Effective Date: May 30, 2026</Text>
           <Text style={styles.powerText}>AdjusterAssist Intelligence</Text>
         </View>

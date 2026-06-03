@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -230,7 +231,7 @@ export default function PrivacyScreen() {
 
                 <View style={styles.footer}>
                     <Text style={styles.footerBrand}>AdjusterAssist Intelligence</Text>
-                    <Text style={styles.footerVersion}>VERSION 1.7.0</Text>
+                    <Text style={styles.footerVersion}> BUILD {Constants.expoConfig?.version} | DEVELOPMENT</Text>
                 </View>
             </ScrollView>
         </View>
@@ -319,5 +320,5 @@ const styles = StyleSheet.create({
     contactLink: { fontSize: 14, color: '#2563EB', fontWeight: '600' },
     footer: { marginTop: 20, alignItems: 'center', gap: 5 },
     footerBrand: { fontSize: 13, fontWeight: '700', color: '#94A3B8' },
-    footerVersion: { fontSize: 10, color: '#CBD5E1', letterSpacing: 2 }
+    footerVersion: { fontSize: 10, color: '#6a6b6d', letterSpacing: 2 }
 });

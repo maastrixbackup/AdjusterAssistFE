@@ -2,7 +2,7 @@
   "expo": {
     "name": "AdjusterAssist",
     "slug": "AdjusterAssist",
-    "version": "1.8.2",
+    "version": "1.8.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "adjusterassist",
@@ -45,7 +45,8 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#004AC0"
+          "color": "#004AC0",
+          "androidMode": "default"
         }
       ],
       [
