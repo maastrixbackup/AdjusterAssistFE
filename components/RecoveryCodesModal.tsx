@@ -1,13 +1,13 @@
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import { Feather } from "@expo/vector-icons";
@@ -48,9 +48,9 @@ export default function RecoveryCodesModal({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <View style={styles.iconWrap}>
+          {/* <View style={styles.iconWrap}>
             <Feather name="shield" size={28} color="#1e40af" />
-          </View>
+          </View> */}
 
           <Text style={styles.title}>Save Your Recovery Codes</Text>
 
@@ -67,6 +67,8 @@ export default function RecoveryCodesModal({
             />
 
             <Text style={styles.warningText}>
+              Save these codes now. You will not be able to view them again.
+              {"\n"}
               Each recovery code works only once.
             </Text>
           </View>
@@ -184,11 +186,12 @@ const styles = StyleSheet.create({
   },
 
   warningText: {
-    flex: 1,
-    color: "#92400E",
-    fontWeight: "600",
-    fontSize: 13,
-  },
+  flex: 1,
+  color: "#92400E",
+  fontWeight: "700",
+  fontSize: 13,
+  lineHeight: 18,
+},
 
   codesContainer: {
     marginTop: 18,

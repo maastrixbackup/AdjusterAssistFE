@@ -249,7 +249,7 @@ export default function LoginScreen() {
 
               <View style={styles.welcomeTextSection}>
                 <Text style={styles.arcTitle}>Welcome Back</Text>
-                <Text style={styles.arcSub}>Enter your details to access your claims</Text>
+                <Text style={styles.arcSub}>Enter your details to access your claim workspace</Text>
               </View>
             </SafeAreaView>
           </View>
@@ -260,7 +260,7 @@ export default function LoginScreen() {
 
               {/* EMAIL FIELD */}
               <View style={styles.inputWrapper}>
-                <Text style={styles.fieldLabel}>WORK EMAIL</Text>
+                <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
                 <View style={[styles.inputBox, focused === "email" && styles.inputActive]}>
                   <Feather name="mail" size={18} color={focused === "email" ? "#1e40af" : "#94A3B8"} />
                   <TextInput

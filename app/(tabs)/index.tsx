@@ -182,35 +182,6 @@ export default function HomeScreen() {
   }, [remainingCredits]);
 
 
-// if (isLoading && !dashboard) {
-//   return (
-//     <View style={styles.mainContainer}>
-//       <StatusBar style="light" />
-
-//       <LinearGradient
-//         colors={["#001529", "#003366"]}
-//         style={styles.loadingScreen}
-//       >
-//         <Image
-//           source={logo}
-//           style={styles.loadingLogo}
-//         />
-
-//         <Text style={styles.loadingTitle}>AdjusterAssist</Text>
-
-//         <Text style={styles.loadingSubtitle}>
-//           Preparing your claims workspace
-//         </Text>
-
-//         <ActivityIndicator
-//           size="large"
-//           color="#FDE68A"
-//           style={{ marginTop: 24 }}
-//         />
-//       </LinearGradient>
-//     </View>
-//   );
-// }
   return (
     <View style={styles.mainContainer}>
       <StatusBar style="light" />

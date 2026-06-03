@@ -95,7 +95,6 @@ export default function SignupScreen() {
             return "Verification email sent. Please check your inbox.";
           },
           error: (err: any) => {
-            // console.error("Signup error:", err);
             return (
               err?.message ||
               "An error occurred during signup."
@@ -118,17 +117,19 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
+      {/* FIX 1: Explicitly using 'padding' behavior with an offset to keep rendering clean */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
         style={{ flex: 1 }}
       >
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: Platform.OS === "ios" ? 100 : 60 }]}
-          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-          contentInsetAdjustmentBehavior="never"
+          // FIX 2: Removed automaticallyAdjustKeyboardInsets to stop layout calculation fighting
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
+          bounces={false} // FIX 3: Disables overscroll micro-stuttering during keyboard layout changes
         >
           {/* ══ ARC HEADER ══════════════════════════════════════════ */}
           <View
@@ -325,7 +326,7 @@ export default function SignupScreen() {
                   </Text>
 
                   <Text style={[styles.verifyText, { fontSize: 13, color: '#94A3B8', marginTop: 8 }]}>
-                    Please check your inbox and click the verification link to activate your profile.
+                    Please check your inbox and confirm your email to activate your account.
                   </Text>
 
                   <Pressable
@@ -368,7 +369,6 @@ const styles = StyleSheet.create({
   arcTitle: { fontSize: 26, fontWeight: "800", color: "#fff", letterSpacing: -0.5, marginBottom: 4 },
   arcSub: { fontSize: 13, color: "rgba(255,255,255,0.6)", textAlign: 'center' },
 
-  // Form Body
   body: { flex: 1, paddingHorizontal: 20, paddingBottom: 40, marginTop: -30, },
   card: {
     backgroundColor: '#fff',
@@ -381,10 +381,8 @@ const styles = StyleSheet.create({
   },
   fieldLabel: { fontSize: 10, fontWeight: "800", color: "#94A3B8", letterSpacing: 1, marginBottom: 8, marginLeft: 4, textTransform: 'uppercase' },
   roleActive: { backgroundColor: "#2d4cb1", borderColor: "#1e40af" },
-  // roleText: { fontSize: 12, fontWeight: "600", color: "#64748B" },
   roleTextActive: { color: "#fff" },
 
-  // Inputs
   inputWrapper: { marginBottom: 16 },
   inputBox: {
     flexDirection: "row",
@@ -402,7 +400,6 @@ const styles = StyleSheet.create({
 
   errorText: { color: "#ef4444", fontSize: 12, textAlign: 'center', fontWeight: '600', marginBottom: 15 },
 
-  // Button
   button: { borderRadius: 20, overflow: "hidden", marginTop: 10, marginBottom: 20 },
   btnInner: { height: 60, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
@@ -416,11 +413,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 40,
     overflow: "hidden",
     justifyContent: 'center',
-    // height: height * 0.25,
     minHeight: 180,
   },
 
-  // NEW: Privacy Styles
   privacyWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -444,11 +439,10 @@ const styles = StyleSheet.create({
   },
   privacyTextContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap', // Important for small screens
+    flexWrap: 'wrap',
     flex: 1,
   },
 
-  // FIX: Improved RoleRow for narrow screens
   roleRow: {
     flexDirection: "row",
     gap: 8,
@@ -457,7 +451,7 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flex: 1,
-    paddingVertical: 12, // Use padding instead of fixed height
+    paddingVertical: 12,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -468,7 +462,6 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
   roleText: {
-    // fontSize: width < 380 ? 10 : 12, // Smaller font for narrow devices
     fontWeight: "600",
     color: "#64748B"
   },
