@@ -36,7 +36,7 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/images/header-icon.png"
       }
     },
     "plugins": [
@@ -44,7 +44,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-1.png",
+          "icon": "./assets/images/notification-icon.png.png",
           "color": "#004AC0"
         }
       ],
