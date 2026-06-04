@@ -15,10 +15,24 @@ import { useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { toast, Toaster } from "sonner-native";
-import { ActivityIndicator, Platform, View } from "react-native";
+import {  Toaster } from "sonner-native";
+import { ActivityIndicator, View } from "react-native";
+import * as Sentry from '@sentry/react-native';
 
-
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: true,
+  environment: process.env.EXPO_PUBLIC_APP_ENV ?? (__DEV__ ? "development" : "production"),
+  sendDefaultPii: false,
+  enableLogs: !__DEV__,
+  tracesSampleRate: __DEV__ ? 1.0 : 0.2,
+  replaysSessionSampleRate: 0.02,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [
+    Sentry.mobileReplayIntegration(),
+    Sentry.feedbackIntegration(),
+  ],
+});
 export const unstable_settings = {
   initialRouteName: "onboarding",
 };
@@ -115,7 +129,7 @@ function NavigationGuard() {
   );
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   const colorScheme = useColorScheme();
   const [queryClient] = useState(() => new QueryClient());
 
@@ -141,7 +155,7 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
-}
+});
 
 // Defined inside layout, but BELOW the provider
 function AppContent() {
@@ -149,26 +163,7 @@ function AppContent() {
   const { isAuthenticated, token } = useAuth();
   const pushRegistrationStarted = useRef(false);
 
-  const showToast = (
-    msg: string,
-    type: "success" | "error" | "warning" = "success"
-  ) => {
-    switch (type) {
-      case "error":
-        toast.error(msg);
-        break;
-
-      case "warning":
-        toast.warning(msg);
-        break;
-
-      default:
-        toast.success(msg);
-    }
-  };
-
   // Push token registration
-
   useEffect(() => {
     if (!isAuthenticated || !token) return;
     if (pushRegistrationStarted.current) return;

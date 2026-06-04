@@ -14,6 +14,7 @@ import {
 import { clearSessionTokens, saveSessionTokens } from "@/lib/utils/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import * as Sentry from "@sentry/react-native";
 import {
   createContext,
   ReactNode,
@@ -174,6 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmail(session.email);
     setAal(finalAal);
     setMfaTempSession(null);
+    Sentry.setUser({
+      email: session.email,
+    });
 
     await saveSessionTokens({
       access_token: session.access_token,
@@ -196,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmail(null);
     setAal(null);
     setMfaTempSession(null);
-
+    Sentry.setUser(null);
     await saveSession(null);
     await clearSessionTokens();
   }
