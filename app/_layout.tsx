@@ -215,14 +215,6 @@ function AppContent() {
 
   }, []);
 
-  useEffect(() => {
-    setTimeout(() => {
-      Sentry.captureException(
-        new Error("AdjusterAssist Sentry Test Error: test 2")
-      );
-    }, 3000);
-  }, []);
-
   return (
     <>
       <NavigationGuard />
