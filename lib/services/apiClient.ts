@@ -1,5 +1,6 @@
 import { BASE_URL } from "@/lib/config/apiConfig";
 import { logoutUser, refreshSessionApi } from "@/lib/services/authService";
+import * as Sentry from "@sentry/react-native";
 import {
   clearSessionTokens,
   getRefreshToken,
@@ -86,6 +87,12 @@ async function refreshAccessToken(): Promise<string | null> {
       `${colors.red}${colors.bold}[TOKEN REFRESH FAILED]${colors.reset}`,
       error,
     );
+    Sentry.captureException(error, {
+      tags: {
+        area: "auth",
+        action: "refresh_access_token",
+      },
+    });
     return null;
   }
 }
@@ -156,6 +163,14 @@ export async function apiRequest<T = unknown>(
 
     if (!newAccessToken) {
       debugLog("red", "REFRESH RETURNED NULL - FORCING OUT VIA CONFIG");
+      Sentry.captureMessage("Refresh token failed. Forced logout triggered.", {
+        level: "warning",
+        tags: {
+          area: "auth",
+          action: "forced_logout_after_refresh_failure",
+          endpoint,
+        },
+      });
       await performLogout();
       throw new Error("Session expired. Please login again.");
     }
@@ -165,12 +180,34 @@ export async function apiRequest<T = unknown>(
 
   if (response.status === 401 && isRefreshEndpoint) {
     debugLog("red", "REFRESH ENDPOINT RETURNED 401 - TERMINATING SESSION");
+    Sentry.captureMessage("Refresh endpoint returned 401.", {
+      level: "warning",
+      tags: {
+        area: "auth",
+        action: "refresh_endpoint_401",
+      },
+    });
     await performLogout();
     throw new Error("Session expired. Please login again.");
   }
 
   if (!response.ok) {
-    throw new Error(data?.message ?? "Request failed");
+    const message = data?.message ?? "Request failed";
+    const shouldReportToSentry =
+      response.status >= 500 || response.status === 0;
+    if (shouldReportToSentry) {
+      Sentry.captureMessage(message, {
+        level: "error",
+        tags: {
+          area: "api",
+          endpoint,
+          method,
+          status: String(response.status),
+        },
+      });
+    }
+
+    throw new Error(message);
   }
 
   return data as T;
