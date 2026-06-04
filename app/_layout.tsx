@@ -15,13 +15,13 @@ import { useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { toast, Toaster } from "sonner-native";
+import {  Toaster } from "sonner-native";
 import { ActivityIndicator, View } from "react-native";
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  enabled: !__DEV__,
+  enabled: true,
   environment: process.env.EXPO_PUBLIC_APP_ENV ?? (__DEV__ ? "development" : "production"),
   sendDefaultPii: false,
   enableLogs: !__DEV__,
@@ -163,26 +163,7 @@ function AppContent() {
   const { isAuthenticated, token } = useAuth();
   const pushRegistrationStarted = useRef(false);
 
-  const showToast = (
-    msg: string,
-    type: "success" | "error" | "warning" = "success"
-  ) => {
-    switch (type) {
-      case "error":
-        toast.error(msg);
-        break;
-
-      case "warning":
-        toast.warning(msg);
-        break;
-
-      default:
-        toast.success(msg);
-    }
-  };
-
   // Push token registration
-
   useEffect(() => {
     if (!isAuthenticated || !token) return;
     if (pushRegistrationStarted.current) return;
@@ -237,7 +218,7 @@ function AppContent() {
   useEffect(() => {
     setTimeout(() => {
       Sentry.captureException(
-        new Error("AdjusterAssist Sentry Test Error")
+        new Error("AdjusterAssist Sentry Test Error: test 2")
       );
     }, 3000);
   }, []);
