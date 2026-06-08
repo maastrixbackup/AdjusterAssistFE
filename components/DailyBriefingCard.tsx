@@ -48,15 +48,15 @@ type TimeTheme = {
 };
 
 function getTimeTheme(hasUrgent: boolean): TimeTheme {
-  if (hasUrgent) {
-    return {
-      gradientColors: ["#F59E0B", "#EF4444"],
-      glowColor: "rgba(245,158,11,0.45)",
-      borderColor: "rgba(255,255,255,0.18)",
-      iconName: "alert-circle",
-      label: "urgent",
-    };
-  }
+  // if (hasUrgent) {
+  //   return {
+  //     gradientColors: ["#F59E0B", "#EF4444"],
+  //     glowColor: "rgba(245,158,11,0.45)",
+  //     borderColor: "rgba(255,255,255,0.18)",
+  //     iconName: "alert-circle",
+  //     label: "urgent",
+  //   };
+  // }
 
   const h = new Date().getHours();
 
