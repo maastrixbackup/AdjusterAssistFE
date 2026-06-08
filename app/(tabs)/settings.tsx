@@ -232,14 +232,17 @@ export default function SettingsScreen() {
     try {
       setDeleteLoading(true);
       await deleteAccount({ confirmation: "DELETE" });
-      toast.success("Account deleted");
+      toast.success("Deletion Request Completed", {
+        description: "Your account deletion request has been processed successfully."
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       await logout();
       router.replace("/login");
     } catch (error: any) {
-      toast.error("Delete failed", {
+      toast.error("Deletion Request failed", {
         description:
           error?.message ||
-          "Unable to delete account.",
+          "Unable to complete your deletion request at this time.",
       });
     } finally {
       setDeleteLoading(false);

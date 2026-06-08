@@ -14,7 +14,7 @@ let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 let isLoggingOut = false;
 
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 const colors = {
   reset: "\x1b[0m",
   blue: "\x1b[34m",

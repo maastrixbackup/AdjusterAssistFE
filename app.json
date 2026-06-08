@@ -2,7 +2,7 @@
   "expo": {
     "name": "AdjusterAssist",
     "slug": "AdjusterAssist",
-    "version": "1.8.3",
+    "version": "1.8.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "adjusterassist",
@@ -44,7 +44,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
+          "icon": "./assets/images/not-8-6-26.png",
           "color": "#004AC0",
           "androidMode": "default"
         }
@@ -92,7 +92,9 @@
           "project": "react-native",
           "organization": "maastrix-solutions"
         }
-      ]
+      ],
+      "expo-font",
+      "@sentry/react-native"
     ],
     "extra": {
       "eas": {
