@@ -33,6 +33,7 @@ Sentry.init({
     Sentry.feedbackIntegration(),
   ],
 });
+
 export const unstable_settings = {
   initialRouteName: "onboarding",
 };

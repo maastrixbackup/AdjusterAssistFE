@@ -72,18 +72,16 @@ export default function DeleteAccountModal({
             <Text style={styles.warningSymbol}>!</Text>
           </View>
 
-          <Text style={styles.title}>Delete Account?</Text>
+          <Text style={styles.title}>Request Account Deletion?</Text>
 
           <Text style={styles.description}>
-            This will permanently remove your profile, workspaces, drafts,
-            credits, subscription details, MFA settings, and account data.
-            This action cannot be undone.
+            Deletion may remove your profile, workspaces, conversations, uploaded files, usage history, MFA settings, and other app-related content.
+            Certain records may be retained where required or permitted for legal, security, billing, fraud prevention, compliance, dispute resolution, or operational purposes.
           </Text>
 
           <View style={styles.noticeBox}>
             <Text style={styles.noticeText}>
-              Type <Text style={styles.noticeStrong}>DELETE</Text> below to
-              confirm.
+              Type <Text style={styles.noticeStrong}>DELETE</Text> below submit your account deletion request.
             </Text>
           </View>
 
@@ -126,7 +124,7 @@ export default function DeleteAccountModal({
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.deleteText}>Delete Account</Text>
+                <Text style={styles.deleteText}>Request Deletion</Text>
               )}
             </Pressable>
           </View>

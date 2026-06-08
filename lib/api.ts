@@ -167,7 +167,7 @@ const responseTypeLabels: Record<string, string> = {
  * Core API Helper
  */
 // Color constants for terminal
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 const API_BASE_URL = BASE_URL;
 
 const colors = {
