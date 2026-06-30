@@ -8,7 +8,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -31,7 +31,7 @@ type VerifiedSessionWithCodes = AuthSession & {
 
 export default function MFASetupScreen() {
   const { width, height } = useWindowDimensions();
-
+  const scrollRef = useRef<ScrollView>(null);
   const isTablet = width >= 768;
   const isSmallDevice = height < 720;
   const qrSize = isTablet ? 230 : isSmallDevice ? 200 : 220;
@@ -212,26 +212,29 @@ export default function MFASetupScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={["top"]} style={styles.topSafeArea} />
-      <StatusBar style="light"/>
+      <StatusBar style="light" />
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.scroll,
+            isSmallDevice && styles.smallScroll,
+          ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets
-          contentInsetAdjustmentBehavior="always"
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           <View
             style={[
               styles.arcHeader,
               {
-                height: isSmallDevice ? 110 : Math.max(125, height * 0.12),
+                height: isSmallDevice ? 90 : Math.min(Math.max(height * 0.12, 115), 145)
               },
             ]}
           >
@@ -378,7 +381,12 @@ export default function MFASetupScreen() {
                         onChangeText={(text) =>
                           setOtp(text.replace(/\D/g, "").slice(0, 6))
                         }
-                        onFocus={() => setFocused(true)}
+                        onFocus={() => {
+                          setFocused(true);
+                          setTimeout(() => {
+                            scrollRef.current?.scrollToEnd({ animated: true });
+                          }, 250);
+                        }}
                         onBlur={() => setFocused(false)}
                         keyboardType={
                           Platform.OS === "ios" ? "number-pad" : "numeric"
@@ -465,7 +473,6 @@ export default function MFASetupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   keyboardView: { flex: 1 },
-  scroll: { flexGrow: 1, paddingBottom: 140 },
 
   arcHeader: {
     borderBottomLeftRadius: 24,
@@ -717,4 +724,12 @@ const styles = StyleSheet.create({
   topSafeArea: {
     backgroundColor: "#276bbd",
   },
+  scroll: {
+  flexGrow: 1,
+  paddingBottom: Platform.OS === "ios" ? 120 : 80,
+},
+
+smallScroll: {
+  paddingBottom: 160,
+},
 });

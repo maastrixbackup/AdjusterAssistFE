@@ -34,11 +34,12 @@ export default function ForgotPasswordScreen() {
 
   async function handleReset() {
     const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!normalizedEmail) {
+    if (!emailRegex.test(normalizedEmail)) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      toast.error("Email Required", {
-        description: "Please enter your registered email address.",
+      toast.error("Invalid Email", {
+        description: "Please enter a valid email address.",
       });
       return;
     }
@@ -91,7 +92,7 @@ export default function ForgotPasswordScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ══ ARC HEADER ══════════════════════════════════════════ */}
-          <View style={[styles.arcHeader, { height: height * 0.35 }]}>
+          <View style={[styles.arcHeader, { height: Math.min(Math.max(height * 0.28, 220), 300) }]}>
             <LinearGradient
               colors={["#276bbd", "#1e40af", "#172554"]}
               style={StyleSheet.absoluteFill}
@@ -130,7 +131,7 @@ export default function ForgotPasswordScreen() {
 
               <Text style={styles.title}>Forgot Password?</Text>
               <Text style={styles.subtitle}>
-                Enter your registered email and we&apos;ll send you a 8-digit recovery code.
+                Enter your registered email and we&apos;ll send you an 8-digit recovery code.
               </Text>
 
               <View style={styles.inputWrapper}>
@@ -144,19 +145,20 @@ export default function ForgotPasswordScreen() {
                   <TextInput
                     value={email}
                     onChangeText={setEmail}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
                     autoCapitalize="none"
+                    autoCorrect={false}
                     keyboardType="email-address"
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="send"
+                    onSubmitEditing={handleReset}
                     placeholder="john@example.com"
-                    placeholderTextColor="#94A3B8"
-                    style={styles.input}
                   />
                 </View>
               </View>
 
               <TouchableOpacity
-                style={styles.button}
+                style={[styles.button, loading && styles.buttonDisabled]}
                 onPress={handleReset}
                 disabled={loading}
                 activeOpacity={0.8}
@@ -255,7 +257,12 @@ const styles = StyleSheet.create({
   },
 
   // Body Section
-  body: { flex: 1, paddingHorizontal: 20, paddingBottom: 40 },
+  body: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    marginTop: -24,
+  },
   card: {
     width: "100%",
     backgroundColor: "#FFF",
@@ -266,6 +273,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 8,
+    maxWidth:460
   },
   iconCircle: {
     width: 70,
@@ -275,7 +283,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center",
-    marginTop: -60, // Sits on top of the card
+    marginTop: -52, // Sits on top of the card
     borderWidth: 6,
     borderColor: "#FFF",
   },
@@ -393,4 +401,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
+  buttonDisabled: {
+    opacity: 0.7,
+  }
 });
